@@ -49,7 +49,7 @@ following:
    ```
 
 3. Based on the user's selection, call the appropriate command:
-   - Approve: `plumb approve <id>`
+   - Approve: `plumb approve <id>` (or `plumb approve --all` if the user says to approve all)
    - Reject: `plumb reject <id> --reason "<user's reason>"` then immediately
      call `plumb modify <id>`
    - Approve with edits: `plumb edit <id> "<new decision text from user>"`
@@ -111,6 +111,7 @@ Present these gaps clearly so the user can prioritize.
 | `plumb diff` | Before committing, to preview decisions |
 | `plumb hook` | Called automatically by pre-commit hook — do not call manually |
 | `plumb approve <id>` | User approves a decision during review |
+| `plumb approve --all` | User approves all pending decisions at once |
 | `plumb reject <id> --reason "<text>"` | User rejects a decision |
 | `plumb modify <id>` | After rejection — auto-modify staged code |
 | `plumb edit <id> "<text>"` | User amends decision text before approving |

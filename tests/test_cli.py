@@ -108,6 +108,41 @@ class TestApprove:
             result = runner.invoke(cli, ["approve", "dec-nope"])
             assert result.exit_code != 0
 
+    def test_approve_all(self, runner, initialized_repo):
+        d1 = Decision(id="dec-all1", status="pending", decision="A")
+        d2 = Decision(id="dec-all2", status="pending", decision="B")
+        d3 = Decision(id="dec-done", status="approved", decision="C")
+        append_decision(initialized_repo, d1)
+        append_decision(initialized_repo, d2)
+        append_decision(initialized_repo, d3)
+
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
+            result = runner.invoke(cli, ["approve", "--all"])
+            assert result.exit_code == 0
+            assert "Approved 2 decision(s)" in result.output
+
+        decisions = read_decisions(initialized_repo)
+        approved = [d for d in decisions if d.status == "approved"]
+        assert len(approved) == 3  # 2 newly approved + 1 already approved
+
+    def test_approve_all_no_pending(self, runner, initialized_repo):
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
+            result = runner.invoke(cli, ["approve", "--all"])
+            assert result.exit_code == 0
+            assert "No pending decisions" in result.output
+
+    def test_approve_all_with_id_errors(self, runner, initialized_repo):
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
+            result = runner.invoke(cli, ["approve", "dec-123", "--all"])
+            assert result.exit_code != 0
+            assert "Cannot use --all with a specific decision ID" in result.output
+
+    def test_approve_no_id_no_all_errors(self, runner, initialized_repo):
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
+            result = runner.invoke(cli, ["approve"])
+            assert result.exit_code != 0
+            assert "Provide a decision ID or use --all" in result.output
+
 
 class TestReject:
     def test_reject_existing(self, runner, initialized_repo):

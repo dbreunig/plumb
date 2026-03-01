@@ -349,13 +349,36 @@ def _run_modify(repo_root: Path, decision_id: str) -> None:
 
 
 @cli.command()
-@click.argument("decision_id")
-def approve(decision_id):
-    """Approve a decision by ID."""
+@click.argument("decision_id", required=False, default=None)
+@click.option("--all", "-a", "approve_all", is_flag=True, help="Approve all pending decisions")
+def approve(decision_id, approve_all):
+    """Approve a decision by ID, or all pending decisions with --all."""
     repo_root = find_repo_root()
     if repo_root is None:
         console.print("[red]Error: Not a git repository.[/red]")
         raise SystemExit(1)
+
+    if approve_all and decision_id:
+        console.print("[red]Error: Cannot use --all with a specific decision ID.[/red]")
+        raise SystemExit(1)
+
+    if not approve_all and not decision_id:
+        console.print("[red]Error: Provide a decision ID or use --all.[/red]")
+        raise SystemExit(1)
+
+    if approve_all:
+        pending = filter_decisions(repo_root, status="pending")
+        if not pending:
+            console.print("[yellow]No pending decisions to approve.[/yellow]")
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        for d in pending:
+            update_decision_status(
+                repo_root, d.id, status="approved", reviewed_at=now,
+            )
+        console.print(f"[green]Approved {len(pending)} decision(s).[/green]")
+        console.print("Run [bold]plumb sync[/bold] to update spec and tests.")
+        return
 
     now = datetime.now(timezone.utc).isoformat()
     result = update_decision_status(
