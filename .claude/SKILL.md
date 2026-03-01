@@ -35,7 +35,10 @@ following:
    }
    ```
 
-2. Present each decision to the user using `AskUserQuestion` with these options:
+2. **You MUST use `AskUserQuestion` to present decisions.** Do NOT print decision
+   details as plain text and ask the user to respond. You MUST use the
+   `AskUserQuestion` tool so the user sees the native multiple-choice UI.
+   Present each decision with these options:
    - **Approve** (Recommended) — accept it and update the spec
    - **Reject** — undo this change in the staged code
    - **Approve with edits** — modify what the decision says before approving
@@ -48,11 +51,17 @@ following:
    Made by: [made_by] (confidence: [confidence])
    ```
 
+   This is non-negotiable. Presenting decisions as plain text defeats the
+   purpose of structured review. Always use `AskUserQuestion`.
+
 3. Based on the user's selection, call the appropriate command:
-   - Approve: `plumb approve <id>` (or `plumb approve --all` if the user says to approve all)
+   - Approve: `plumb approve <id>`
    - Reject: `plumb reject <id> --reason "<user's reason>"` then immediately
      call `plumb modify <id>`
    - Approve with edits: `plumb edit <id> "<new decision text from user>"`
+
+   If the user approved ALL decisions with no edits, use `plumb approve --all`
+   instead of approving each one individually.
 
 4. For rejections, after calling `plumb modify <id>`, parse its JSON output:
    ```json
@@ -91,9 +100,13 @@ Present these gaps clearly so the user can prioritize.
 ## Rules
 
 - **NEVER approve, reject, or edit decisions without explicit user instruction.**
-  Every decision must be presented to the user conversationally, and the user must
-  tell you how to handle each one. Do not batch-approve, auto-approve, or assume
-  the user's intent. This is the core purpose of Plumb — human review of decisions.
+  Every decision must be presented to the user via `AskUserQuestion`, and the user
+  must tell you how to handle each one. Do not batch-approve, auto-approve, or
+  assume the user's intent. This is the core purpose of Plumb — human review of
+  decisions.
+- **ALWAYS use `AskUserQuestion` to present decisions. NEVER print them as plain
+  text.** The native multiple-choice UI is the only acceptable way to present
+  decisions. If you present decisions as plain text you are doing it wrong.
 - Never edit `.plumb/decisions.jsonl` directly.
 - Never edit `.plumb/config.json` directly. Use `plumb init` or `plumb status`.
 - Never install the Plumb skill globally (`~/.claude/`). It is project-local only.
