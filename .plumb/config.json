@@ -1,0 +1,12 @@
+{
+  "spec_paths": [
+    "plumb_spec.md"
+  ],
+  "test_paths": [
+    "tests/"
+  ],
+  "claude_log_path": null,
+  "initialized_at": "2026-03-01T00:32:10.439519+00:00",
+  "last_commit": null,
+  "last_commit_branch": null
+}

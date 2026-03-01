@@ -1,6 +1,6 @@
 # Plumb: Specification
 
-**Version:** 0.2.0-draft  
+**Version:** 0.4.0-draft  
 **Purpose:** This document is the authoritative spec for the Plumb Python library. It is intended to be fed to Claude Code to guide implementation. Implement exactly what is described here — no more, no less.
 
 ---
@@ -70,6 +70,8 @@ plumb/
     ├── spec_updater.py         # Rewrite spec to reflect approved decisions
     ├── test_generator.py       # Generate pytest stubs for uncovered requirements
     └── code_modifier.py        # Modify staged code to satisfy rejected decisions
+├── skill/
+│   └── SKILL.md                # Claude Code skill file, installed locally on plumb init
 ```
 
 ### `.plumb/` Directory
@@ -142,9 +144,10 @@ Initializes Plumb in the current git repository.
    - Provide a path to a test file or test directory. Validates that the path exists.
 4. Writes `.plumb/config.json` with the provided paths.
 5. Installs the git pre-commit hook by writing a script to `.git/hooks/pre-commit` that calls `plumb hook`. Sets the script as executable.
-6. Appends a Plumb status block to `CLAUDE.md` at the project root (creating `CLAUDE.md` if it does not exist). See **CLAUDE.md Integration**.
-7. Runs `plumb parse-spec` to do an initial parse of the spec into requirements.
-8. Prints a confirmation summary to the terminal.
+6. Installs the Claude Code skill locally by copying `plumb/skill/SKILL.md` to `.claude/SKILL.md` in the project root. Creates `.claude/` if it does not exist. This is a project-local installation only — Plumb never writes to the user's global `~/.claude/` directory.
+7. Appends a Plumb status block to `CLAUDE.md` at the project root (creating `CLAUDE.md` if it does not exist). See **CLAUDE.md Integration**.
+8. Runs `plumb parse-spec` to do an initial parse of the spec into requirements.
+9. Prints a confirmation summary to the terminal, including confirmation that the skill was installed at `.claude/SKILL.md`.
 
 **Config schema (`.plumb/config.json`):**
 ```json
@@ -373,6 +376,152 @@ Prints a human-readable summary:
 - Decisions with broken git references
 - Last sync commit
 - Coverage summary (all three dimensions)
+
+---
+
+## Claude Code Skill
+
+### Overview
+
+Plumb ships with a Claude Code skill file at `plumb/skill/SKILL.md`. During `plumb init`, this file is copied to `.claude/SKILL.md` in the project root — a project-local installation only. It is never installed globally. Claude Code automatically reads files in `.claude/` at the start of each session, so no additional configuration is required after `plumb init`.
+
+The skill file serves two purposes: it teaches Claude Code the Plumb workflow so it can guide the user naturally, and it provides the machine-readable protocol for parsing hook output and calling per-decision commands during conversational review.
+
+### Skill File Location
+
+- **Source (in Plumb package):** `plumb/skill/SKILL.md`
+- **Installed to (per project):** `<project_root>/.claude/SKILL.md`
+- **Scope:** Local to the project. Not installed globally. Not shared across projects.
+
+The `.claude/` directory and `SKILL.md` should be committed to version control so all contributors to the project get the skill automatically.
+
+### Skill File Content
+
+The following is the exact content of `plumb/skill/SKILL.md`. Implement this file verbatim.
+
+---
+
+```markdown
+# Plumb Skill
+
+Plumb keeps the spec, tests, and code in sync. It intercepts every `git commit`
+via a pre-commit hook, analyzes staged changes and conversation history, and
+surfaces decisions for review before the commit lands.
+
+## Your responsibilities when Plumb is active
+
+### Before starting work
+Run `plumb status` to understand the current state of spec/test/code alignment.
+Note any pending decisions and any broken git references. Report a brief summary
+to the user before proceeding.
+
+### Before committing
+Run `plumb diff` to preview what Plumb will capture from staged changes. Report
+the estimated decisions to the user so they are not surprised during review.
+
+### When git commit is intercepted
+When you run `git commit` and it exits non-zero with Plumb output, do the
+following:
+
+1. Parse the JSON from stdout. It will have this shape:
+   ```json
+   {
+     "pending_decisions": 2,
+     "decisions": [
+       {
+         "id": "dec-abc123",
+         "question": "...",
+         "decision": "...",
+         "made_by": "llm",
+         "confidence": 0.87
+       }
+     ]
+   }
+   ```
+
+2. Present each decision to the user conversationally, one at a time. Use this
+   format:
+   ---
+   Plumb found [N] decision(s) to review before this commit.
+
+   **Decision [X of N]**
+   **Question:** [question]
+   **Decision made:** [decision]
+   **Made by:** [made_by] (confidence: [confidence])
+
+   How would you like to handle this?
+   - **Approve** — accept it and update the spec
+   - **Reject** — undo this change in the staged code
+   - **Edit** — modify what the decision says before approving
+   ---
+
+3. Based on the user's response, call the appropriate command:
+   - Approve: `plumb approve <id>`
+   - Reject: `plumb reject <id> --reason "<user's reason>"` then immediately
+     call `plumb modify <id>`
+   - Edit: `plumb edit <id> "<new decision text>"`
+
+4. For rejections, after calling `plumb modify <id>`, parse its JSON output:
+   ```json
+   {
+     "id": "dec-abc123",
+     "result": "modified",
+     "tests_passed": true,
+     "diff": "..."
+   }
+   ```
+   - If `tests_passed` is true: show the user the diff and confirm the change
+     looks correct before proceeding.
+   - If `tests_passed` is false: inform the user that automatic modification
+     failed, show them the test output, and ask them to resolve it manually.
+     The decision status will be `rejected_manual` — the user must fix the code
+     themselves before committing.
+
+5. Once all decisions are resolved, re-run `git commit`. The hook will fire
+   again. If there are no pending decisions it will exit 0 and the commit will
+   land. If new decisions are found (rare), repeat the review process.
+
+### After committing
+Run `plumb coverage` and briefly report the three coverage dimensions to the
+user: code coverage, spec-to-test coverage, and spec-to-code coverage. Flag any
+gaps that should be addressed before the next commit.
+
+### Using coverage to guide work
+When the user asks what to work on next, run `plumb coverage` to identify:
+- Requirements with no corresponding tests (run `plumb parse-spec` first if the
+  spec has changed)
+- Requirements with no corresponding implementation
+- Code with no test coverage
+
+Present these gaps clearly so the user can prioritize.
+
+## Rules
+
+- Never edit `.plumb/decisions.jsonl` directly.
+- Never edit `.plumb/config.json` directly. Use `plumb init` or `plumb status`.
+- Never install the Plumb skill globally (`~/.claude/`). It is project-local only.
+- The spec markdown files are the source of truth for intended behavior. Plumb
+  keeps them updated as decisions are approved. Do not edit spec files to resolve
+  decisions — let Plumb do it via `plumb sync`.
+- Do not attempt to commit if there are decisions with `status: rejected_manual`.
+  The user must resolve these manually first.
+
+## Command reference
+
+| Command | When to use |
+|---|---|
+| `plumb status` | Start of session, before beginning work |
+| `plumb diff` | Before committing, to preview decisions |
+| `plumb hook` | Called automatically by pre-commit hook — do not call manually |
+| `plumb approve <id>` | User approves a decision during review |
+| `plumb reject <id> --reason "<text>"` | User rejects a decision |
+| `plumb modify <id>` | After rejection — auto-modify staged code |
+| `plumb edit <id> "<text>"` | User amends decision text before approving |
+| `plumb review` | Interactive terminal review (not needed in Claude Code) |
+| `plumb sync` | Called automatically by approve/edit — updates spec and tests |
+| `plumb coverage` | Report coverage across all three dimensions |
+| `plumb parse-spec` | Re-parse spec after manual edits |
+```
 
 ---
 

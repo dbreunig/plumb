@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "plumb-dev"
+version = "0.1.0"
+description = "Keep spec, tests, and code in sync during AI-assisted development"
+requires-python = ">=3.10"
+dependencies = [
+    "dspy",
+    "anthropic",
+    "pytest",
+    "pytest-cov",
+    "gitpython",
+    "click",
+    "rich",
+    "jsonlines",
+]
+
+[project.scripts]
+plumb = "plumb.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["plumb"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
