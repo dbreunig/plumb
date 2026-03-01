@@ -4,6 +4,7 @@ import json
 import re
 
 import anthropic
+from dotenv import load_dotenv
 
 
 class CodeModifier:
@@ -12,6 +13,7 @@ class CodeModifier:
     is inherently open-ended."""
 
     def __init__(self, client: anthropic.Anthropic | None = None):
+        load_dotenv(override=False)
         self.client = client or anthropic.Anthropic()
 
     def modify(
