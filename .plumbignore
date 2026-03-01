@@ -1,0 +1,12 @@
+README.md
+LICENSE
+LICENSE.*
+CHANGELOG.md
+CONTRIBUTING.md
+docs/
+.github/
+.vscode/
+.idea/
+Makefile
+Dockerfile
+docker-compose*

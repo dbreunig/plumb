@@ -20,22 +20,27 @@ docker-compose*
 """
 
 
-def parse_plumbignore(repo_root: str | Path) -> list[str]:
-    """Read .plumbignore and return a list of patterns.
-
-    Skips blank lines and comments (lines starting with ``#``).
-    Returns ``[]`` when the file is absent.
-    """
-    path = Path(repo_root) / ".plumbignore"
-    if not path.is_file():
-        return []
+def _parse_lines(text: str) -> list[str]:
+    """Parse pattern lines, skipping blanks and comments."""
     patterns: list[str] = []
-    for line in path.read_text().splitlines():
+    for line in text.splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         patterns.append(line)
     return patterns
+
+
+def parse_plumbignore(repo_root: str | Path) -> list[str]:
+    """Read .plumbignore and return a list of patterns.
+
+    Skips blank lines and comments (lines starting with ``#``).
+    Falls back to DEFAULT_PLUMBIGNORE when the file is absent.
+    """
+    path = Path(repo_root) / ".plumbignore"
+    if not path.is_file():
+        return _parse_lines(DEFAULT_PLUMBIGNORE)
+    return _parse_lines(path.read_text())
 
 
 def is_ignored(filepath: str, patterns: list[str]) -> bool:

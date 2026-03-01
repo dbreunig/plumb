@@ -2,7 +2,7 @@
 
 ### A tool to keep things true.
 
-Plumb keeps your spec, tests, and code in sync during AI-assisted development.
+`plumb` keeps your spec, tests, and code in sync during AI-assisted development.
 
 When you work with Claude Code, decisions get made — a caching strategy is chosen, an API contract changes, a behavior is refined. These decisions live in conversation history and staged diffs, but they never make it back to the spec or tests. Over time, the spec drifts from reality, tests cover the wrong behavior, and the codebase becomes its own undocumented source of truth.
 
@@ -32,9 +32,10 @@ This will:
 1. Ask for paths to your spec markdown and test directory
 2. Create a `.plumb/` directory for state (commit this to version control)
 3. Install a git pre-commit hook
-4. Install a Claude Code skill file at `.claude/SKILL.md`
+4. Install a Claude Code skill file at `.claude/skills/plumb/SKILL.md`
 5. Add a Plumb block to `CLAUDE.md`
-6. Parse your spec into requirements
+6. Create a `.plumbignore` file for excluding irrelevant files from analysis
+7. Parse your spec into requirements
 
 From here, just work normally. Plumb activates when you commit.
 
@@ -66,6 +67,7 @@ Same flow, but you drive it with `plumb review` instead of the skill.
 | `plumb diff` | Preview what decisions Plumb would extract from staged changes |
 | `plumb review` | Interactively review pending decisions in the terminal |
 | `plumb approve <id>` | Approve a decision and sync it to spec/tests |
+| `plumb approve --all` | Approve all pending decisions at once |
 | `plumb reject <id> --reason "..."` | Reject a decision |
 | `plumb edit <id> "new text"` | Amend a decision's text and approve it |
 | `plumb modify <id>` | Auto-modify staged code to satisfy a rejected decision |
@@ -83,6 +85,10 @@ Plumb tracks three dimensions of coverage:
 
 Run `plumb coverage` to see all three.
 
+## `.plumbignore`
+
+Plumb uses a `.plumbignore` file with gitignore-style patterns to exclude files from analysis. This keeps noise out of the decision extraction process — lock files, generated code, and other irrelevant diffs won't produce spurious decisions.
+
 ## Project State
 
 All Plumb state lives in `.plumb/` at the repo root:
@@ -90,6 +96,7 @@ All Plumb state lives in `.plumb/` at the repo root:
 ```
 .plumb/
 ├── config.json          # Spec paths, test paths, settings
+├── coverage.json        # Cached coverage data
 ├── decisions.jsonl      # Append-only log of all decisions
 └── requirements.json    # Parsed requirements from the spec
 ```
@@ -100,7 +107,7 @@ Commit this directory to version control.
 
 - Python 3.10+
 - A git repository
-- An `ANTHROPIC_API_KEY` environment variable (for LLM-powered analysis)
+- An `ANTHROPIC_API_KEY` environment variable or `.env` file (for LLM-powered analysis)
 
 Note: `plumb init`, `plumb status`, and `plumb review` work without an API key. The key is only needed when the hook analyzes diffs or when syncing decisions to spec/tests.
 

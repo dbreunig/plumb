@@ -6,8 +6,10 @@ from plumb.ignore import parse_plumbignore, is_ignored, DEFAULT_PLUMBIGNORE
 
 
 class TestParseNullCases:
-    def test_missing_file_returns_empty(self, tmp_path):
-        assert parse_plumbignore(tmp_path) == []
+    def test_missing_file_returns_defaults(self, tmp_path):
+        patterns = parse_plumbignore(tmp_path)
+        assert "README.md" in patterns
+        assert "docs/" in patterns
 
     def test_empty_file_returns_empty(self, tmp_path):
         (tmp_path / ".plumbignore").write_text("")
