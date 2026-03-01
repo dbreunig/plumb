@@ -1,5 +1,7 @@
 # Plumb
 
+### A tool to keep things true.
+
 Plumb keeps your spec, tests, and code in sync during AI-assisted development.
 
 When you work with Claude Code, decisions get made — a caching strategy is chosen, an API contract changes, a behavior is refined. These decisions live in conversation history and staged diffs, but they never make it back to the spec or tests. Over time, the spec drifts from reality, tests cover the wrong behavior, and the codebase becomes its own undocumented source of truth.

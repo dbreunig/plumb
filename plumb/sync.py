@@ -90,6 +90,16 @@ def parse_spec_files(repo_root: str | Path) -> list[dict]:
     all_requirements: list[dict] = []
     now = datetime.now(timezone.utc).isoformat()
 
+    # Load existing requirements to preserve history
+    req_path = repo_root / ".plumb" / "requirements.json"
+    existing_by_id: dict[str, dict] = {}
+    if req_path.exists():
+        try:
+            for r in json.loads(req_path.read_text()):
+                existing_by_id[r["id"]] = r
+        except Exception:
+            pass
+
     configure_dspy()
     parser = RequirementParser()
 
@@ -111,6 +121,7 @@ def parse_spec_files(repo_root: str | Path) -> list[dict]:
 
             for req in parsed:
                 req_id = _generate_requirement_id(req.text)
+                existing = existing_by_id.get(req_id)
                 all_requirements.append(
                     {
                         "id": req_id,
@@ -118,8 +129,8 @@ def parse_spec_files(repo_root: str | Path) -> list[dict]:
                         "source_section": "",
                         "text": req.text,
                         "ambiguous": req.ambiguous,
-                        "created_at": now,
-                        "last_seen_commit": None,
+                        "created_at": existing["created_at"] if existing else now,
+                        "last_seen_commit": existing["last_seen_commit"] if existing else None,
                     }
                 )
 
@@ -144,7 +155,6 @@ def sync_decisions(
     Returns summary dict with counts of spec sections updated and test stubs created.
     """
     from plumb.programs import configure_dspy, run_with_retries
-    from plumb.programs.spec_updater import SpecUpdater
     from plumb.programs.test_generator import TestGenerator
 
     repo_root = Path(repo_root)
@@ -170,37 +180,54 @@ def sync_decisions(
         return {"spec_updated": 0, "tests_generated": 0}
 
     configure_dspy()
-    updater = SpecUpdater()
+    from plumb.programs.spec_updater import BatchSpecUpdater
+    batch_updater = BatchSpecUpdater()
     spec_updated = 0
 
-    # Update spec for each decision
-    for d in to_sync:
-        for spec_path_str in config.spec_paths:
-            spec_path = repo_root / spec_path_str
-            if not spec_path.is_file():
-                continue
+    # Group decisions by (spec_file, section) for batching
+    for spec_path_str in config.spec_paths:
+        spec_path = repo_root / spec_path_str
+        if not spec_path.is_file():
+            continue
 
-            content = spec_path.read_text()
-            section_text, start, end = find_spec_section(
-                content, d.decision or ""
-            )
+        content = spec_path.read_text()
+
+        # Map each decision to its target section
+        section_decisions: dict[tuple[int, int], list[Decision]] = {}
+        for d in to_sync:
+            _, start, end = find_spec_section(content, d.decision or "")
+            key = (start, end)
+            section_decisions.setdefault(key, []).append(d)
+
+        # Process sections in reverse order so replacements don't shift line numbers
+        for (start, end) in sorted(section_decisions.keys(), reverse=True):
+            decisions_in_section = section_decisions[(start, end)]
+            lines = content.split("\n")
+            section_text = "\n".join(lines[start:end])
+
+            # Format all decisions for this section into a single prompt
+            decision_lines = []
+            for i, d in enumerate(decisions_in_section, 1):
+                decision_lines.append(
+                    f"{i}. Question: {d.question or 'N/A'}\n   Decision: {d.decision or 'N/A'}"
+                )
+            decisions_text = "\n".join(decision_lines)
 
             try:
                 updated_section = run_with_retries(
-                    updater,
+                    batch_updater,
                     section_text,
-                    d.decision or "",
-                    d.question or "",
+                    decisions_text,
                 )
             except Exception:
                 continue
 
             # Replace section in content
-            lines = content.split("\n")
             new_lines = lines[:start] + updated_section.split("\n") + lines[end:]
-            _atomic_write(spec_path, "\n".join(new_lines))
-            spec_updated += 1
-            break  # Only update first matching spec file
+            content = "\n".join(new_lines)
+            spec_updated += len(decisions_in_section)
+
+        _atomic_write(spec_path, content)
 
     # Generate test stubs
     tests_generated = 0

@@ -35,27 +35,24 @@ following:
    }
    ```
 
-2. Present each decision to the user conversationally, one at a time. Use this
-   format:
-   ---
-   Plumb found [N] decision(s) to review before this commit.
-
-   **Decision [X of N]**
-   **Question:** [question]
-   **Decision made:** [decision]
-   **Made by:** [made_by] (confidence: [confidence])
-
-   How would you like to handle this?
-   - **Approve** — accept it and update the spec
+2. Present each decision to the user using `AskUserQuestion` with these options:
+   - **Approve** (Recommended) — accept it and update the spec
    - **Reject** — undo this change in the staged code
-   - **Edit** — modify what the decision says before approving
-   ---
+   - **Approve with edits** — modify what the decision says before approving
 
-3. Based on the user's response, call the appropriate command:
+   Include the decision details in the question text:
+   ```
+   Plumb found [N] decision(s). Decision [X of N]:
+   Question: [question]
+   Decision: [decision]
+   Made by: [made_by] (confidence: [confidence])
+   ```
+
+3. Based on the user's selection, call the appropriate command:
    - Approve: `plumb approve <id>`
    - Reject: `plumb reject <id> --reason "<user's reason>"` then immediately
      call `plumb modify <id>`
-   - Edit: `plumb edit <id> "<new decision text>"`
+   - Approve with edits: `plumb edit <id> "<new decision text from user>"`
 
 4. For rejections, after calling `plumb modify <id>`, parse its JSON output:
    ```json

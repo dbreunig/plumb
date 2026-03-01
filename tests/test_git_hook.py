@@ -13,6 +13,8 @@ from plumb.decision_log import Decision, append_decision, read_decisions
 from plumb.git_hook import (
     run_hook,
     _get_staged_diff,
+    _get_staged_diff_filtered,
+    _get_plumb_managed_paths,
     _get_branch_name,
     _detect_amend,
     _check_broken_refs,
@@ -33,6 +35,68 @@ class TestGetStagedDiff:
     def test_empty_when_nothing_staged(self, tmp_repo):
         repo = Repo(tmp_repo)
         diff = _get_staged_diff(repo)
+        assert diff == ""
+
+
+class TestGetPlumbManagedPaths:
+    def test_includes_plumb_dir_and_spec(self, sample_config):
+        paths = _get_plumb_managed_paths(sample_config)
+        assert ".plumb/" in paths
+        assert "spec.md" in paths
+
+    def test_multiple_spec_paths(self):
+        from plumb.config import PlumbConfig
+        cfg = PlumbConfig(spec_paths=["spec.md", "docs/spec/"])
+        paths = _get_plumb_managed_paths(cfg)
+        assert len(paths) == 3  # .plumb/ + 2 spec paths
+
+
+class TestGetStagedDiffFiltered:
+    def test_excludes_spec_file(self, initialized_repo):
+        repo = Repo(initialized_repo)
+        # Stage changes to both a code file and the spec file
+        code = initialized_repo / "app.py"
+        code.write_text("x = 1\n")
+        spec = initialized_repo / "spec.md"
+        spec.write_text("# Updated Spec\n")
+        repo.index.add(["app.py", "spec.md"])
+
+        from plumb.config import load_config
+        config = load_config(initialized_repo)
+        diff = _get_staged_diff_filtered(repo, config)
+        assert "x = 1" in diff
+        assert "Updated Spec" not in diff
+
+    def test_excludes_plumb_dir(self, initialized_repo):
+        repo = Repo(initialized_repo)
+        code = initialized_repo / "app.py"
+        code.write_text("x = 1\n")
+        plumb_file = initialized_repo / ".plumb" / "decisions.jsonl"
+        plumb_file.write_text('{"id": "dec-1"}\n')
+        repo.index.add(["app.py", ".plumb/decisions.jsonl"])
+
+        from plumb.config import load_config
+        config = load_config(initialized_repo)
+        diff = _get_staged_diff_filtered(repo, config)
+        assert "x = 1" in diff
+        assert "dec-1" not in diff
+
+    def test_empty_when_only_managed_files(self, initialized_repo):
+        repo = Repo(initialized_repo)
+        spec = initialized_repo / "spec.md"
+        spec.write_text("# Updated\n")
+        repo.index.add(["spec.md"])
+
+        from plumb.config import load_config
+        config = load_config(initialized_repo)
+        diff = _get_staged_diff_filtered(repo, config)
+        assert diff == ""
+
+    def test_empty_when_nothing_staged(self, initialized_repo):
+        repo = Repo(initialized_repo)
+        from plumb.config import load_config
+        config = load_config(initialized_repo)
+        diff = _get_staged_diff_filtered(repo, config)
         assert diff == ""
 
 

@@ -31,6 +31,26 @@ def _get_staged_diff(repo: Repo) -> str:
     return repo.git.diff("--cached")
 
 
+def _get_plumb_managed_paths(config) -> list[str]:
+    """Return paths managed by plumb that should be excluded from diff analysis."""
+    return [".plumb/"] + list(config.spec_paths)
+
+
+def _get_staged_diff_filtered(repo: Repo, config) -> str:
+    """Get staged diff excluding plumb-managed files (spec files and .plumb/)."""
+    managed = _get_plumb_managed_paths(config)
+    staged_files = repo.git.diff("--cached", "--name-only").splitlines()
+    if not staged_files:
+        return ""
+    unmanaged = [
+        f for f in staged_files
+        if not any(f == m or f.startswith(m) for m in managed)
+    ]
+    if not unmanaged:
+        return ""
+    return repo.git.diff("--cached", "--", *unmanaged)
+
+
 def _get_branch_name(repo: Repo) -> str:
     try:
         return str(repo.active_branch)
@@ -253,8 +273,8 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
 
     repo = Repo(repo_root)
 
-    # 2. Get staged diff and branch
-    diff = _get_staged_diff(repo)
+    # 2. Get staged diff and branch (excluding plumb-managed files)
+    diff = _get_staged_diff_filtered(repo, config)
     if not diff:
         return 0
 
@@ -282,8 +302,8 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
     if not conv_decisions:
         conv_decisions = _extract_decisions_from_diff(diff_summary, branch)
 
-    # 8. Merge/dedup
-    conv_decisions = deduplicate_decisions(conv_decisions)
+    # 8. Merge/dedup (also filter against already-resolved decisions)
+    conv_decisions = deduplicate_decisions(conv_decisions, existing_decisions=existing_decisions)
 
     # 9. Synthesize questions for questionless decisions
     conv_decisions = _synthesize_questions(conv_decisions)

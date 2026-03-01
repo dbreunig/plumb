@@ -13,6 +13,8 @@ from plumb.decision_log import (
     filter_decisions,
     delete_decisions_by_commit,
     deduplicate_decisions,
+    _normalize_text,
+    _text_similarity,
 )
 
 
@@ -157,3 +159,61 @@ class TestDeduplicateDecisions:
         d2 = Decision(id="dec-2", question="should we?", decision="yes", chunk_index=1)
         result = deduplicate_decisions([d1, d2])
         assert len(result) == 1
+
+    def test_filters_similar_to_existing_approved(self):
+        new = [Decision(id="dec-new", question="Use sync or async?", decision="Use sync for simplicity")]
+        existing = [Decision(id="dec-old", status="approved", question="Use sync or async?", decision="Use sync for simplicity")]
+        result = deduplicate_decisions(new, existing_decisions=existing)
+        assert len(result) == 0
+
+    def test_keeps_novel_decisions(self):
+        new = [Decision(id="dec-new", question="What cache strategy?", decision="Use Redis")]
+        existing = [Decision(id="dec-old", status="approved", question="Use sync or async?", decision="Use sync")]
+        result = deduplicate_decisions(new, existing_decisions=existing)
+        assert len(result) == 1
+
+    def test_ignores_pending_existing(self):
+        new = [Decision(id="dec-new", question="Use sync?", decision="Yes sync")]
+        existing = [Decision(id="dec-old", status="pending", question="Use sync?", decision="Yes sync")]
+        result = deduplicate_decisions(new, existing_decisions=existing)
+        assert len(result) == 1  # pending existing should NOT filter
+
+    def test_no_existing_decisions(self):
+        new = [Decision(id="dec-1", question="Q?", decision="A.")]
+        result = deduplicate_decisions(new, existing_decisions=None)
+        assert len(result) == 1
+
+    def test_similarity_threshold(self):
+        """Near-duplicate with slight wording difference should still be filtered."""
+        new = [Decision(id="dec-new", question="Should we use synchronous processing?", decision="Use sync for code simplicity")]
+        existing = [Decision(id="dec-old", status="approved", question="Should we use sync or async processing?", decision="Use sync for simplicity")]
+        result = deduplicate_decisions(new, existing_decisions=existing, similarity_threshold=0.5)
+        assert len(result) == 0
+
+
+class TestNormalizeText:
+    def test_removes_stop_words(self):
+        result = _normalize_text("the system should use a cache")
+        assert "the" not in result
+        assert "should" not in result
+        assert "cache" in result
+        assert "system" in result
+
+    def test_empty_string(self):
+        result = _normalize_text("")
+        assert result == set()
+
+
+class TestTextSimilarity:
+    def test_identical(self):
+        assert _text_similarity("use sync for simplicity", "use sync for simplicity") == 1.0
+
+    def test_completely_different(self):
+        sim = _text_similarity("redis cache strategy", "database migration plan")
+        assert sim < 0.3
+
+    def test_both_empty(self):
+        assert _text_similarity("", "") == 1.0
+
+    def test_one_empty(self):
+        assert _text_similarity("hello", "") == 0.0

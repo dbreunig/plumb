@@ -142,3 +142,44 @@ class TestParseSpecFiles:
         data = json.loads(req_path.read_text())
         assert len(data) == 2
         assert data[0]["id"].startswith("req-")
+
+    def test_preserves_created_at_for_existing_requirements(self, initialized_repo):
+        """Re-parsing spec should preserve created_at from existing requirements."""
+        old_time = "2025-01-01T00:00:00+00:00"
+        old_commit = "abc123"
+        req_id = _generate_requirement_id("The system must do X.")
+        existing_reqs = [
+            {
+                "id": req_id,
+                "source_file": "spec.md",
+                "source_section": "",
+                "text": "The system must do X.",
+                "ambiguous": False,
+                "created_at": old_time,
+                "last_seen_commit": old_commit,
+            }
+        ]
+        req_path = initialized_repo / ".plumb" / "requirements.json"
+        _atomic_write(req_path, json.dumps(existing_reqs, indent=2) + "\n")
+
+        mock_reqs = [MagicMock(text="The system must do X.", ambiguous=False)]
+
+        with patch("plumb.programs.configure_dspy"), \
+             patch("plumb.programs.run_with_retries", return_value=mock_reqs):
+            result = parse_spec_files(initialized_repo)
+
+        assert len(result) == 1
+        assert result[0]["created_at"] == old_time
+        assert result[0]["last_seen_commit"] == old_commit
+
+    def test_new_requirement_gets_current_timestamp(self, initialized_repo):
+        """New requirements (not in existing) should get fresh created_at."""
+        mock_reqs = [MagicMock(text="Brand new requirement.", ambiguous=False)]
+
+        with patch("plumb.programs.configure_dspy"), \
+             patch("plumb.programs.run_with_retries", return_value=mock_reqs):
+            result = parse_spec_files(initialized_repo)
+
+        assert len(result) == 1
+        assert result[0]["created_at"] is not None
+        assert result[0]["last_seen_commit"] is None
