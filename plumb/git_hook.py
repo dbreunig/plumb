@@ -10,6 +10,7 @@ from git import Repo
 
 from plumb import PlumbAuthError
 from plumb.config import load_config, save_config, find_repo_root
+from plumb.ignore import parse_plumbignore, is_ignored
 from plumb.conversation import (
     locate_conversation_log,
     read_conversation_log,
@@ -37,14 +38,16 @@ def _get_plumb_managed_paths(config) -> list[str]:
 
 
 def _get_staged_diff_filtered(repo: Repo, config) -> str:
-    """Get staged diff excluding plumb-managed files (spec files and .plumb/)."""
+    """Get staged diff excluding plumb-managed and ignored files."""
     managed = _get_plumb_managed_paths(config)
+    ignore_patterns = parse_plumbignore(repo.working_dir)
     staged_files = repo.git.diff("--cached", "--name-only").splitlines()
     if not staged_files:
         return ""
     unmanaged = [
         f for f in staged_files
         if not any(f == m or f.startswith(m) for m in managed)
+        and not is_ignored(f, ignore_patterns)
     ]
     if not unmanaged:
         return ""

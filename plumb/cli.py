@@ -19,6 +19,7 @@ from plumb.config import (
     load_config,
     save_config,
 )
+from plumb.ignore import DEFAULT_PLUMBIGNORE
 from plumb.decision_log import (
     Decision,
     read_decisions,
@@ -89,6 +90,11 @@ def init():
     hook_path.write_text("#!/bin/sh\nplumb hook\nexit $?\n")
     hook_path.chmod(0o755)
 
+    # Create default .plumbignore if it doesn't exist
+    plumbignore_path = repo_root / ".plumbignore"
+    if not plumbignore_path.exists():
+        plumbignore_path.write_text(DEFAULT_PLUMBIGNORE)
+
     # Install skill file
     claude_dir = repo_root / ".claude"
     claude_dir.mkdir(exist_ok=True)
@@ -113,6 +119,7 @@ def init():
     console.print(f"\n[green]Plumb initialized successfully![/green]")
     console.print(f"  Config: .plumb/config.json")
     console.print(f"  Hook: .git/hooks/pre-commit")
+    console.print(f"  Ignore: .plumbignore")
     console.print(f"  Skill: .claude/SKILL.md")
     console.print(f"  Spec: {spec_input}")
     console.print(f"  Tests: {test_input}")

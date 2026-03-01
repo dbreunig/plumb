@@ -46,6 +46,39 @@ class TestInit:
         assert os.access(str(hook), os.X_OK)
 
 
+class TestInitPlumbignore:
+    def test_init_creates_plumbignore(self, runner, tmp_repo):
+        spec = tmp_repo / "spec.md"
+        spec.write_text("# Spec\n")
+        (tmp_repo / "tests").mkdir(exist_ok=True)
+
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            assert result.exit_code == 0
+
+        plumbignore = tmp_repo / ".plumbignore"
+        assert plumbignore.exists()
+        content = plumbignore.read_text()
+        assert "README.md" in content
+        assert "docs/" in content
+        assert ".plumbignore" in result.output
+
+    def test_reinit_preserves_existing_plumbignore(self, runner, tmp_repo):
+        spec = tmp_repo / "spec.md"
+        spec.write_text("# Spec\n")
+        (tmp_repo / "tests").mkdir(exist_ok=True)
+        custom = "my-custom-pattern\n"
+        (tmp_repo / ".plumbignore").write_text(custom)
+
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            assert result.exit_code == 0
+
+        assert (tmp_repo / ".plumbignore").read_text() == custom
+
+
 class TestClaudeMdIntegration:
     def test_creates_claude_md(self, tmp_repo):
         cfg = PlumbConfig(spec_paths=["spec.md"], test_paths=["tests/"])

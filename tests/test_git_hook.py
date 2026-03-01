@@ -100,6 +100,47 @@ class TestGetStagedDiffFiltered:
         assert diff == ""
 
 
+class TestGetStagedDiffFilteredWithIgnore:
+    def test_ignored_files_excluded(self, initialized_repo):
+        repo = Repo(initialized_repo)
+        # Create .plumbignore
+        (initialized_repo / ".plumbignore").write_text("README.md\n*.txt\n")
+        # Stage a code file, a README, and a txt file
+        (initialized_repo / "app.py").write_text("x = 1\n")
+        (initialized_repo / "notes.txt").write_text("some notes\n")
+        readme = initialized_repo / "README.md"
+        readme.write_text("# Updated README\n")
+        repo.index.add(["app.py", "notes.txt", "README.md"])
+
+        from plumb.config import load_config
+        config = load_config(initialized_repo)
+        diff = _get_staged_diff_filtered(repo, config)
+        assert "x = 1" in diff
+        assert "some notes" not in diff
+        assert "Updated README" not in diff
+
+    def test_no_plumbignore_still_works(self, initialized_repo):
+        repo = Repo(initialized_repo)
+        (initialized_repo / "app.py").write_text("x = 1\n")
+        repo.index.add(["app.py"])
+
+        from plumb.config import load_config
+        config = load_config(initialized_repo)
+        diff = _get_staged_diff_filtered(repo, config)
+        assert "x = 1" in diff
+
+    def test_all_ignored_returns_empty(self, initialized_repo):
+        repo = Repo(initialized_repo)
+        (initialized_repo / ".plumbignore").write_text("*.txt\n")
+        (initialized_repo / "notes.txt").write_text("hello\n")
+        repo.index.add(["notes.txt"])
+
+        from plumb.config import load_config
+        config = load_config(initialized_repo)
+        diff = _get_staged_diff_filtered(repo, config)
+        assert diff == ""
+
+
 class TestGetBranchName:
     def test_returns_main(self, tmp_repo):
         repo = Repo(tmp_repo)
