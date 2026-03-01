@@ -38,7 +38,7 @@ class TestInit:
         # Verify artifacts
         assert (tmp_repo / ".plumb" / "config.json").exists()
         assert (tmp_repo / ".git" / "hooks" / "pre-commit").exists()
-        assert (tmp_repo / ".claude" / "SKILL.md").exists()
+        assert (tmp_repo / ".claude" / "skills" / "plumb" / "SKILL.md").exists()
         assert (tmp_repo / "CLAUDE.md").exists()
 
         # Verify hook is executable

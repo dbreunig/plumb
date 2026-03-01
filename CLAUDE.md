@@ -11,13 +11,11 @@ This project uses Plumb to keep the spec, tests, and code in sync.
 
 - Run `plumb status` before beginning work to understand current alignment.
 - Run `plumb diff` before committing to preview what Plumb will capture.
-- When `git commit` is intercepted by Plumb, present each pending decision to
-  the user conversationally and wait for their explicit instruction:
-  - `plumb approve <id>` — ONLY when the user says to approve
-  - `plumb reject <id> --reason "<text>"` — ONLY when the user says to reject; follow with `plumb modify <id>`
-  - `plumb edit <id> "<new text>"` — ONLY when the user says to edit
-  - **NEVER approve, reject, or edit decisions on the user's behalf.** Always
-    present decisions and wait for the user to decide. This is non-negotiable.
+- When `git commit` is intercepted by Plumb, **use `AskUserQuestion`** to present
+  each pending decision via the native multiple-choice UI. Options: Approve,
+  Reject, Approve with edits. Then run the corresponding `plumb` command.
+  **NEVER approve, reject, or edit decisions on the user's behalf.** This is
+  non-negotiable.
 - After all decisions are resolved, re-run `git commit`.
 - Use `plumb coverage` to identify what needs to be implemented or tested next.
 - Never edit `.plumb/decisions.jsonl` directly.
