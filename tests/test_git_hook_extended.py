@@ -65,7 +65,8 @@ class TestHookWithConversation:
             )
         ]
 
-        with patch("plumb.git_hook._analyze_diff", return_value="feature: hello"), \
+        with patch("plumb.programs.validate_api_access"), \
+             patch("plumb.git_hook._analyze_diff", return_value="feature: hello"), \
              patch("plumb.git_hook._extract_decisions_from_conversation", return_value=mock_decisions), \
              patch("plumb.git_hook._synthesize_questions", return_value=mock_decisions):
             result = run_hook(initialized_repo)
@@ -126,7 +127,8 @@ class TestHookEdgeCases:
         f.write_text("x=1\n")
         repo.index.add(["x.py"])
 
-        with patch("plumb.git_hook._analyze_diff", return_value="ok"), \
+        with patch("plumb.programs.validate_api_access"), \
+             patch("plumb.git_hook._analyze_diff", return_value="ok"), \
              patch("plumb.git_hook._extract_decisions_from_conversation", return_value=[]), \
              patch("plumb.git_hook._extract_decisions_from_diff", return_value=[]), \
              patch("plumb.coverage_reporter.print_coverage_report"):

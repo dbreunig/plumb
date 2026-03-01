@@ -16,6 +16,7 @@ dependencies = [
     "click",
     "rich",
     "jsonlines",
+    "python-dotenv",
 ]
 
 [project.scripts]

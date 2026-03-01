@@ -93,6 +93,10 @@ Present these gaps clearly so the user can prioritize.
 
 ## Rules
 
+- **NEVER approve, reject, or edit decisions without explicit user instruction.**
+  Every decision must be presented to the user conversationally, and the user must
+  tell you how to handle each one. Do not batch-approve, auto-approve, or assume
+  the user's intent. This is the core purpose of Plumb — human review of decisions.
 - Never edit `.plumb/decisions.jsonl` directly.
 - Never edit `.plumb/config.json` directly. Use `plumb init` or `plumb status`.
 - Never install the Plumb skill globally (`~/.claude/`). It is project-local only.

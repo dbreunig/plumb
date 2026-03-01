@@ -5,9 +5,10 @@ import json
 from unittest.mock import MagicMock, patch
 
 import dspy
+import pytest
 
-from plumb.programs import run_with_retries, configure_dspy
-from plumb import PlumbInferenceError
+from plumb.programs import run_with_retries, configure_dspy, validate_api_access
+from plumb import PlumbAuthError, PlumbInferenceError
 from plumb.programs.diff_analyzer import (
     ChangeSummary,
     DiffAnalyzerSignature,
@@ -32,6 +33,34 @@ from plumb.programs.test_generator import TestGeneratorSignature, TestGenerator
 from plumb.programs.code_modifier import CodeModifier
 
 
+class TestValidateApiAccess:
+    def test_raises_when_key_missing(self):
+        with patch("dotenv.load_dotenv"), \
+             patch.dict("os.environ", {}, clear=True):
+            import os
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            with pytest.raises(PlumbAuthError, match="ANTHROPIC_API_KEY is not set"):
+                validate_api_access()
+
+    def test_raises_when_key_empty(self):
+        with patch("dotenv.load_dotenv"), \
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": ""}):
+            with pytest.raises(PlumbAuthError, match="ANTHROPIC_API_KEY is not set"):
+                validate_api_access()
+
+    def test_passes_when_key_set(self):
+        with patch("dotenv.load_dotenv"), \
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}):
+            validate_api_access()  # should not raise
+
+    def test_loads_dotenv_file(self):
+        """Verify load_dotenv is called so .env files are picked up."""
+        with patch("dotenv.load_dotenv") as mock_load, \
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}):
+            validate_api_access()
+            mock_load.assert_called_once_with(override=False)
+
+
 class TestRunWithRetries:
     def test_success_first_try(self):
         result = run_with_retries(lambda: 42)
@@ -52,10 +81,22 @@ class TestRunWithRetries:
         assert call_count == 3
 
     def test_raises_after_max_retries(self):
-        import pytest
-
         with pytest.raises(PlumbInferenceError):
             run_with_retries(lambda: 1 / 0, max_retries=1)
+
+    def test_auth_error_raises_immediately(self):
+        def bad_key():
+            raise Exception("AuthenticationError: invalid API key")
+
+        with pytest.raises(PlumbAuthError, match="invalid or rejected"):
+            run_with_retries(bad_key, max_retries=2)
+
+    def test_api_key_error_raises_immediately(self):
+        def bad_key():
+            raise Exception("API Key not found")
+
+        with pytest.raises(PlumbAuthError, match="invalid or rejected"):
+            run_with_retries(bad_key, max_retries=2)
 
 
 class TestChangeSummary:

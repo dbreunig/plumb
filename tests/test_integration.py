@@ -81,7 +81,8 @@ class TestFullHookFlow:
         ]
 
         # First hook run — should block (pending decisions)
-        with patch("plumb.git_hook._analyze_diff", return_value="feature: auth change"), \
+        with patch("plumb.programs.validate_api_access"), \
+             patch("plumb.git_hook._analyze_diff", return_value="feature: auth change"), \
              patch("plumb.git_hook._extract_decisions_from_conversation", return_value=mock_decisions), \
              patch("plumb.git_hook._synthesize_questions", return_value=mock_decisions):
             result = run_hook(full_repo)
@@ -98,7 +99,8 @@ class TestFullHookFlow:
                                    reviewed_at=datetime.now(timezone.utc).isoformat())
 
         # Second hook run — should allow (no pending decisions)
-        with patch("plumb.git_hook._analyze_diff", return_value="feature: auth change"), \
+        with patch("plumb.programs.validate_api_access"), \
+             patch("plumb.git_hook._analyze_diff", return_value="feature: auth change"), \
              patch("plumb.git_hook._extract_decisions_from_conversation", return_value=[]), \
              patch("plumb.git_hook._extract_decisions_from_diff", return_value=[]), \
              patch("plumb.coverage_reporter.print_coverage_report"):
@@ -161,7 +163,8 @@ class TestAmendFlow:
         f.write_text("x = 2\n")
         repo.index.add(["src/new.py"])
 
-        with patch("plumb.git_hook._analyze_diff", return_value="change"), \
+        with patch("plumb.programs.validate_api_access"), \
+             patch("plumb.git_hook._analyze_diff", return_value="change"), \
              patch("plumb.git_hook._extract_decisions_from_conversation", return_value=[]), \
              patch("plumb.git_hook._extract_decisions_from_diff", return_value=[]), \
              patch("plumb.coverage_reporter.print_coverage_report"):
@@ -219,8 +222,7 @@ class TestCLIEndToEnd:
         d = Decision(id="dec-e2e1", status="pending", decision="Test")
         append_decision(full_repo, d)
 
-        with patch("plumb.cli.find_repo_root", return_value=full_repo), \
-             patch("plumb.sync.sync_decisions", return_value={"spec_updated": 0, "tests_generated": 0}):
+        with patch("plumb.cli.find_repo_root", return_value=full_repo):
             result = runner.invoke(cli, ["approve", "dec-e2e1"])
             assert result.exit_code == 0
 
@@ -239,7 +241,8 @@ class TestHookNeverBlocks:
         f.write_text("crash = True\n")
         repo.index.add(["src/crash.py"])
 
-        with patch("plumb.git_hook._analyze_diff", side_effect=RuntimeError("LLM down")):
+        with patch("plumb.programs.validate_api_access"), \
+             patch("plumb.git_hook._analyze_diff", side_effect=RuntimeError("LLM down")):
             result = run_hook(full_repo)
             assert result == 0  # Must not block
 
@@ -249,7 +252,8 @@ class TestHookNeverBlocks:
         f.write_text("crash2 = True\n")
         repo.index.add(["src/crash2.py"])
 
-        with patch("plumb.git_hook._analyze_diff", return_value="ok"), \
+        with patch("plumb.programs.validate_api_access"), \
+             patch("plumb.git_hook._analyze_diff", return_value="ok"), \
              patch("plumb.git_hook._extract_decisions_from_conversation",
                    side_effect=RuntimeError("boom")):
             result = run_hook(full_repo)

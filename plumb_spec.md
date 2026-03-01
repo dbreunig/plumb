@@ -10,11 +10,12 @@
 Plumb is a Python library and CLI tool that keeps three artifacts in sync throughout a software project's lifecycle:
 
 1. **The Spec** — one or more markdown files describing intended behavior as human-readable requirements
-2. **The Tests** — a pytest-based test suite covering those requirements
+2. **The Tests** — a comprehensive pytest-based test suite covering those requirements with unit tests, integration tests, and edge cases
 3. **The Code** — the implementation
 
 As code is written with an AI coding agent (Claude Code), decisions are made that deviate from the spec. Bugs are fixed. Features are refined. Plumb captures these decisions, surfaces them to the user, and ensures the spec, tests, and code are updated together so that on any given day, the spec and tests alone are sufficient to reconstruct the program.
 
+Plumb supports loading environment variables from .env files to manage configuration settings. The `plumb init` command creates a .env file in the project directory to facilitate environment-based configuration management.
 ### Design Principles
 
 - **Simple over clever.** Plumb solves a bounded problem. It should be holdable in a single programmer's head.
@@ -39,7 +40,7 @@ The package name on PyPI is `plumb-dev`. The CLI command is `plumb`.
 
 ### Dependencies
 
-- `dspy` — LLM workflow programs
+- `dspy` — LLM workflow programs and framework for implementing LLM-based components
 - `anthropic` — Claude SDK for inference
 - `pytest` — test runner
 - `pytest-cov` — coverage reporting
@@ -48,8 +49,11 @@ The package name on PyPI is `plumb-dev`. The CLI command is `plumb`.
 - `rich` — terminal output formatting
 - `jsonlines` — reading/writing `.jsonl` decision logs
 
----
+### Integration
 
+Plumb integrates with git hooks to automatically trigger workflows based on repository events. This enables seamless integration into the development process without requiring manual intervention.
+
+---
 ## Project Structure
 
 ```
@@ -97,20 +101,22 @@ There are two paths through review, both of which use the same underlying CLI co
 
 This is the primary workflow. The user works inside a Claude Code session. When they run `git commit` (or Claude Code runs it on their behalf), the pre-commit hook fires as a subprocess.
 
-1. The hook analyzes the staged diff and the Claude Code conversation log.
-2. It writes pending decisions to `decisions.jsonl`.
-3. It **prints a machine-readable JSON summary of pending decisions to stdout** and **exits non-zero**, aborting the commit.
-4. Claude Code's skill reads that output and begins presenting decisions to the user conversationally, one at a time:
+1. The hook validates API access before proceeding with analysis. If API authentication fails, the hook must exit non-zero and block the commit.
+2. The hook analyzes the staged diff and the Claude Code conversation log.
+3. It writes pending decisions to `decisions.jsonl`.
+4. It **prints a machine-readable JSON summary of pending decisions to stdout** and **exits non-zero**, aborting the commit.
+5. Claude Code's skill reads that output and begins presenting decisions to the user conversationally, one at a time:
    > "Plumb found 3 decisions before this commit. Here's the first one:
    > **Question:** Should we cache API responses in memory or on disk?
    > **Decision made:** In-memory cache using a dict.
    > Approve, reject, or edit?"
-5. The user responds in the chat. The skill calls the appropriate per-decision command (`plumb approve <id>`, `plumb reject <id>`, or `plumb edit <id> "<text>"`).
-6. For **rejected** decisions, the skill invokes `plumb modify <id>` (see below), which modifies the staged code, runs tests, and reports the result conversationally.
-7. Once all decisions are resolved, the skill re-runs `git commit`. The hook fires again, finds no pending decisions, exits zero, and the commit lands.
+6. The user responds in the chat. The skill calls the appropriate per-decision command (`plumb approve <id>`, `plumb reject <id>`, or `plumb edit <id> "<text>"`).
+7. For **rejected** decisions, the skill invokes `plumb modify <id>` (see below), which modifies the staged code, runs tests, and reports the result conversationally.
+8. Once all decisions are resolved, the skill re-runs `git commit`. The hook fires again, finds no pending decisions, exits zero, and the commit lands.
 
 **The commit only lands when there are zero pending decisions.**
 
+The pre-commit hook must validate API access before performing any LLM operations and must block commits when authentication fails. When API authentication fails, the system must raise a custom PlumbAuthError exception that alerts the user and provides clear instructions to set their API key via environment variable export or in a .env file. API key validation must be implemented as a separate validate_api_access function that is called before all LLM operations. All authentication functionality must have comprehensive test coverage, and existing tests must be updated to mock API validation calls to ensure test suites remain unaffected.
 ### Path 2: Committing from the terminal (Interactive Review)
 
 The user commits directly from a terminal, outside of Claude Code. The pre-commit hook fires the same way:
@@ -385,8 +391,7 @@ Prints a human-readable summary:
 
 Plumb ships with a Claude Code skill file at `plumb/skill/SKILL.md`. During `plumb init`, this file is copied to `.claude/SKILL.md` in the project root — a project-local installation only. It is never installed globally. Claude Code automatically reads files in `.claude/` at the start of each session, so no additional configuration is required after `plumb init`.
 
-The skill file serves two purposes: it teaches Claude Code the Plumb workflow so it can guide the user naturally, and it provides the machine-readable protocol for parsing hook output and calling per-decision commands during conversational review.
-
+The skill file provides structured guidance for AI-assisted development workflow. It teaches Claude Code the Plumb workflow so it can guide the user naturally through the development process, and it provides the machine-readable protocol for parsing hook output and calling per-decision commands during conversational review.
 ### Skill File Location
 
 - **Source (in Plumb package):** `plumb/skill/SKILL.md`
@@ -455,13 +460,15 @@ following:
    - **Edit** — modify what the decision says before approving
    ---
 
-3. Based on the user's response, call the appropriate command:
+3. All decisions must be explicitly reviewed and approved by the user. No decisions shall be automatically approved without explicit user instruction.
+
+4. Based on the user's response, call the appropriate command:
    - Approve: `plumb approve <id>`
    - Reject: `plumb reject <id> --reason "<user's reason>"` then immediately
      call `plumb modify <id>`
    - Edit: `plumb edit <id> "<new decision text>"`
 
-4. For rejections, after calling `plumb modify <id>`, parse its JSON output:
+5. For rejections, after calling `plumb modify <id>`, parse its JSON output:
    ```json
    {
      "id": "dec-abc123",
@@ -477,10 +484,11 @@ following:
      The decision status will be `rejected_manual` — the user must fix the code
      themselves before committing.
 
-5. Once all decisions are resolved, re-run `git commit`. The hook will fire
+6. Once all decisions are resolved, re-run `git commit`. The hook will fire
    again. If there are no pending decisions it will exit 0 and the commit will
    land. If new decisions are found (rare), repeat the review process.
 
+7. All CLI operations require explicit user commands. The system shall not perform automatic synchronization or background operations without direct user instruction.
 ### After committing
 Run `plumb coverage` and briefly report the three coverage dimensions to the
 user: code coverage, spec-to-test coverage, and spec-to-code coverage. Flag any
@@ -728,7 +736,6 @@ Called via the Anthropic API directly with a structured prompt. Plumb applies th
 - If `plumb modify` test run fails, Plumb does not stage the modification and updates decision status to `rejected_manual`.
 
 ---
-
 ## Testing Plumb Itself
 
 pytest, 80% coverage minimum for v0.1.0.
@@ -767,4 +774,5 @@ pytest, 80% coverage minimum for v0.1.0.
 | **Broken Reference** | A decision whose `commit_sha` is no longer reachable in git history |
 | **Conversational Review** | The review loop driven by the Claude Code skill, using per-decision commands |
 | **Interactive Review** | The review loop driven by `plumb review` in a terminal |
+| **Programs Module** | A dedicated module containing LLM programs, separate from core library functionality |
 | **Plumb** | This library |

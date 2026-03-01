@@ -66,8 +66,7 @@ class TestReviewExtended:
         )
         append_decision(initialized_repo, d)
 
-        with patch("plumb.cli.find_repo_root", return_value=initialized_repo), \
-             patch("plumb.sync.sync_decisions", return_value={"spec_updated": 0, "tests_generated": 0}):
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["review"], input="a\n")
             assert "Approved" in result.output
 
@@ -95,8 +94,7 @@ class TestReviewExtended:
         )
         append_decision(initialized_repo, d)
 
-        with patch("plumb.cli.find_repo_root", return_value=initialized_repo), \
-             patch("plumb.sync.sync_decisions", return_value={"spec_updated": 0, "tests_generated": 0}):
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["review"], input="e\nnew text\n")
             assert "Edited" in result.output
 

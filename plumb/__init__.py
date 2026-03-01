@@ -7,3 +7,7 @@ class PlumbError(Exception):
 
 class PlumbInferenceError(PlumbError):
     """Raised when an LLM inference call fails after retries."""
+
+
+class PlumbAuthError(PlumbError):
+    """Raised when the API key is missing or invalid."""

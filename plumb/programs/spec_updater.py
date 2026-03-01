@@ -17,7 +17,7 @@ class SpecUpdaterSignature(dspy.Signature):
 class SpecUpdater(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.predict = dspy.ChainOfThought(SpecUpdaterSignature)
+        self.predict = dspy.Predict(SpecUpdaterSignature)
 
     def forward(self, spec_section: str, decision: str, question: str) -> str:
         result = self.predict(

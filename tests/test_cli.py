@@ -94,8 +94,7 @@ class TestApprove:
         d = Decision(id="dec-test1", status="pending", decision="A")
         append_decision(initialized_repo, d)
 
-        with patch("plumb.cli.find_repo_root", return_value=initialized_repo), \
-             patch("plumb.sync.sync_decisions", return_value={"spec_updated": 0, "tests_generated": 0}):
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["approve", "dec-test1"])
             assert result.exit_code == 0
             assert "Approved" in result.output
@@ -131,8 +130,7 @@ class TestEdit:
         d = Decision(id="dec-test3", status="pending", decision="C")
         append_decision(initialized_repo, d)
 
-        with patch("plumb.cli.find_repo_root", return_value=initialized_repo), \
-             patch("plumb.sync.sync_decisions", return_value={"spec_updated": 0, "tests_generated": 0}):
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["edit", "dec-test3", "new text"])
             assert result.exit_code == 0
             assert "Edited" in result.output

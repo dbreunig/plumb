@@ -7,6 +7,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 from git import Repo
 
+from plumb import PlumbAuthError
 from plumb.config import PlumbConfig, save_config, ensure_plumb_dir
 from plumb.decision_log import Decision, append_decision, read_decisions
 from plumb.git_hook import (
@@ -127,6 +128,31 @@ class TestRunHook:
             result = run_hook(initialized_repo)
             assert result == 0
 
+    def test_auth_error_blocks_commit(self, initialized_repo):
+        """Auth errors should block commits (exit 1)."""
+        with patch(
+            "plumb.git_hook._run_hook_inner",
+            side_effect=PlumbAuthError("ANTHROPIC_API_KEY is not set"),
+        ):
+            result = run_hook(initialized_repo)
+            assert result == 1
+
+    def test_missing_api_key_blocks_commit(self, initialized_repo):
+        """Missing ANTHROPIC_API_KEY should block commit when there's a staged diff."""
+        repo = Repo(initialized_repo)
+        f = initialized_repo / "new.py"
+        f.write_text("x = 1\n")
+        repo.index.add(["new.py"])
+
+        with patch("dotenv.load_dotenv"), \
+             patch.dict("os.environ", {}, clear=True), \
+             patch.dict("os.environ", {"HOME": "/tmp"}):
+            # Remove ANTHROPIC_API_KEY if present
+            import os
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            result = run_hook(initialized_repo)
+            assert result == 1
+
     def test_dry_run_returns_0(self, initialized_repo):
         """Dry run always returns 0."""
         repo = Repo(initialized_repo)
@@ -135,7 +161,8 @@ class TestRunHook:
         repo.index.add(["new.py"])
 
         # Mock the DSPy calls
-        with patch("plumb.git_hook._analyze_diff", return_value="summary"), \
+        with patch("plumb.programs.validate_api_access"), \
+             patch("plumb.git_hook._analyze_diff", return_value="summary"), \
              patch("plumb.git_hook._extract_decisions_from_conversation", return_value=[]), \
              patch("plumb.git_hook._extract_decisions_from_diff", return_value=[]):
             result = run_hook(initialized_repo, dry_run=True)
@@ -159,7 +186,8 @@ class TestRunHook:
             )
         ]
 
-        with patch("plumb.git_hook._analyze_diff", return_value="summary"), \
+        with patch("plumb.programs.validate_api_access"), \
+             patch("plumb.git_hook._analyze_diff", return_value="summary"), \
              patch("plumb.git_hook._extract_decisions_from_conversation", return_value=mock_decisions), \
              patch("plumb.git_hook._synthesize_questions", return_value=mock_decisions):
             result = run_hook(initialized_repo)
@@ -172,7 +200,8 @@ class TestRunHook:
         f.write_text("x = 1\n")
         repo.index.add(["new.py"])
 
-        with patch("plumb.git_hook._analyze_diff", return_value="summary"), \
+        with patch("plumb.programs.validate_api_access"), \
+             patch("plumb.git_hook._analyze_diff", return_value="summary"), \
              patch("plumb.git_hook._extract_decisions_from_conversation", return_value=[]), \
              patch("plumb.git_hook._extract_decisions_from_diff", return_value=[]), \
              patch("plumb.coverage_reporter.print_coverage_report"):

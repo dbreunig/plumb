@@ -247,15 +247,9 @@ def review(branch):
         else:
             console.print("  Skipped.\n")
 
-    # Sync approved/edited decisions
     if approved_ids:
-        from plumb.sync import sync_decisions
-        try:
-            result = sync_decisions(repo_root)
-            console.print(f"Synced: {result['spec_updated']} spec sections updated, "
-                          f"{result['tests_generated']} test stubs generated.")
-        except Exception as e:
-            console.print(f"[yellow]Warning: Sync failed: {e}[/yellow]")
+        console.print(f"\n{len(approved_ids)} decision(s) resolved. "
+                      "Run [bold]plumb sync[/bold] to update spec and tests.")
 
 
 def _run_modify(repo_root: Path, decision_id: str) -> None:
@@ -370,14 +364,7 @@ def approve(decision_id):
         raise SystemExit(1)
 
     console.print(f"[green]Approved {decision_id}.[/green]")
-
-    # Run sync for this decision
-    from plumb.sync import sync_decisions
-    try:
-        sync_result = sync_decisions(repo_root, decision_ids=[decision_id])
-        console.print(f"Synced: {sync_result['spec_updated']} spec sections updated.")
-    except Exception as e:
-        console.print(f"[yellow]Warning: Sync failed: {e}[/yellow]")
+    console.print("Run [bold]plumb sync[/bold] to update spec and tests.")
 
 
 @cli.command()
@@ -426,14 +413,7 @@ def edit(decision_id, text):
         raise SystemExit(1)
 
     console.print(f"[yellow]Edited {decision_id}.[/yellow]")
-
-    # Run sync
-    from plumb.sync import sync_decisions
-    try:
-        sync_result = sync_decisions(repo_root, decision_ids=[decision_id])
-        console.print(f"Synced: {sync_result['spec_updated']} spec sections updated.")
-    except Exception as e:
-        console.print(f"[yellow]Warning: Sync failed: {e}[/yellow]")
+    console.print("Run [bold]plumb sync[/bold] to update spec and tests.")
 
 
 @cli.command()

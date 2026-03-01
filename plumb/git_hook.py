@@ -8,6 +8,7 @@ from pathlib import Path
 
 from git import Repo
 
+from plumb import PlumbAuthError
 from plumb.config import load_config, save_config, find_repo_root
 from plumb.conversation import (
     locate_conversation_log,
@@ -225,9 +226,13 @@ def run_hook(repo_root: str | Path | None = None, dry_run: bool = False) -> int:
 
     Top-level try/except: on ANY internal error, print warning to stderr, return 0.
     Never block commits due to internal Plumb errors.
+    Auth errors block commits — a missing/invalid API key must be fixed.
     """
     try:
         return _run_hook_inner(repo_root, dry_run)
+    except PlumbAuthError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
     except Exception as e:
         print(f"Warning: Plumb encountered an error: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
@@ -263,27 +268,31 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
     existing_decisions = read_decisions(repo_root)
     existing_decisions = _check_broken_refs(repo, existing_decisions)
 
-    # 5. Analyze diff
+    # 5. Validate API access before any LLM work
+    from plumb.programs import validate_api_access
+    validate_api_access()
+
+    # 6. Analyze diff
     diff_summary = _analyze_diff(diff)
 
-    # 6. Extract decisions from conversation (or diff-only fallback)
+    # 7. Extract decisions from conversation (or diff-only fallback)
     conv_decisions = _extract_decisions_from_conversation(
         repo_root, config, diff_summary
     )
     if not conv_decisions:
         conv_decisions = _extract_decisions_from_diff(diff_summary, branch)
 
-    # 7. Merge/dedup
+    # 8. Merge/dedup
     conv_decisions = deduplicate_decisions(conv_decisions)
 
-    # 8. Synthesize questions for questionless decisions
+    # 9. Synthesize questions for questionless decisions
     conv_decisions = _synthesize_questions(conv_decisions)
 
-    # 9. Write decisions (unless dry_run)
+    # 10. Write decisions (unless dry_run)
     if not dry_run and conv_decisions:
         append_decisions(repo_root, conv_decisions)
 
-    # 10. Check pending decisions
+    # 11. Check pending decisions
     if dry_run:
         # In dry-run, just report what we found
         if conv_decisions:
