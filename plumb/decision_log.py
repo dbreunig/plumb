@@ -213,8 +213,7 @@ def _llm_dedup(
         _format_decision_line(i + 1, d) for i, d in enumerate(recent_existing)
     ) or "(none)"
 
-    print(f"[dedup:llm] Candidates sent to LLM:\n{candidates_str}", flush=True)
-    print(f"[dedup:llm] Existing context ({len(recent_existing)} decisions):\n{existing_str}", flush=True)
+    print(f"[dedup:llm] Sending {len(candidates)} candidates against {len(recent_existing)} existing decisions", flush=True)
 
     from plumb.programs import get_program_lm
 

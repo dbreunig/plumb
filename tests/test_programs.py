@@ -197,7 +197,7 @@ class TestTestGeneratorSignature:
         assert "requirements" in sig.input_fields
         assert "existing_tests" in sig.input_fields
         assert "code_context" in sig.input_fields
-        assert "test_stubs" in sig.output_fields
+        assert "test_code" in sig.output_fields
 
 
 class TestDiffAnalyzerModule:

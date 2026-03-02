@@ -154,7 +154,7 @@ def sync_decisions(
 ) -> dict:
     """Sync approved/edited decisions to spec and tests.
 
-    Returns summary dict with counts of spec sections updated and test stubs created.
+    Returns summary dict with counts of spec sections updated and tests created.
     """
     from plumb.programs import configure_dspy, run_with_retries
     from plumb.programs.test_generator import TestGenerator
@@ -239,9 +239,9 @@ def sync_decisions(
         _atomic_write(spec_path, content)
 
     if on_progress:
-        on_progress(f"Spec updated ({spec_updated} section(s)). Generating test stubs...")
+        on_progress(f"Spec updated ({spec_updated} section(s)). Generating tests...")
 
-    # Generate test stubs
+    # Generate tests
     tests_generated = 0
     req_path = repo_root / ".plumb" / "requirements.json"
     if req_path.exists():
@@ -290,21 +290,21 @@ def sync_decisions(
                         continue
 
             try:
-                stubs = run_with_retries(
-                    gen, req_text, existing_tests[:2000], code_context[:2000]
+                test_code = run_with_retries(
+                    gen, req_text, existing_tests[:8000], code_context[:16000]
                 )
-                if stubs.strip():
-                    # Append to first test path, using test_stubs.py
+                if test_code.strip():
+                    # Append to first test path, using test_generated.py
                     test_target = repo_root / config.test_paths[0]
                     if test_target.is_dir():
-                        test_target = test_target / "test_stubs.py"
+                        test_target = test_target / "test_generated.py"
                     if test_target.exists():
                         existing = test_target.read_text()
-                        _atomic_write(test_target, existing + "\n\n" + stubs + "\n")
+                        _atomic_write(test_target, existing + "\n\n" + test_code + "\n")
                     else:
                         _atomic_write(
                             test_target,
-                            "import pytest\n\n\n" + stubs + "\n",
+                            "import pytest\n\n\n" + test_code + "\n",
                         )
                     tests_generated += 1
             except Exception:

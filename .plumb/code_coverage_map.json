@@ -3,7 +3,7 @@
   "source_hashes": {
     "plumb/__init__.py": "16f2211e2ab3b9c5a45e928e80fca934302b2b508239ff957eaf7d698ff4fb39",
     "plumb/claude_session.py": "39fa928294a449e6912e432600560ca9dcaec47a82a691e9a6ca66ed9f909f69",
-    "plumb/cli.py": "ceacd9505b369f320bd30c710385c87e40f73528db64ed24e0b5484bf298a142",
+    "plumb/cli.py": "46081ade17dbb751d03ad9d4c66fbaee7265a4cbe71d94fb99c08cb3e6e2633f",
     "plumb/config.py": "07c24955e1355679da85a31f409e07365b66f235e813716136cda404c93f87f2",
     "plumb/conversation.py": "c09215d97193559579e083efab8d399c3c9332218070c7e1e0d78a907af80ad1",
     "plumb/coverage_reporter.py": "704d0bea155e95ccded6c13451963e4af824ef0dc57391dd35bb36528c37c90c",
@@ -785,57 +785,57 @@
     },
     "req-79c36afc": {
       "implemented": false,
-      "evidence": "No setup.py, pyproject.toml, or packaging configuration found in source summaries to indicate pip installability",
+      "evidence": "No setup.py, pyproject.toml, or package configuration files found in source summaries to enable pip installation",
       "source_files": []
     },
     "req-30f031dc": {
       "implemented": false,
-      "evidence": "No packaging configuration found in source summaries to indicate uv installability",
+      "evidence": "No package configuration files found in source summaries to enable uv installation",
       "source_files": []
     },
     "req-ba9f07a3": {
       "implemented": false,
-      "evidence": "No packaging metadata found in source summaries to confirm PyPI package name",
+      "evidence": "No package metadata or configuration files found in source summaries to specify PyPI package name",
       "source_files": []
     },
     "req-96630c2a": {
       "implemented": false,
-      "evidence": "No authentication functionality or related tests found in the provided source summaries",
+      "evidence": "No authentication functionality or related tests visible in the provided source summaries",
       "source_files": []
     },
     "req-415178b1": {
       "implemented": false,
-      "evidence": "No existing tests or API validation mocking found in the provided source summaries",
+      "evidence": "No existing tests or API validation mocking code visible in the provided source summaries",
       "source_files": []
     },
     "req-0435395b": {
       "implemented": false,
-      "evidence": "No TestGenerator class found in the provided source summaries",
+      "evidence": "No TestGenerator class or functionality found in the provided source summaries",
       "source_files": []
     },
     "req-73e41872": {
       "implemented": false,
-      "evidence": "No TestGenerator class found in the provided source summaries",
+      "evidence": "No TestGenerator class or pytest test stub generation functionality found in source summaries",
       "source_files": []
     },
     "req-9e06fbf5": {
       "implemented": false,
-      "evidence": "No TestGenerator class found in the provided source summaries",
+      "evidence": "No TestGenerator class or test function generation functionality found in source summaries",
       "source_files": []
     },
     "req-50c3ada9": {
       "implemented": false,
-      "evidence": "No TestGenerator class found in the provided source summaries",
+      "evidence": "No TestGenerator class or test stub generation with TODO/skip functionality found in source summaries",
       "source_files": []
     },
     "req-ea418181": {
       "implemented": false,
-      "evidence": "No TestGenerator class found in the provided source summaries",
+      "evidence": "No TestGenerator class or test overwrite prevention logic found in source summaries",
       "source_files": []
     },
     "req-bcf96fa4": {
-      "implemented": false,
-      "evidence": "No pytest configuration or test files found in the provided source summaries",
+      "implemented": true,
+      "evidence": "CLI has 'coverage' command that runs coverage analysis, and '_coverage_bar' function suggests pytest-based testing infrastructure exists",
       "source_files": []
     }
   }

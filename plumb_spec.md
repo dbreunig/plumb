@@ -4,7 +4,6 @@
 **Purpose:** This document is the authoritative spec for the Plumb Python library. It is intended to be fed to Claude Code to guide implementation. Implement exactly what is described here — no more, no less.
 
 ---
-
 ## Overview
 
 Plumb is a Python library and CLI tool that keeps three artifacts in sync throughout a software project's lifecycle:
@@ -15,18 +14,25 @@ Plumb is a Python library and CLI tool that keeps three artifacts in sync throug
 
 As code is written with an AI coding agent (Claude Code), decisions are made that deviate from the spec. Bugs are fixed. Features are refined. Plumb captures these decisions, surfaces them to the user, and ensures the spec, tests, and code are updated together so that on any given day, the spec and tests alone are sufficient to reconstruct the program.
 
-Plumb supports loading environment variables from .env files to manage configuration settings. The `plumb init` command creates a .env file in the project directory to facilitate environment-based configuration management.
+Plumb supports loading environment variables from .env files to manage configuration settings. The `plumb init` command creates a .env file in the project directory to facilitate environment-based configuration management. The system supports ANTHROPIC_API_KEY configuration through both environment variables and .env files.
+
+Tests are linked to requirements through requirement ID comments (e.g., `# plumb:req-XXXXXXXX`) to establish traceability between test functions and specific requirements. All tests are organized in the tests/ directory with specific test files for each component. Tests without requirement links are treated as sync violations that indicate either missing requirements or unnecessary tests.
+
+The system supports file ignore patterns through a '.plumbignore' file and provides a '--all' command option for the 'plumb approve' command to approve all changes at once. Generated cache and coverage files are excluded from commits, and the system includes a 'check' command as an alias for manual decision scanning.
+
+Plumb can handle conversations that span multiple Claude Code session files by reading and merging them chronologically to support exit-and-relaunch scenarios. The sync command provides progress indicators with status updates to give users feedback during operation. The workflow requires an explicit sync step after approving decisions, with staging of sync output before re-committing changes.
 ### Design Principles
 
 - **Simple over clever.** Plumb solves a bounded problem. It should be holdable in a single programmer's head.
 - **DSPy for LLM workflows.** All LLM-powered functions are implemented as DSPy programs, not open-ended agents. This ensures they are controllable, auditable, and reliable.
-- **Inference via Claude.** Plumb uses the Anthropic Claude SDK (via the user's existing account) as its inference provider.
+- **Inference via Claude.** Plumb uses the Anthropic Claude SDK (via the user's existing account) as its inference provider. Claude Sonnet 4.6 serves as the default model for all programs.
 - **Non-intrusive.** Plumb operates as a git hook and CLI tool. It does not change how the user writes code.
 - **The commit is canonical.** The pre-commit hook ensures that every committed state has been reviewed and approved. A commit represents a fully reconciled snapshot of spec, tests, and code.
-- **Conversation analysis is opportunistic.** Plumb uses the Claude Code conversation log when available. When it is not (e.g., committing from a bare terminal), Plumb falls back to diff-only analysis. Decisions still get captured; they are just derived from code changes rather than reasoning.
+- **Conversation analysis is opportunistic.** Plumb uses Claude Code session data when available. When it is not (e.g., committing from a bare terminal), Plumb falls back to diff-only analysis. Decisions still get captured; they are just derived from code changes rather than reasoning.
+- **Multi-stage deduplication.** The system prevents duplicate decisions through a multi-stage pipeline using exact matching, Jaccard similarity, and LLM semantic analysis to catch different types of duplicates.
+- **Decision filtering.** Only prescriptive choices that affect system design, behavior, architecture, or data models are captured as decisions. Process observations, tooling choices, and diagnostic findings are filtered out.
 
 ---
-
 ## Installation
 
 Plumb must be installable via both `pip` and `uv`:
@@ -37,6 +43,28 @@ uv add plumb-dev
 ```
 
 The package name on PyPI is `plumb-dev`. The CLI command is `plumb`.
+
+## Test-Requirement Linking
+
+Tests must support two formats for linking to requirements:
+- Comment-based markers using `# plumb:req-XXXXXXXX` format
+- Function name-based linking using `test_req_XXXXXXXX_` format
+
+Both formats must be supported for backwards compatibility.
+
+## Decision Extraction
+
+The system must filter for spec-relevant content during decision extraction in both conversation analysis and diff analysis methods to ensure only pertinent decisions are processed.
+
+## Decision Processing Requirements
+
+The system must implement semantic similarity checking to handle duplicate or similar decisions effectively.
+
+Classification tasks must not generate reasoning traces to maintain optimal performance.
+
+LLM-based deduplication must utilize Claude Haiku 4.5 as the designated model.
+
+The `deduplicate_decisions()` function must accept a `use_llm` parameter that defaults to False to ensure backward compatibility while enabling optional LLM-based deduplication.
 
 ### Dependencies
 
@@ -66,18 +94,19 @@ plumb/
 ├── decision_log.py         # Read/write .plumb/decisions.jsonl
 ├── coverage_reporter.py    # Code, spec, and test coverage analysis
 ├── sync.py                 # Spec and test sync logic
-└── programs/               # DSPy programs
+└── programs/               # DSPy programs using Predict pattern
     ├── __init__.py
-    ├── diff_analyzer.py        # Cluster and summarize git diffs
+    ├── diff_analyzer.py        # Cluster and summarize git diffs (excludes Plumb-managed files)
     ├── decision_extractor.py   # Extract decisions/questions from conversation chunks
     ├── requirement_parser.py   # Convert spec markdown into explicit requirements
     ├── spec_updater.py         # Rewrite spec to reflect approved decisions
-    ├── test_generator.py       # Generate pytest stubs for uncovered requirements
+    ├── test_generator.py       # Generate pytest tests for uncovered requirements
     └── code_modifier.py        # Modify staged code to satisfy rejected decisions
 ├── skill/
 │   └── SKILL.md                # Claude Code skill file, installed locally on plumb init
 ```
 
+DSPy programs support program-specific model configuration through a model configuration array in config.json. Pattern parsing logic is modularized into separate functions for reusability across programs.
 ### `.plumb/` Directory
 
 Plumb stores all state in a `.plumb/` folder at the root of the user's repository. This folder should be committed to version control.
@@ -89,8 +118,9 @@ Plumb stores all state in a `.plumb/` folder at the root of the user's repositor
 └── requirements.json       # Cached parsed requirements from the spec
 ```
 
----
+The system shall track which requirements have been modified and only send dirty (changed) requirements to the mapper for processing, rather than sending all requirements.
 
+---
 ## Core Workflow
 
 Plumb intercepts commits via a **git pre-commit hook**. This is the central design decision: the commit is the gate, and nothing is committed until decisions have been reviewed.
@@ -102,36 +132,43 @@ There are two paths through review, both of which use the same underlying CLI co
 This is the primary workflow. The user works inside a Claude Code session. When they run `git commit` (or Claude Code runs it on their behalf), the pre-commit hook fires as a subprocess.
 
 1. The hook validates API access before proceeding with analysis. If API authentication fails, the hook must exit non-zero and block the commit.
-2. The hook analyzes the staged diff and the Claude Code conversation log.
-3. It writes pending decisions to `decisions.jsonl`.
+2. The hook analyzes the staged diff and the Claude Code conversation log using the unified conversation reading system that auto-detects Claude Code sessions vs legacy logs and reads from Claude Code's actual session files at `~/.claude/projects/<encoded-path>/<uuid>.jsonl`.
+3. It writes pending decisions to `decisions.jsonl` and sets the `last_extracted_at` timestamp.
 4. It **prints a machine-readable JSON summary of pending decisions to stdout** and **exits non-zero**, aborting the commit.
-5. Claude Code's skill reads that output and begins presenting decisions to the user conversationally, one at a time:
+5. Claude Code's skill reads that output and begins presenting decisions to the user using AskUserQuestion format, one at a time:
    > "Plumb found 3 decisions before this commit. Here's the first one:
    > **Question:** Should we cache API responses in memory or on disk?
    > **Decision made:** In-memory cache using a dict.
    > Approve, reject, or edit?"
-6. The user responds in the chat. The skill calls the appropriate per-decision command (`plumb approve <id>`, `plumb reject <id>`, or `plumb edit <id> "<text>"`).
+6. The user responds in the chat. The skill calls the appropriate per-decision command (`plumb approve <id>`, `plumb reject <id>`, or `plumb edit <id> "<text>"`). The system includes explicit safeguards to never approve, reject, or edit decisions on the user's behalf. Users can approve multiple pending decisions efficiently using the `--all` flag with the approve command.
 7. For **rejected** decisions, the skill invokes `plumb modify <id>` (see below), which modifies the staged code, runs tests, and reports the result conversationally.
-8. Once all decisions are resolved, the skill re-runs `git commit`. The hook fires again, finds no pending decisions, exits zero, and the commit lands.
+8. Once all decisions are resolved, the skill re-runs `git commit`. The hook fires again, finds no pending decisions, exits zero, and the commit lands. The system drafts commit messages after decision review and includes the list of approved decisions.
 
 **The commit only lands when there are zero pending decisions.**
 
-The pre-commit hook must validate API access before performing any LLM operations and must block commits when authentication fails. When API authentication fails, the system must raise a custom PlumbAuthError exception that alerts the user and provides clear instructions to set their API key via environment variable export or in a .env file. API key validation must be implemented as a separate validate_api_access function that is called before all LLM operations. All authentication functionality must have comprehensive test coverage, and existing tests must be updated to mock API validation calls to ensure test suites remain unaffected.
+The pre-commit hook must validate API access before performing any LLM operations and must block commits when authentication fails. When API authentication fails, the system must raise a custom PlumbAuthError exception that alerts the user and provides clear instructions to set their API key via environment variable export or in a .env file. API key validation must be implemented as a separate validate_api_access function that is called before all LLM operations. All authentication functionality must have comprehensive test coverage, and existing tests must be updated to mock API validation calls to ensure test suites remain unaffected. The system supports environment variable management using .env files with python-dotenv dependency.
+
+The system uses gitignore-style patterns for ignore functionality, with default patterns used when no .plumbignore file exists. After commit completion, the post-commit hook clears the `last_extracted_at` timestamp to reset the filter for future extractions.
+
+The conversation parser handles Claude Code's type/message schema format and converts tool usage blocks to text format '[tool: Name] description' for consistency. The system includes comprehensive documentation for the Plumb skill with detailed instructions for managing spec/test/code alignment and decision review processes.
+
+The system implements intelligent deduplication by first running Jaccard similarity filtering, then applying LLM deduplication as a second pass when 2 or more candidates remain, using DSPy's context manager with Haiku LM for deduplication while preserving Sonnet for other operations.
+
+The system generates complete and runnable tests rather than stub files with TODO comments. Test generation uses increased context limits to accommodate complete test code. The test generator produces fully functional test code that can be executed immediately.
 ### Path 2: Committing from the terminal (Interactive Review)
 
 The user commits directly from a terminal, outside of Claude Code. The pre-commit hook fires the same way:
 
-1. The hook analyzes the staged diff. Conversation analysis is skipped if no log is found (noted in output).
-2. It writes pending decisions to `decisions.jsonl`.
+1. The hook analyzes the staged diff. It reads Claude Code's native session files directly from auto-detected paths (~/.claude/conversations.jsonl, etc.) and extracts prescriptive choices while excluding observations and diagnostics. Within-batch similarity deduplication prevents duplicate decisions in the same batch. Time awareness uses both last_commit datetime and last_extracted_at timestamp as cutoffs, taking the later of the two to determine which conversations to process.
+2. It writes pending decisions to `decisions.jsonl`, passing current decisions and recent decisions from the last couple commits to the deduplication pass.
 3. It prints a human-readable summary of pending decisions and exits non-zero, aborting the commit.
 4. The user runs `plumb review` in their terminal, which presents decisions interactively and accepts keypresses.
 5. Rejected decisions can be modified via `plumb modify <id>`, which stages the modified code and reports test results.
 6. The user re-runs `git commit`. Hook fires again, finds no pending decisions, exits zero. Commit lands.
 
-Both paths use the same hook, the same decision log, the same per-decision commands, and the same sync logic. The only difference is who drives the review loop: Claude Code's skill or the interactive `plumb review` CLI.
+Both paths use the same hook, the same decision log, the same per-decision commands, and the same sync logic. The only difference is who drives the review loop: Claude Code's skill or the interactive `plumb review` CLI. The system uses exact deduplication and LLM-based semantic deduplication with groq/openai/gpt-oss-120b configured for both decision_deduplicator and question_synthesizer (8192 max_tokens). Source summaries are structured as per-file mappings to enable granular tracking. All documentation files including SKILL files and CLAUDE.md must be kept consistent with the same sync workflow requirements.
 
 ---
-
 ## CLI Commands
 
 All commands are invoked as `plumb <command>`.
@@ -149,11 +186,12 @@ Initializes Plumb in the current git repository.
    - Provide a path to a spec file or directory of spec markdown files. Validates that the path exists and contains `.md` files.
    - Provide a path to a test file or test directory. Validates that the path exists.
 4. Writes `.plumb/config.json` with the provided paths.
-5. Installs the git pre-commit hook by writing a script to `.git/hooks/pre-commit` that calls `plumb hook`. Sets the script as executable.
-6. Installs the Claude Code skill locally by copying `plumb/skill/SKILL.md` to `.claude/SKILL.md` in the project root. Creates `.claude/` if it does not exist. This is a project-local installation only — Plumb never writes to the user's global `~/.claude/` directory.
-7. Appends a Plumb status block to `CLAUDE.md` at the project root (creating `CLAUDE.md` if it does not exist). See **CLAUDE.md Integration**.
-8. Runs `plumb parse-spec` to do an initial parse of the spec into requirements.
-9. Prints a confirmation summary to the terminal, including confirmation that the skill was installed at `.claude/SKILL.md`.
+5. Creates a `.plumbignore` file in the project root if it does not exist.
+6. Installs the git pre-commit hook by writing a script to `.git/hooks/pre-commit` that calls `plumb hook`. Sets the script as executable.
+7. Installs the Claude Code skill locally by copying `plumb/skill/SKILL.md` to `.claude/skills/plumb/SKILL.md` in the project root. Creates `.claude/skills/plumb/` directories if they do not exist. This is a project-local installation only — Plumb never writes to the user's global `~/.claude/` directory.
+8. Appends a Plumb status block to `CLAUDE.md` at the project root (creating `CLAUDE.md` if it does not exist). See **CLAUDE.md Integration**.
+9. Runs `plumb parse-spec` to do an initial parse of the spec into requirements.
+10. Prints a confirmation summary to the terminal, including confirmation that the skill was installed at `.claude/skills/plumb/SKILL.md`.
 
 **Config schema (`.plumb/config.json`):**
 ```json
@@ -168,7 +206,6 @@ Initializes Plumb in the current git repository.
 ```
 
 ---
-
 ### `plumb hook`
 
 Called automatically by the git pre-commit hook. Not intended to be called directly by users, but must work if called manually.
@@ -181,13 +218,14 @@ Called automatically by the git pre-commit hook. Not intended to be called direc
 5. **Detects broken references (rebase):** Check all SHAs in `decisions.jsonl` against git history. Flag unreachable SHAs with `"ref_status": "broken"` and include a warning in output.
 6. Runs the **Diff Analysis** DSPy program on the staged diff.
 7. Attempts to locate and read the Claude Code conversation log (see **Conversation Log Parsing and Chunking**).
-   - If found: reads and chunks turns since `last_commit` timestamp. Runs **Decision Extraction** per chunk.
+   - If found: reads and chunks turns since `last_commit` timestamp. Uses unified conversation reading interface to support multiple sessions. Merges conversation turns from all relevant session files modified after the last commit and sorts chronologically. Handles multi-line assistant responses that span multiple JSONL lines. Converts tool_use blocks to '[tool: Name] description' format in conversation turns. Runs **Decision Extraction** per chunk.
    - If not found: skips conversation analysis. Notes `"conversation_available": false` in each decision object.
-8. Merges and deduplicates decisions across chunks.
-9. For each decision with no associated question, runs **Question Synthesizer**.
-10. Writes all new decisions with `status: "pending"` to `decisions.jsonl`.
-11. Runs `plumb parse-spec` to update requirements cache for any modified spec files.
-12. **If pending decisions exist:**
+8. Filters out decisions marked as non-spec-relevant during extraction before creating Decision records.
+9. Merges and deduplicates decisions across chunks. Deduplication checks against all existing decisions (both pending and resolved) instead of only resolved ones. Implements within-batch similarity deduplication to compare new decisions against each other using Jaccard similarity check.
+10. For each decision with no associated question, runs **Question Synthesizer** with program-specific model configuration.
+11. Writes all new decisions with `status: "pending"` to `decisions.jsonl`.
+12. Runs `plumb parse-spec` to update requirements cache for any modified spec files.
+13. **If pending decisions exist:**
     - Checks whether it is running in a TTY (interactive terminal) or as a subprocess (e.g., called by Claude Code).
     - **TTY:** Prints a human-readable summary of pending decisions with instructions to run `plumb review`.
     - **Non-TTY (subprocess):** Prints a machine-readable JSON object to stdout:
@@ -206,12 +244,11 @@ Called automatically by the git pre-commit hook. Not intended to be called direc
       }
       ```
     - **Exits non-zero** in both cases, aborting the commit.
-13. **If no pending decisions exist:** Runs `plumb coverage`, prints a brief summary, updates `last_commit` and `last_commit_branch` in `config.json`, and **exits 0**, allowing the commit to proceed.
+14. **If no pending decisions exist:** Runs `plumb coverage`, prints a brief summary, updates `last_commit` and `last_commit_branch` in `config.json`, and **exits 0**, allowing the commit to proceed.
 
 **The hook must never exit non-zero due to an internal Plumb error.** If Plumb itself fails, it prints a warning to stderr and exits 0 so the commit is not blocked.
 
 ---
-
 ### `plumb hook --dry-run`
 
 Runs the full hook analysis on staged changes but does not write to `decisions.jsonl` and always exits 0. Equivalent to `plumb diff`. Intended for testing and preview.
@@ -242,31 +279,35 @@ Interactive review of pending decisions. Intended for terminal (TTY) use.
 **Behavior:**
 1. Reads `.plumb/decisions.jsonl`, filters for `status == "pending"`.
 2. Accepts an optional `--branch <name>` flag to filter by branch.
-3. If none, prints "No pending decisions." and exits 0.
-4. For each pending decision, displays:
+3. When multiple session files exist, uses the most recent session file by modification time or matches the current session ID for session selection.
+4. If no pending decisions exist, prints "No pending decisions." and exits 0.
+5. For each pending decision, displays:
    - The framing question
    - The decision made (by user or LLM)
    - The branch it was made on
    - File and line references
    - Whether the commit SHA is reachable (`ref_status`)
    - The most related current spec text (if any)
-5. Prompts the user:
+6. Prompts the user:
    - `[a]pprove`
    - `[r]eject` (prompts for reason; optionally runs `plumb modify <id>` automatically)
    - `[e]dit` (user provides replacement decision text)
    - `[s]kip` (remains pending)
-6. After all decisions are resolved, runs `plumb sync` for all approved/edited decisions.
+7. After all decisions are resolved, runs `plumb sync` for all approved/edited decisions.
+
+**Decision Classification:**
+- Defaults `spec_relevant` field to `True` to ensure decisions pass through for user review when LLM classification is uncertain.
 
 ---
-
 ### `plumb approve <id>`
 
 Approves a single decision by ID. Updates its status to `approved` in `decisions.jsonl`. Then runs `plumb sync` for that decision only.
 
+The status display should include a visual bar chart representation for coverage statistics and use Rich's Status spinner that updates in-place for progress indication.
+
 Intended to be called by the Claude Code skill during conversational review.
 
 ---
-
 ### `plumb reject <id> [--reason "<text>"]`
 
 Rejects a single decision by ID. Updates its status to `rejected` and records the reason. Does not modify code or spec.
@@ -297,7 +338,7 @@ Modifies the staged code to satisfy a rejected decision. This is the automatic c
    - The current spec
    - An instruction to modify the staged code to satisfy the rejection while keeping behavior consistent with the spec
 4. Applies the proposed modification to the staged files.
-5. Runs `pytest` on the test suite.
+5. Runs `pytest` on the test suite to verify that tests still pass after modification.
    - If tests pass: prints the resulting diff to the terminal (or returns it as JSON in non-TTY mode). Stages the modified files. Updates the decision status to `"rejected_modified"`.
    - If tests fail: prints the failure output. Does **not** stage the modification. Prompts the user to resolve manually. Updates decision status to `"rejected_manual"`.
 6. In non-TTY mode (Claude Code), returns a machine-readable JSON result:
@@ -310,12 +351,11 @@ Modifies the staged code to satisfy a rejected decision. This is the automatic c
    }
    ```
 
-**Plumb never commits the modification.** It only stages it. The user (or Claude Code) re-runs `git commit` after all decisions are resolved.
+**`plumb` never commits the modification.** It only stages it. The user (or Claude Code) re-runs `git commit` after all decisions are resolved.
 
 **Status values added for modification:** `rejected_modified` | `rejected_manual`
 
 ---
-
 ### `plumb sync`
 
 Updates the spec and tests to reflect all approved and edited decisions. Can be run manually or is called automatically by `plumb approve` and `plumb edit`.
@@ -323,16 +363,18 @@ Updates the spec and tests to reflect all approved and edited decisions. Can be 
 **Behavior:**
 1. Reads decisions from `decisions.jsonl` with status `approved` or `edited` that have not yet been synced (no `synced_at` timestamp).
 2. For each decision:
-   - Runs **Spec Updater**: rewrites the relevant spec section so the result of the decision is captured as a natural requirement. The decision itself is not mentioned.
+   - Runs **Spec Updater**: rewrites the relevant spec section so the result of the decision is captured as a natural requirement. The decision itself is not mentioned. Multiple decisions affecting the same spec section are processed together in batches.
    - Writes the updated spec file to disk (temp file → rename).
-3. Runs **Test Generator**: generates pytest stubs for requirements not covered by existing tests.
-4. Writes generated stubs to the appropriate test file (temp file → rename).
+3. Runs **Test Generator**: generates organized tests for requirements not covered by existing tests. Tests are organized by functionality with proper requirement links in the format `test_<req_id>_<description>`. The generator reads only source files referenced by `file_refs` on synced decisions for context.
+4. Writes generated tests to `test_generated.py` (temp file → rename).
 5. Runs `plumb parse-spec` to re-cache requirements.
 6. Sets `synced_at` on each processed decision.
-7. Prints a summary of spec sections updated and test stubs created.
+7. Prints a summary of spec sections updated and test files created.
+
+**Default Configuration:**
+- Uses `.plumbignore` file with default patterns for documentation, build files, and IDE configurations to exclude irrelevant files from processing.
 
 ---
-
 ### `plumb parse-spec`
 
 Parses all spec markdown files into an explicit list of requirements and caches them.
@@ -341,7 +383,11 @@ Parses all spec markdown files into an explicit list of requirements and caches 
 1. Reads all markdown files in `spec_paths` from `config.json`.
 2. For each file or paragraph block, runs **Requirement Parser** to produce explicit, testable requirement statements.
 3. Assigns each requirement a stable ID based on a hash of its content.
-4. Writes results to `.plumb/requirements.json`. Requirements with matching hashes are not re-processed.
+4. Writes results to `.plumb/requirements.json`. Requirements with matching hashes are not re-processed, preserving existing metadata including `created_at` and `last_seen_commit` timestamps.
+5. Uses regex patterns `PLUMB_MARKER_RE` and `FUNC_NAME_RE` to extract requirement IDs from test files for coverage mapping.
+6. Processes all requirements and AST summaries of every non-test `.py` file through the CodeCoverageMapper in batch operations.
+7. Implements granular per-file hashing with structured v2 cache format that tracks individual requirement results for efficient cache invalidation.
+8. Extracts source file paths from evidence strings using pattern matching against known files to determine requirement-to-file mappings.
 
 **Requirements cache schema:**
 ```json
@@ -359,19 +405,19 @@ Parses all spec markdown files into an explicit list of requirements and caches 
 ```
 
 ---
-
 ### `plumb coverage`
 
 Reports coverage across all three dimensions.
 
 **Behavior:**
 1. **Code coverage:** Runs `pytest --cov` and parses output. Reports line coverage percentage.
-2. **Spec-to-test coverage:** For each requirement in the cache, checks whether a test references or maps to it. Reports count and percentage covered.
-3. **Spec-to-code coverage:** Uses the requirements cache to check whether each requirement has a corresponding implementation. Reports gaps.
+2. **Spec-to-test coverage:** For each requirement in the cache, checks whether a test references or maps to it using string-matching to look for requirement IDs (like 'req-79c36afc') literally in test files. Also scans for link markers in test files to determine coverage. Reports count and percentage covered.
+3. **Spec-to-code coverage:** Uses the requirements cache to check whether each requirement has a corresponding implementation by using string-matching to look for requirement IDs literally in source files. Reports gaps.
 4. Prints a formatted table using `rich`.
+5. Uses LLM calls to refresh the requirements cache for accurate coverage analysis.
+6. Measures and reports coverage improvement achieved by marker injection.
 
 ---
-
 ### `plumb status`
 
 Prints a human-readable summary:
@@ -392,6 +438,8 @@ Prints a human-readable summary:
 Plumb ships with a Claude Code skill file at `plumb/skill/SKILL.md`. During `plumb init`, this file is copied to `.claude/SKILL.md` in the project root — a project-local installation only. It is never installed globally. Claude Code automatically reads files in `.claude/` at the start of each session, so no additional configuration is required after `plumb init`.
 
 The skill file provides structured guidance for AI-assisted development workflow. It teaches Claude Code the Plumb workflow so it can guide the user naturally through the development process, and it provides the machine-readable protocol for parsing hook output and calling per-decision commands during conversational review.
+
+The system supports reading Claude Code native session files with JSONL parsing from the `~/.claude/projects/` directory structure. Conversation logs are located in the real session JSONL files using the format `~/.claude/projects/<project>/<session-uuid>.jsonl`.
 ### Skill File Location
 
 - **Source (in Plumb package):** `plumb/skill/SKILL.md`
@@ -464,11 +512,10 @@ following:
 
 4. Based on the user's response, call the appropriate command:
    - Approve: `plumb approve <id>`
-   - Reject: `plumb reject <id> --reason "<user's reason>"` then immediately
-     call `plumb modify <id>`
+   - Reject: `plumb reject <id> --reason "<user's reason>"` (automatically triggers modification workflow)
    - Edit: `plumb edit <id> "<new decision text>"`
 
-5. For rejections, after calling `plumb modify <id>`, parse its JSON output:
+5. For rejections, the system automatically calls `plumb modify <id>` and parses its JSON output:
    ```json
    {
      "id": "dec-abc123",
@@ -484,11 +531,11 @@ following:
      The decision status will be `rejected_manual` — the user must fix the code
      themselves before committing.
 
-6. Once all decisions are resolved, re-run `git commit`. The hook will fire
-   again. If there are no pending decisions it will exit 0 and the commit will
-   land. If new decisions are found (rare), repeat the review process.
+6. Rejected decisions are marked with 'ignored' status rather than being deleted from the system.
 
-7. All CLI operations require explicit user commands. The system shall not perform automatic synchronization or background operations without direct user instruction.
+7. Once all decisions are resolved, the user must run `plumb sync` to update the spec with approved decisions before re-running `git commit`. The hook will fire again. If there are no pending decisions it will exit 0 and the commit will land. If new decisions are found (rare), repeat the review process.
+
+8. All CLI operations require explicit user commands. The system shall not perform automatic synchronization or background operations without direct user instruction.
 ### After committing
 Run `plumb coverage` and briefly report the three coverage dimensions to the
 user: code coverage, spec-to-test coverage, and spec-to-code coverage. Flag any
@@ -513,7 +560,7 @@ Present these gaps clearly so the user can prioritize.
   decisions — let Plumb do it via `plumb sync`.
 - Do not attempt to commit if there are decisions with `status: rejected_manual`.
   The user must resolve these manually first.
-
+- When handling decision conflicts, use opposite ordering rules: for duplicate decisions, keep the earlier one (lower index); for countermanded decisions, keep the later one (higher index).
 ## Command reference
 
 | Command | When to use |
@@ -529,10 +576,10 @@ Present these gaps clearly so the user can prioritize.
 | `plumb sync` | Called automatically by approve/edit — updates spec and tests |
 | `plumb coverage` | Report coverage across all three dimensions |
 | `plumb parse-spec` | Re-parse spec after manual edits |
-```
+
+The conversation log reader must work seamlessly across different repositories without requiring additional user setup or configuration overhead.
 
 ---
-
 ## CLAUDE.md Integration
 
 `plumb init` appends the following block to `CLAUDE.md`. Delimited by comment markers so future Plumb commands can update it without affecting surrounding content.
@@ -552,7 +599,7 @@ This project uses Plumb to keep the spec, tests, and code in sync.
 - Run `plumb status` before beginning work to understand current alignment.
 - Run `plumb diff` before committing to preview what Plumb will capture.
 - When `git commit` is intercepted by Plumb, present each pending decision to
-  the user conversationally and call the appropriate command:
+  the user using structured decision presentation and call the appropriate command:
   - `plumb approve <id>` — user accepts the decision
   - `plumb reject <id> --reason "<text>"` — user rejects it; follow with `plumb modify <id>`
   - `plumb edit <id> "<new text>"` — user amends the decision text
@@ -561,11 +608,11 @@ This project uses Plumb to keep the spec, tests, and code in sync.
 - Never edit `.plumb/decisions.jsonl` directly.
 - Treat the spec markdown files as the source of truth for intended behavior.
   Plumb will keep them updated as decisions are approved.
+- When parsing session files, skip assistant entries that contain 'thinking' blocks, have 'isSidechain: true', or have 'isMeta: true'.
 <!-- plumb:end -->
 ```
 
 ---
-
 ## Conversation Log Parsing and Chunking
 
 ### Locating the Log
@@ -574,8 +621,9 @@ This project uses Plumb to keep the spec, tests, and code in sync.
 - If not set, Plumb attempts to auto-detect using common Claude Code log locations.
 - If not found, Plumb skips conversation analysis, notes `"conversation_available": false` in each decision, prints a warning, and continues with diff-only analysis.
 - The log is a JSONL file where each line is a turn with at minimum `role` (`user` | `assistant`), `content` (string), and `timestamp`.
+- Session files are pre-filtered by modification time to avoid reading old files, then individual entries are filtered by timestamp.
 - Plumb reads only turns recorded after the `last_commit` timestamp in `config.json`.
-
+- The conversation parser handles the native session JSONL format with type/message schema used by Claude Code.
 ### Chunking Strategy
 
 Chunking is performed in `conversation.py` before any DSPy program is called. No LLM is involved in this step — chunks are created deterministically.
@@ -588,6 +636,8 @@ Chunking is performed in `conversation.py` before any DSPy program is called. No
 
 **Noise reduction.** Before chunking, replace tool result turns longer than 500 tokens whose content appears to be a raw file read (heuristic: content begins with a file path or code fence) with `[file read: <filename>]`.
 
+**Multi-line assistant parsing.** Assistant messages that span multiple JSONL entries (one content block per line) must be properly parsed and reassembled.
+
 **Chunk metadata:**
 ```json
 {
@@ -598,7 +648,6 @@ Chunking is performed in `conversation.py` before any DSPy program is called. No
   "turns": [...]
 }
 ```
-
 ### Running DecisionExtractor per Chunk
 
 - Called once per chunk with the `diff_summary` passed identically to every call.
@@ -708,10 +757,10 @@ Rules: result of decision captured as natural requirement; no reference to the d
 
 ### `TestGenerator`
 
-**Input:** `requirements` (uncovered), `existing_tests` (file contents), `code_context` (relevant source)  
-**Output:** pytest test stubs as a Python string
+**Input:** `requirements` (uncovered), `existing_tests` (file contents), `code_context` (relevant source)
+**Output:** Runnable pytest test code as a Python string
 
-Rules: one function per requirement, descriptive names (`test_<req_id>_<description>`), stubs include `# TODO: implement` and `pytest.skip()`, no overwriting existing tests.
+Rules: one function per requirement, descriptive names (`test_<req_id>_<description>`), tests contain real assertions against actual code under test, no `pytest.skip()` or `# TODO: implement`, no overwriting existing tests.
 
 ---
 
@@ -734,13 +783,16 @@ Called via the Anthropic API directly with a structured prompt. Plumb applies th
 - File writes (spec updates, test generation) use temp file → rename to avoid partial writes.
 - If conversation log is unavailable, Plumb continues with diff-only analysis. This is not an error.
 - If `plumb modify` test run fails, Plumb does not stage the modification and updates decision status to `rejected_manual`.
+- The `plumb status` command operates in cache-only mode to avoid making LLM calls.
+- The `plumb coverage` command displays progress using an in-place updating spinner, then prints the final results table.
+- Session file reading is optimized by pre-filtering based on file modification times to skip files that cannot contain relevant conversations.
 
 ---
 ## Testing Plumb Itself
 
 pytest, 80% coverage minimum for v0.1.0.
 
-- `cli.py`: all commands run without error given valid inputs; per-decision commands update `decisions.jsonl` correctly
+- `cli.py`: all commands run without error given valid inputs; per-decision commands update `decisions.jsonl` correctly; coverage command provides progress feedback with progress bar and status text
 - `decision_log.py`: read/write/filter/dedup on `.jsonl`; latest-line-wins logic for status updates
 - `git_hook.py`: hook produces correct pending decisions given mock diffs and conversation logs; amend detection; TTY vs non-TTY output formats
 - `conversation.py`: correct chunk boundaries, overlap, noise reduction, metadata; oversized chunks split at tool call boundaries
@@ -749,7 +801,6 @@ pytest, 80% coverage minimum for v0.1.0.
 - `sync.py`: spec and test files updated correctly given approved decisions; no partial writes
 
 ---
-
 ## Out of Scope for v0.1.0
 
 - Web UI or dashboard
@@ -776,3 +827,8 @@ pytest, 80% coverage minimum for v0.1.0.
 | **Interactive Review** | The review loop driven by `plumb review` in a terminal |
 | **Programs Module** | A dedicated module containing LLM programs, separate from core library functionality |
 | **Plumb** | This library |
+| **Ignore Module** | A dedicated module (ignore.py) that handles file exclusion functionality |
+| **.plumbignore** | A configuration file using gitignore-style patterns to exclude files from plumb operations and analysis |
+| **Claude Session Module** | A module (plumb/claude_session.py) that reads Claude Code native session files from ~/.claude/projects/ |
+| **Decision Cycling** | The phenomenon where LLMs rephrase decisions slightly differently on each run, causing them to slip past deduplication thresholds |
+| **DecisionDeduplicator** | A dedicated module that performs LLM-based deduplication of decisions |

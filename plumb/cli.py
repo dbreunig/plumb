@@ -161,7 +161,10 @@ This project uses Plumb to keep the spec, tests, and code in sync.
   Ignore, Reject. Then run the corresponding `plumb` command.
   **NEVER approve, reject, or edit decisions on the user's behalf.** This is
   non-negotiable.
-- After all decisions are resolved, re-run `git commit`.
+- After all decisions are resolved, run `plumb sync` to update the spec and
+  generate tests. Stage the sync output, then re-run `git commit`. Draft the
+  commit message **after** decision review and include a list of approved
+  decisions.
 - Use `plumb coverage` to identify what needs to be implemented or tested next.
 - Never edit `.plumb/decisions.jsonl` directly.
 - Treat the spec markdown files as the source of truth for intended behavior.
@@ -528,7 +531,7 @@ def sync_cmd():
                 status.update(f"[bold cyan]{msg}")
             result = sync_decisions(repo_root, on_progress=on_progress)
         console.print(f"Synced: {result['spec_updated']} spec sections updated, "
-                      f"{result['tests_generated']} test stubs generated.")
+                      f"{result['tests_generated']} tests generated.")
     except Exception as e:
         console.print(f"[red]Sync failed: {e}[/red]")
         raise SystemExit(1)

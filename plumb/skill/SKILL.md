@@ -65,9 +65,17 @@ following:
    If the user approved ALL decisions with no edits, use `plumb approve --all`
    instead of approving each one individually.
 
-4. Once all decisions are resolved, re-run `git commit`. The hook will fire
-   again. If there are no pending decisions it will exit 0 and the commit will
-   land. If new decisions are found (rare), repeat the review process.
+4. **After all decisions are resolved, run `plumb sync`.** This updates the spec
+   files and generates tests for approved decisions. You MUST run sync
+   before re-committing — approved decisions that are not synced will leave the
+   spec out of date.
+
+5. Stage any files changed by sync (spec files, generated tests), then re-run
+   `git commit`. Draft the commit message **after** decision review is complete
+   and include a summary of approved decisions (e.g. "Approved: dec-abc123
+   (added caching), dec-def456 (fixed retry logic)"). The hook will fire again.
+   If there are no pending decisions it will exit 0 and the commit will land.
+   If new decisions are found (rare), repeat the review process.
 
 ### After committing
 Run `plumb coverage` and briefly report the three coverage dimensions to the
@@ -108,7 +116,8 @@ Present these gaps clearly so the user can prioritize.
 |---|---|
 | `plumb status` | Start of session, before beginning work |
 | `plumb diff` | Before committing, to preview decisions |
-| `plumb hook` | Called automatically by pre-commit hook — do not call manually |
+| `plumb hook` | Called automatically by pre-commit hook |
+| `plumb check` | Manually scan staged changes for decisions (alias for hook) |
 | `plumb approve <id>` | User approves a decision during review |
 | `plumb approve --all` | User approves all pending decisions at once |
 | `plumb reject <id> --reason "<text>"` | User rejects a decision (auto-modifies code) |
@@ -116,6 +125,6 @@ Present these gaps clearly so the user can prioritize.
 | `plumb modify <id>` | Called automatically by reject — do not call directly |
 | `plumb edit <id> "<text>"` | User amends decision text before approving |
 | `plumb review` | Interactive terminal review (not needed in Claude Code) |
-| `plumb sync` | Called automatically by approve/edit — updates spec and tests |
+| `plumb sync` | **Run after approving decisions** — updates spec and generates tests |
 | `plumb coverage` | Report coverage across all three dimensions |
 | `plumb parse-spec` | Re-parse spec after manual edits |
