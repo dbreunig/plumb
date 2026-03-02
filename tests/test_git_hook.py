@@ -143,6 +143,7 @@ class TestGetStagedDiffFilteredWithIgnore:
 
 class TestGetBranchName:
     def test_returns_main(self, tmp_repo):
+        # plumb:req-c5fc9f66
         repo = Repo(tmp_repo)
         name = _get_branch_name(repo)
         assert name in ("main", "master")
@@ -154,6 +155,7 @@ class TestDetectAmend:
         assert _detect_amend(repo, None) is False
 
     def test_not_amend(self, tmp_repo):
+        # plumb:req-7fb50a59
         repo = Repo(tmp_repo)
         # Make a second commit
         f = tmp_repo / "a.py"
@@ -167,6 +169,8 @@ class TestDetectAmend:
 
 class TestCheckBrokenRefs:
     def test_ok_ref(self, tmp_repo):
+        # plumb:req-280a71d8
+        # plumb:req-1f885ef1
         repo = Repo(tmp_repo)
         sha = str(repo.head.commit)
         d = Decision(id="dec-1", commit_sha=sha)
@@ -188,6 +192,7 @@ class TestCheckBrokenRefs:
 
 class TestFormatOutput:
     def test_tty_output(self):
+        # plumb:req-6f83d98c
         pending = [
             Decision(
                 id="dec-abc",
@@ -203,6 +208,7 @@ class TestFormatOutput:
         assert "plumb review" in output
 
     def test_json_output(self):
+        # plumb:req-cee2a552
         pending = [
             Decision(
                 id="dec-abc",
@@ -220,20 +226,25 @@ class TestFormatOutput:
 
 class TestRunHook:
     def test_no_config_returns_0(self, tmp_repo):
+        # plumb:req-eb649dd1
         """If plumb not initialized, exit 0."""
         assert run_hook(tmp_repo) == 0
 
     def test_no_staged_diff_returns_0(self, initialized_repo):
+        # plumb:req-bafc9fa8
         """No staged changes means nothing to analyze."""
         assert run_hook(initialized_repo) == 0
 
     def test_error_returns_0(self, initialized_repo):
+        # plumb:req-8e003e34
+        # plumb:req-2699997e
         """Internal errors should never block commits."""
         with patch("plumb.git_hook._run_hook_inner", side_effect=RuntimeError("boom")):
             result = run_hook(initialized_repo)
             assert result == 0
 
     def test_auth_error_blocks_commit(self, initialized_repo):
+        # plumb:req-b42c75c3
         """Auth errors should block commits (exit 1)."""
         with patch(
             "plumb.git_hook._run_hook_inner",
@@ -243,6 +254,7 @@ class TestRunHook:
             assert result == 1
 
     def test_missing_api_key_blocks_commit(self, initialized_repo):
+        # plumb:req-3f212a0d
         """Missing ANTHROPIC_API_KEY should block commit when there's a staged diff."""
         repo = Repo(initialized_repo)
         f = initialized_repo / "new.py"
@@ -259,6 +271,7 @@ class TestRunHook:
             assert result == 1
 
     def test_dry_run_returns_0(self, initialized_repo):
+        # plumb:req-970aa4c2
         """Dry run always returns 0."""
         repo = Repo(initialized_repo)
         f = initialized_repo / "new.py"
@@ -274,6 +287,7 @@ class TestRunHook:
             assert result == 0
 
     def test_pending_decisions_block_commit(self, initialized_repo):
+        # plumb:req-bdfb0f18
         """Pending decisions should cause exit 1."""
         repo = Repo(initialized_repo)
         f = initialized_repo / "new.py"
@@ -299,6 +313,7 @@ class TestRunHook:
             assert result == 1
 
     def test_no_pending_decisions_allow_commit(self, initialized_repo):
+        # plumb:req-124ad3e8
         """No pending decisions should allow commit (exit 0)."""
         repo = Repo(initialized_repo)
         f = initialized_repo / "new.py"

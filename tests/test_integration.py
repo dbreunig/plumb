@@ -134,6 +134,7 @@ class TestFullHookFlow:
 
 class TestAmendFlow:
     def test_amend_deletes_old_decisions(self, full_repo):
+        # plumb:req-c5b53da1
         """When amending, old decisions for that commit should be removed."""
         repo = Repo(full_repo)
         initial_sha = str(repo.head.commit)

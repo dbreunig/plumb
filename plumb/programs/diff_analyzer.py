@@ -28,7 +28,7 @@ class DiffAnalyzerSignature(dspy.Signature):
 class DiffAnalyzer(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.predict = dspy.ChainOfThought(DiffAnalyzerSignature)
+        self.predict = dspy.Predict(DiffAnalyzerSignature)
 
     def forward(self, diff: str) -> list[ChangeSummary]:
         result = self.predict(diff=diff)

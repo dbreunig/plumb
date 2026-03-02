@@ -23,7 +23,7 @@ class RequirementParserSignature(dspy.Signature):
 class RequirementParser(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.predict = dspy.ChainOfThought(RequirementParserSignature)
+        self.predict = dspy.Predict(RequirementParserSignature)
 
     def forward(self, markdown: str) -> list[ParsedRequirement]:
         result = self.predict(markdown=markdown)

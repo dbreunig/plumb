@@ -41,6 +41,7 @@ class TestLocateConversationLog:
 
 class TestReadConversationLog:
     def test_basic_read(self, tmp_path):
+        # plumb:req-5436da8c
         log = tmp_path / "conv.jsonl"
         lines = [
             json.dumps({"role": "user", "content": "hello", "timestamp": "2025-01-01T00:00:00Z"}),
@@ -53,6 +54,7 @@ class TestReadConversationLog:
         assert turns[1].content == "hi there"
 
     def test_filter_by_since(self, tmp_path):
+        # plumb:req-36d35d26
         log = tmp_path / "conv.jsonl"
         lines = [
             json.dumps({"role": "user", "content": "old", "timestamp": "2025-01-01T00:00:00Z"}),
@@ -72,6 +74,7 @@ class TestReadConversationLog:
 
 class TestReduceNoise:
     def test_replaces_large_file_reads(self):
+        # plumb:req-74d0f651
         big_content = "```python\n" + "x = 1\n" * 600 + "```"
         turns = [ConversationTurn(role="assistant", content=big_content)]
         result = reduce_noise(turns)
@@ -95,6 +98,7 @@ class TestChunkConversation:
         assert chunk_conversation([]) == []
 
     def test_single_group(self):
+        # plumb:req-7f96b754
         turns = [
             ConversationTurn(role="user", content="hello", timestamp="t1"),
             ConversationTurn(role="assistant", content="hi", timestamp="t2"),
@@ -117,6 +121,8 @@ class TestChunkConversation:
         assert any(t.content == "a1" for t in chunks[1].turns)
 
     def test_oversized_group_splits(self):
+        # plumb:req-3f660d18
+        # plumb:req-079c3155
         # Create a single user turn group that exceeds token limit
         big = "x " * 15000  # ~7500 tokens > 6000
         turns = [

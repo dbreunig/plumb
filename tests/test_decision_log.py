@@ -61,6 +61,8 @@ class TestReadWriteDecisions:
         assert read_decisions(initialized_repo) == []
 
     def test_append_and_read(self, initialized_repo, sample_decisions):
+        # plumb:req-fa14efa8
+        # plumb:req-bf22567e
         append_decision(initialized_repo, sample_decisions[0])
         result = read_decisions(initialized_repo)
         assert len(result) == 1
@@ -72,6 +74,7 @@ class TestReadWriteDecisions:
         assert len(result) == 2
 
     def test_latest_line_wins(self, initialized_repo, sample_decisions):
+        # plumb:req-b2576545
         append_decision(initialized_repo, sample_decisions[0])
         # Append same id with updated status
         updated = sample_decisions[0].model_copy(update={"status": "approved"})
@@ -83,6 +86,7 @@ class TestReadWriteDecisions:
 
 class TestUpdateDecisionStatus:
     def test_update_existing(self, initialized_repo, sample_decisions):
+        # plumb:req-2aaba138
         append_decision(initialized_repo, sample_decisions[0])
         result = update_decision_status(
             initialized_repo, "dec-aaa111", status="approved"

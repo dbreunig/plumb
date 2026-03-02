@@ -36,6 +36,7 @@ class TestPlumbConfig:
 
 class TestFindRepoRoot:
     def test_finds_git_repo(self, tmp_repo):
+        # plumb:req-fedab03e
         assert find_repo_root(tmp_repo) == tmp_repo
 
     def test_finds_from_subdirectory(self, tmp_repo):
@@ -44,11 +45,13 @@ class TestFindRepoRoot:
         assert find_repo_root(sub) == tmp_repo
 
     def test_returns_none_for_non_repo(self, tmp_path):
+        # plumb:req-dc5b8f48
         assert find_repo_root(tmp_path) is None
 
 
 class TestEnsurePlumbDir:
     def test_creates_directory(self, tmp_repo):
+        # plumb:req-27edd42d
         plumb_dir = ensure_plumb_dir(tmp_repo)
         assert plumb_dir.exists()
         assert plumb_dir.name == ".plumb"
@@ -61,6 +64,8 @@ class TestEnsurePlumbDir:
 
 class TestLoadSaveConfig:
     def test_save_and_load(self, tmp_repo):
+        # plumb:req-1a094799
+        # plumb:req-87c1d58b
         ensure_plumb_dir(tmp_repo)
         cfg = PlumbConfig(spec_paths=["spec.md"], test_paths=["tests/"])
         save_config(tmp_repo, cfg)

@@ -15,7 +15,7 @@ class QuestionSynthesizerSignature(dspy.Signature):
 class QuestionSynthesizer(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.predict = dspy.ChainOfThought(QuestionSynthesizerSignature)
+        self.predict = dspy.Predict(QuestionSynthesizerSignature)
 
     def forward(self, decision: str) -> str:
         result = self.predict(decision=decision)

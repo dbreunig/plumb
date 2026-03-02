@@ -18,6 +18,7 @@ class TestRunPytestCoverage:
         assert run_pytest_coverage(tmp_repo) is None
 
     def test_with_config(self, initialized_repo):
+        # plumb:req-e8a350d6
         # This actually runs pytest so it may work or not depending on setup
         # We just verify it doesn't crash
         result = run_pytest_coverage(initialized_repo)
@@ -45,7 +46,7 @@ class TestSpecToTestCoverageExtended:
         )
         save_config(initialized_repo, cfg)
         test_file = initialized_repo / "test_single.py"
-        test_file.write_text("# req-abc123\ndef test_x(): pass\n")
+        test_file.write_text("def test_x():\n    # plumb:req-abc123\n    pass\n")
         req_path = initialized_repo / ".plumb" / "requirements.json"
         req_path.write_text(json.dumps([{"id": "req-abc123", "text": "X"}]))
         covered, total = check_spec_to_test_coverage(initialized_repo)
@@ -71,10 +72,11 @@ class TestPrintCoverageReportExtended:
         # Write test referencing one
         test_dir = initialized_repo / "tests"
         test_dir.mkdir(exist_ok=True)
-        (test_dir / "test_a.py").write_text("# req-abc\ndef test_x(): pass\n")
+        (test_dir / "test_a.py").write_text("def test_x():\n    # plumb:req-abc\n    pass\n")
 
         cov_data = {"totals": {"percent_covered": 75.0}}
-        with patch("plumb.coverage_reporter.run_pytest_coverage", return_value=cov_data):
+        with patch("plumb.coverage_reporter.run_pytest_coverage", return_value=cov_data), \
+             patch("plumb.coverage_reporter.check_spec_to_code_coverage", return_value=(1, 2)):
             print_coverage_report(initialized_repo)
         captured = capsys.readouterr()
         assert "75.0%" in captured.out

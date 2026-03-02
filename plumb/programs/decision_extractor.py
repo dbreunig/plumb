@@ -31,7 +31,7 @@ class DecisionExtractorSignature(dspy.Signature):
 class DecisionExtractor(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.predict = dspy.ChainOfThought(DecisionExtractorSignature)
+        self.predict = dspy.Predict(DecisionExtractorSignature)
 
     def forward(self, chunk: str, diff_summary: str) -> list[ExtractedDecision]:
         result = self.predict(chunk=chunk, diff_summary=diff_summary)

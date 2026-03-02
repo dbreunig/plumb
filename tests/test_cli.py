@@ -20,11 +20,15 @@ def runner():
 
 class TestInit:
     def test_not_git_repo(self, runner, tmp_path):
+        # plumb:req-fedab03e
+        # plumb:req-dc5b8f48
         with patch("plumb.cli.find_repo_root", return_value=None):
             result = runner.invoke(cli, ["init"])
             assert result.exit_code != 0
 
     def test_successful_init(self, runner, tmp_repo):
+        # plumb:req-1a094799
+        # plumb:req-26d23d84
         spec = tmp_repo / "spec.md"
         spec.write_text("# Spec\n")
         (tmp_repo / "tests").mkdir(exist_ok=True)
@@ -109,12 +113,14 @@ class TestClaudeMdIntegration:
 
 class TestHook:
     def test_hook_command(self, runner, initialized_repo):
+        # plumb:req-87dd4040
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo), \
              patch("plumb.git_hook.run_hook", return_value=0):
             result = runner.invoke(cli, ["hook"])
             assert result.exit_code == 0
 
     def test_hook_dry_run(self, runner, initialized_repo):
+        # plumb:req-b0b19348
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo), \
              patch("plumb.git_hook.run_hook", return_value=0) as mock_hook:
             result = runner.invoke(cli, ["hook", "--dry-run"])
@@ -124,6 +130,8 @@ class TestHook:
 
 class TestApprove:
     def test_approve_existing(self, runner, initialized_repo):
+        # plumb:req-42c8fd3f
+        # plumb:req-3a769972
         d = Decision(id="dec-test1", status="pending", decision="A")
         append_decision(initialized_repo, d)
 
@@ -179,6 +187,8 @@ class TestApprove:
 
 class TestReject:
     def test_reject_existing(self, runner, initialized_repo):
+        # plumb:req-74db9086
+        # plumb:req-4e20343f
         d = Decision(id="dec-test2", status="pending", decision="B")
         append_decision(initialized_repo, d)
 
@@ -195,6 +205,9 @@ class TestReject:
 
 class TestEdit:
     def test_edit_existing(self, runner, initialized_repo):
+        # plumb:req-127001f3
+        # plumb:req-b6f2c3c1
+        # plumb:req-5d3f1baf
         d = Decision(id="dec-test3", status="pending", decision="C")
         append_decision(initialized_repo, d)
 

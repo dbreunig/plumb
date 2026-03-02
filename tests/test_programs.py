@@ -35,6 +35,9 @@ from plumb.programs.code_modifier import CodeModifier
 
 class TestValidateApiAccess:
     def test_raises_when_key_missing(self):
+        # plumb:req-60f97012
+        # plumb:req-ab686eaa
+        # plumb:req-222ddbbd
         with patch("dotenv.load_dotenv"), \
              patch.dict("os.environ", {}, clear=True):
             import os
@@ -54,6 +57,7 @@ class TestValidateApiAccess:
             validate_api_access()  # should not raise
 
     def test_loads_dotenv_file(self):
+        # plumb:req-98d8bd75
         """Verify load_dotenv is called so .env files are picked up."""
         with patch("dotenv.load_dotenv") as mock_load, \
              patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}):
@@ -67,6 +71,7 @@ class TestRunWithRetries:
         assert result == 42
 
     def test_retries_on_failure(self):
+        # plumb:req-ab92bd9c
         call_count = 0
 
         def flaky():
@@ -81,6 +86,7 @@ class TestRunWithRetries:
         assert call_count == 3
 
     def test_raises_after_max_retries(self):
+        # plumb:req-a8b816ec
         with pytest.raises(PlumbInferenceError):
             run_with_retries(lambda: 1 / 0, max_retries=1)
 

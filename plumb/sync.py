@@ -248,11 +248,12 @@ def sync_decisions(
                 for tf in test_path.rglob("test_*.py"):
                     existing_tests += tf.read_text()
 
-        # Find uncovered requirements
-        existing_lower = existing_tests.lower()
+        # Find uncovered requirements using marker/function-name scanning
+        from plumb.coverage_reporter import _extract_test_req_ids
+        covered_ids = _extract_test_req_ids(existing_tests)
         uncovered = [
             r for r in requirements
-            if r["id"].lower() not in existing_lower
+            if r["id"] not in covered_ids
         ]
 
         if uncovered:
@@ -277,15 +278,18 @@ def sync_decisions(
                     gen, req_text, existing_tests[:2000], code_context[:2000]
                 )
                 if stubs.strip():
-                    # Append to first test path
+                    # Append to first test path, using test_stubs.py
                     test_target = repo_root / config.test_paths[0]
                     if test_target.is_dir():
-                        test_target = test_target / "test_generated.py"
+                        test_target = test_target / "test_stubs.py"
                     if test_target.exists():
                         existing = test_target.read_text()
                         _atomic_write(test_target, existing + "\n\n" + stubs + "\n")
                     else:
-                        _atomic_write(test_target, stubs + "\n")
+                        _atomic_write(
+                            test_target,
+                            "import pytest\n\n\n" + stubs + "\n",
+                        )
                     tests_generated += 1
             except Exception:
                 pass

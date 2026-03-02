@@ -125,6 +125,15 @@ def init():
     console.print(f"  Tests: {test_input}")
 
 
+def _coverage_bar(covered: int, total: int, width: int = 20) -> str:
+    """Render an inline coverage bar like: ████████░░░░░░░░░░░░ 37%  (60/163)"""
+    pct = (covered / total) * 100 if total else 0
+    filled = round(width * covered / total) if total else 0
+    bar = "█" * filled + "░" * (width - filled)
+    color = "green" if pct >= 70 else "yellow" if pct >= 40 else "red"
+    return f"[{color}]{bar}[/{color}] {pct:.0f}%  ({covered}/{total})"
+
+
 def _update_claude_md(repo_root: Path, cfg: PlumbConfig) -> None:
     """Append/update Plumb block in CLAUDE.md."""
     claude_md = repo_root / "CLAUDE.md"
@@ -493,6 +502,171 @@ def parse_spec():
         raise SystemExit(1)
 
 
+@cli.command(name="map-tests")
+@click.option("--dry-run", is_flag=True, help="Show proposed mappings without writing")
+def map_tests(dry_run):
+    """Map existing tests to requirements using LLM analysis."""
+    import ast
+
+    repo_root = find_repo_root()
+    if repo_root is None:
+        console.print("[red]Error: Not a git repository.[/red]")
+        raise SystemExit(1)
+
+    config = load_config(repo_root)
+    if not config:
+        console.print("[red]Error: Plumb not initialized.[/red]")
+        raise SystemExit(1)
+
+    req_path = Path(repo_root) / ".plumb" / "requirements.json"
+    if not req_path.exists():
+        console.print("[red]No requirements.json found. Run 'plumb parse-spec' first.[/red]")
+        raise SystemExit(1)
+
+    requirements = json.loads(req_path.read_text())
+    if not requirements:
+        console.print("[yellow]No requirements found.[/yellow]")
+        return
+
+    # Collect test summaries from all test files
+    test_summaries = []
+    test_files: dict[str, str] = {}  # rel_path -> content
+    for tp in config.test_paths:
+        test_dir = Path(repo_root) / tp
+        if test_dir.is_file():
+            files = [test_dir]
+        elif test_dir.is_dir():
+            files = list(test_dir.rglob("test_*.py"))
+        else:
+            continue
+        for tf in files:
+            content = tf.read_text()
+            rel_path = str(tf.relative_to(repo_root))
+            test_files[rel_path] = content
+            try:
+                tree = ast.parse(content)
+            except SyntaxError:
+                continue
+            lines = content.split("\n")
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef) and node.name.startswith("test_"):
+                    # Extract docstring
+                    docstring = ast.get_docstring(node) or ""
+                    # Extract first few lines of body for context
+                    end_line = min(node.end_lineno or node.lineno + 10, len(lines))
+                    body_preview = "\n".join(lines[node.lineno - 1:end_line])[:300]
+                    test_summaries.append({
+                        "file": rel_path,
+                        "name": node.name,
+                        "docstring": docstring,
+                        "preview": body_preview,
+                    })
+
+    if not test_summaries:
+        console.print("[yellow]No test functions found.[/yellow]")
+        return
+
+    console.print(f"Found {len(test_summaries)} test functions and {len(requirements)} requirements.")
+    console.print("Running LLM mapping...")
+
+    from plumb.programs import configure_dspy, run_with_retries
+    from plumb.programs.test_mapper import TestMapper
+
+    configure_dspy()
+    mapper = TestMapper()
+
+    req_json = json.dumps([{"id": r["id"], "text": r["text"]} for r in requirements])
+    summaries_json = json.dumps(test_summaries)
+
+    try:
+        mappings = run_with_retries(mapper, req_json, summaries_json)
+    except Exception as e:
+        console.print(f"[red]Mapping failed: {e}[/red]")
+        raise SystemExit(1)
+
+    if not mappings:
+        console.print("[yellow]No mappings found.[/yellow]")
+        return
+
+    # Display results
+    table = Table(title="Proposed Test-to-Requirement Mappings")
+    table.add_column("Test", style="cyan")
+    table.add_column("File")
+    table.add_column("Requirements", style="green")
+    table.add_column("Confidence", justify="right")
+
+    for m in mappings:
+        table.add_row(
+            m.test_function,
+            m.file_path,
+            ", ".join(m.requirement_ids),
+            f"{m.confidence:.0%}",
+        )
+    console.print(table)
+
+    if dry_run:
+        console.print("\n[yellow]Dry run — no markers written.[/yellow]")
+        return
+
+    # Ask user for approval
+    action = click.prompt(
+        "\nApply these mappings? [y]es / [n]o / [s]elect individually",
+        type=click.Choice(["y", "n", "s"], case_sensitive=False),
+    )
+
+    if action == "n":
+        console.print("Aborted.")
+        return
+
+    approved_mappings = mappings
+    if action == "s":
+        approved_mappings = []
+        for m in mappings:
+            if click.confirm(
+                f"  Map {m.test_function} -> {', '.join(m.requirement_ids)}?"
+            ):
+                approved_mappings.append(m)
+
+    # Inject markers into test files
+    injected = 0
+    modified_files: dict[str, str] = {}
+    for m in approved_mappings:
+        file_path = m.file_path
+        if file_path not in test_files:
+            continue
+        content = modified_files.get(file_path, test_files[file_path])
+        lines = content.split("\n")
+        # Find the function definition line
+        for i, line in enumerate(lines):
+            if f"def {m.test_function}(" in line:
+                # Find indentation of the function body
+                indent = "    "
+                for j in range(i + 1, min(i + 5, len(lines))):
+                    stripped = lines[j]
+                    if stripped.strip():
+                        indent = stripped[: len(stripped) - len(stripped.lstrip())]
+                        break
+                # Build marker comments
+                markers = []
+                for req_id in m.requirement_ids:
+                    marker = f"{indent}# plumb:{req_id}"
+                    # Check it's not already there
+                    if marker not in content:
+                        markers.append(marker)
+                if markers:
+                    marker_text = "\n".join(markers)
+                    lines.insert(i + 1, marker_text)
+                    injected += len(markers)
+                break
+        modified_files[file_path] = "\n".join(lines)
+
+    # Write back modified files
+    for rel_path, content in modified_files.items():
+        (Path(repo_root) / rel_path).write_text(content)
+
+    console.print(f"\n[green]Injected {injected} marker(s) across {len(modified_files)} file(s).[/green]")
+
+
 @cli.command()
 def coverage():
     """Run and print all three coverage dimensions."""
@@ -517,9 +691,7 @@ def status():
     if config is None:
         console.print("[yellow]Plumb not initialized. Run 'plumb init'.[/yellow]")
         return
-
-    console.print("[bold]Plumb Status[/bold]\n")
-
+    
     # Spec files
     console.print(f"[cyan]Spec files:[/cyan] {', '.join(config.spec_paths)}")
 
@@ -547,6 +719,15 @@ def status():
                     pass
     console.print(f"[cyan]Tests:[/cyan] {test_count}")
 
+    # Check for uncommitted changes
+    has_uncommitted = False
+    try:
+        from git import Repo
+        repo = Repo(repo_root)
+        has_uncommitted = repo.is_dirty() or len(repo.untracked_files) > 0
+    except Exception:
+        pass
+
     # Decisions
     decisions = read_decisions(repo_root)
     pending = [d for d in decisions if d.status == "pending"]
@@ -560,6 +741,8 @@ def status():
             by_branch[b] = by_branch.get(b, 0) + 1
         branch_info = ", ".join(f"{b}: {c}" for b, c in by_branch.items())
         console.print(f"[cyan]Pending decisions:[/cyan] {len(pending)} ({branch_info})")
+    elif has_uncommitted:
+        console.print("[cyan]Pending decisions:[/cyan] 0 [yellow](uncommitted changes — commit to capture decisions)[/yellow]")
     else:
         console.print("[cyan]Pending decisions:[/cyan] 0")
 
@@ -576,6 +759,10 @@ def status():
     test_cov, test_total = check_spec_to_test_coverage(repo_root)
     code_cov, code_total = check_spec_to_code_coverage(repo_root)
     if test_total > 0:
-        console.print(f"[cyan]Spec-to-test:[/cyan] {test_cov}/{test_total}")
+        console.print(f"[cyan]Spec-to-test:[/cyan]  {_coverage_bar(test_cov, test_total)}")
     if code_total > 0:
-        console.print(f"[cyan]Spec-to-code:[/cyan] {code_cov}/{code_total}")
+        stale = code_cov == 0 and code_total > 0
+        bar = _coverage_bar(code_cov, code_total)
+        if stale:
+            bar += "  [dim](run plumb coverage to refresh)[/dim]"
+        console.print(f"[cyan]Spec-to-code:[/cyan]  {bar}")

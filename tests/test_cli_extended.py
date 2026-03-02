@@ -45,6 +45,7 @@ class TestInitExtended:
 
 class TestReviewExtended:
     def test_no_pending(self, runner, initialized_repo):
+        # plumb:req-22157990
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["review"])
             assert "No pending" in result.output
@@ -55,6 +56,8 @@ class TestReviewExtended:
             assert result.exit_code != 0
 
     def test_review_approve_decision(self, runner, initialized_repo):
+        # plumb:req-acc69753
+        # plumb:req-d7f7c95c
         d = Decision(
             id="dec-rev1",
             status="pending",
@@ -145,6 +148,7 @@ class TestModifyExtended:
             assert result.exit_code != 0
 
     def test_modify_not_rejected(self, runner, initialized_repo):
+        # plumb:req-b25a2e8d
         d = Decision(id="dec-m1", status="pending")
         append_decision(initialized_repo, d)
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):

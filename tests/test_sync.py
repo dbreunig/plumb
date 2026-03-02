@@ -16,6 +16,7 @@ from plumb.sync import (
 
 class TestGenerateRequirementId:
     def test_format(self):
+        # plumb:req-dda066fd
         rid = _generate_requirement_id("The system must do X.")
         assert rid.startswith("req-")
         assert len(rid) == 12  # req- + 8 hex
@@ -38,6 +39,7 @@ class TestGenerateRequirementId:
 
 class TestAtomicWrite:
     def test_writes_file(self, tmp_path):
+        # plumb:req-06185a82
         f = tmp_path / "test.txt"
         _atomic_write(f, "hello")
         assert f.read_text() == "hello"
@@ -126,6 +128,9 @@ class TestSyncDecisions:
 
 class TestParseSpecFiles:
     def test_parses_spec(self, initialized_repo):
+        # plumb:req-b3844050
+        # plumb:req-c76392d0
+        # plumb:req-0256d633
         mock_reqs = [
             MagicMock(text="The system must do X.", ambiguous=False),
             MagicMock(text="The system should maybe Y.", ambiguous=True),

@@ -5,9 +5,21 @@ import dspy
 
 class TestGeneratorSignature(dspy.Signature):
     """Generate pytest test stubs for uncovered requirements.
-    Rules: one function per requirement, descriptive names
-    (test_<req_id>_<description>), stubs include '# TODO: implement'
-    and pytest.skip(), do not overwrite existing tests."""
+
+    Rules:
+    - One function per requirement, descriptive names (test_req_<id>_<description>)
+    - Each function MUST start with a ``# plumb:req-XXXXXXXX`` comment linking
+      it to the requirement it covers (use the exact requirement ID)
+    - Stubs include '# TODO: implement' and pytest.skip()
+    - Do not overwrite existing tests
+
+    Example output::
+
+        def test_req_abc12345_creates_config(self, tmp_repo):
+            # plumb:req-abc12345
+            # TODO: implement
+            pytest.skip("Not implemented")
+    """
 
     requirements: str = dspy.InputField(desc="Uncovered requirements as text")
     existing_tests: str = dspy.InputField(desc="Content of existing test files")
@@ -18,7 +30,7 @@ class TestGeneratorSignature(dspy.Signature):
 class TestGenerator(dspy.Module):
     def __init__(self):
         super().__init__()
-        self.predict = dspy.ChainOfThought(TestGeneratorSignature)
+        self.predict = dspy.Predict(TestGeneratorSignature)
 
     def forward(
         self, requirements: str, existing_tests: str, code_context: str
