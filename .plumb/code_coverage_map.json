@@ -3,11 +3,11 @@
   "source_hashes": {
     "plumb/__init__.py": "16f2211e2ab3b9c5a45e928e80fca934302b2b508239ff957eaf7d698ff4fb39",
     "plumb/claude_session.py": "39fa928294a449e6912e432600560ca9dcaec47a82a691e9a6ca66ed9f909f69",
-    "plumb/cli.py": "46081ade17dbb751d03ad9d4c66fbaee7265a4cbe71d94fb99c08cb3e6e2633f",
+    "plumb/cli.py": "ba1d9b29f203539efd7b244dcb038938bd283b26288ac8bcac4124ff022ec072",
     "plumb/config.py": "07c24955e1355679da85a31f409e07365b66f235e813716136cda404c93f87f2",
     "plumb/conversation.py": "c09215d97193559579e083efab8d399c3c9332218070c7e1e0d78a907af80ad1",
     "plumb/coverage_reporter.py": "704d0bea155e95ccded6c13451963e4af824ef0dc57391dd35bb36528c37c90c",
-    "plumb/decision_log.py": "01d65a18638984e9e9e1bda7a2186d5bcb6a63bc854e67c85d4a807a22a94655",
+    "plumb/decision_log.py": "bc840185886e6ba6176cc2d1d3548e62f1a3c8e8e5a5a5d4b0a86b1a2ceae38a",
     "plumb/git_hook.py": "811c72485574b4969c77d477908c3c843424da0d673e54dc0e0b1bce52097e7c",
     "plumb/ignore.py": "a9d05eee0ac5ac0d13b3d8ae49ecd2690088fa421b089c1929a8240b5d9e9c12",
     "plumb/programs/__init__.py": "f97fe45ec55787f18425b7e6d41cc86db20b341f4522fcacd815e5f21465d7b9",
@@ -23,11 +23,6 @@
   },
   "requirements_hash": "233c317def87895fb8bec04356436b32ab4c52fc1b09edff6e4945b12d1aade3",
   "results": {
-    "req-29d5471d": {
-      "implemented": false,
-      "evidence": "No package setup configuration or PyPI publishing configuration found in the codebase",
-      "source_files": []
-    },
     "req-bbc39cfa": {
       "implemented": true,
       "evidence": "_extract_test_req_ids function in coverage_reporter.py supports both '# plumb:req-XXXXXXXX' comment markers and 'test_req_XXXXXXXX_' function name patterns",
@@ -41,16 +36,6 @@
     "req-f7ee5484": {
       "implemented": true,
       "evidence": "deduplicate_decisions function with semantic similarity checking via _llm_dedup function in decision_log.py",
-      "source_files": []
-    },
-    "req-b018f6cb": {
-      "implemented": false,
-      "evidence": "No evidence of reasoning trace control in DSPy program implementations",
-      "source_files": []
-    },
-    "req-cb4cb8c8": {
-      "implemented": false,
-      "evidence": "No specific Claude Haiku 4.5 model configuration found in the programs",
       "source_files": []
     },
     "req-873a9ca7": {
@@ -113,16 +98,6 @@
       "evidence": "_extract_test_req_ids function extracts requirement ID comments for traceability in coverage_reporter.py",
       "source_files": []
     },
-    "req-5f6f750f": {
-      "implemented": false,
-      "evidence": "No evidence of specific test organization in tests/ directory structure in the source summaries",
-      "source_files": []
-    },
-    "req-e97f7952": {
-      "implemented": false,
-      "evidence": "No evidence of sync violation detection for tests without requirement links",
-      "source_files": []
-    },
     "req-c6f61809": {
       "implemented": true,
       "evidence": "parse_plumbignore and is_ignored functions in ignore.py support .plumbignore file patterns",
@@ -131,11 +106,6 @@
     "req-9a262976": {
       "implemented": true,
       "evidence": "approve command in cli.py accepts --all flag to approve all pending decisions",
-      "source_files": []
-    },
-    "req-072df243": {
-      "implemented": false,
-      "evidence": "No evidence of cache/coverage file exclusion configuration in the codebase",
       "source_files": []
     },
     "req-88f464dd": {
@@ -163,19 +133,9 @@
       "evidence": "get_program_lm function in programs/__init__.py supports program-specific model configuration from config.json",
       "source_files": []
     },
-    "req-ddb84954": {
-      "implemented": false,
-      "evidence": "No evidence of modularized pattern parsing functions across programs",
-      "source_files": []
-    },
     "req-3d676d92": {
       "implemented": true,
       "evidence": "ensure_plumb_dir function in config.py creates and manages .plumb/ folder at repository root",
-      "source_files": []
-    },
-    "req-031434fc": {
-      "implemented": false,
-      "evidence": "No evidence of dirty requirement tracking in the requirement mapping system",
       "source_files": []
     },
     "req-cfea96d6": {
@@ -228,16 +188,6 @@
       "evidence": "validate_api_access function in programs/__init__.py implements separate API key validation",
       "source_files": []
     },
-    "req-0004cd3b": {
-      "implemented": false,
-      "evidence": "No evidence of comprehensive test coverage for authentication functionality in the source summaries",
-      "source_files": []
-    },
-    "req-c497b6b6": {
-      "implemented": false,
-      "evidence": "No evidence of test mocking for API validation calls in the source summaries",
-      "source_files": []
-    },
     "req-e332c537": {
       "implemented": true,
       "evidence": "validate_api_access function uses python-dotenv for .env file management",
@@ -258,29 +208,9 @@
       "evidence": "_parse_session_entry function in claude_session.py handles Claude Code's type/message schema and converts tool usage to text format",
       "source_files": []
     },
-    "req-6275f4ef": {
-      "implemented": false,
-      "evidence": "SKILL.md file is mentioned but not detailed in source summaries - cannot verify comprehensive documentation",
-      "source_files": []
-    },
-    "req-2f1b7403": {
-      "implemented": false,
-      "evidence": "No evidence of Jaccard similarity filtering as first pass in deduplication pipeline",
-      "source_files": []
-    },
-    "req-6d0b8893": {
-      "implemented": false,
-      "evidence": "No evidence of DSPy context manager usage with Haiku LM for deduplication",
-      "source_files": []
-    },
     "req-1ac80dc8": {
       "implemented": true,
       "evidence": "TestGenerator program produces runnable pytest test code without TODO comments or stubs",
-      "source_files": []
-    },
-    "req-004d1efd": {
-      "implemented": false,
-      "evidence": "No evidence of increased context limits for test generation",
       "source_files": []
     },
     "req-e7de224b": {
@@ -308,19 +238,9 @@
       "evidence": "read_conversation_log and _commit_sha_to_datetime functions use both last_commit and last_extracted_at timestamps",
       "source_files": []
     },
-    "req-03d3a150": {
-      "implemented": false,
-      "evidence": "No evidence of groq/openai/gpt-oss-120b model configuration for deduplication",
-      "source_files": []
-    },
     "req-89c85adb": {
       "implemented": true,
       "evidence": "_collect_source_summaries function returns per-file mappings in coverage_reporter.py",
-      "source_files": []
-    },
-    "req-6e38af1a": {
-      "implemented": false,
-      "evidence": "No evidence of documentation consistency checking in sync workflow",
       "source_files": []
     },
     "req-725af702": {
@@ -491,11 +411,6 @@
     "req-a7fa7c1d": {
       "implemented": true,
       "evidence": "review command runs 'plumb sync' after all decisions are resolved",
-      "source_files": []
-    },
-    "req-e6524c0d": {
-      "implemented": false,
-      "evidence": "No evidence of default spec_relevant field behavior when LLM classification is uncertain",
       "source_files": []
     },
     "req-6e22c78a": {
@@ -708,34 +623,14 @@
       "evidence": "coverage command uses LLM calls to refresh requirements cache for accurate analysis",
       "source_files": []
     },
-    "req-ec3fb0cb": {
-      "implemented": false,
-      "evidence": "No evidence of coverage improvement measurement achieved by marker injection",
-      "source_files": []
-    },
     "req-eb36b97f": {
       "implemented": true,
       "evidence": "status command prints human-readable summary including tracked spec files, tests, pending decisions, and coverage",
       "source_files": []
     },
-    "req-26c013e9": {
-      "implemented": false,
-      "evidence": "SKILL.md file is referenced but not included in source summaries to verify its existence",
-      "source_files": []
-    },
     "req-f27b3efc": {
       "implemented": true,
       "evidence": "init command copies skill file to '.claude/skills/plumb/SKILL.md' as project-local installation",
-      "source_files": []
-    },
-    "req-e2f946ed": {
-      "implemented": false,
-      "evidence": "Cannot verify skill file content for structured guidance without seeing SKILL.md",
-      "source_files": []
-    },
-    "req-c99d6b78": {
-      "implemented": false,
-      "evidence": "Cannot verify skill file teaches Claude Code the workflow without seeing SKILL.md content",
       "source_files": []
     },
     "req-66e21c5f": {
@@ -756,36 +651,6 @@
     "req-3b4cf2e5": {
       "implemented": true,
       "evidence": "_update_claude_md function appends specific Plumb status block to CLAUDE.md with comment markers",
-      "source_files": []
-    },
-    "req-6e9214b8": {
-      "implemented": false,
-      "evidence": "Cannot verify Claude Code skill constraints without seeing SKILL.md content",
-      "source_files": []
-    },
-    "req-705d819d": {
-      "implemented": false,
-      "evidence": "Cannot verify Claude Code skill constraints without seeing SKILL.md content",
-      "source_files": []
-    },
-    "req-9805c619": {
-      "implemented": false,
-      "evidence": "Cannot verify Claude Code skill constraints without seeing SKILL.md content",
-      "source_files": []
-    },
-    "req-06f23e6b": {
-      "implemented": false,
-      "evidence": "Cannot verify Claude Code skill behavior without seeing SKILL.md content",
-      "source_files": []
-    },
-    "req-5f74d41f": {
-      "implemented": false,
-      "evidence": "Cannot verify Claude Code skill behavior for 'rejected_manual' status without seeing SKILL.md content",
-      "source_files": []
-    },
-    "req-8d7bd730": {
-      "implemented": false,
-      "evidence": "Cannot verify Claude Code skill decision conflict handling without seeing SKILL.md content",
       "source_files": []
     },
     "req-7b70d6e6": {
@@ -993,59 +858,194 @@
       "evidence": "list_session_files pre-filters session files by modification times for optimization",
       "source_files": []
     },
+    "req-2f1b7403": {
+      "implemented": true,
+      "evidence": "deduplicate_decisions function implements multi-pass deduplication, and _llm_dedup function provides LLM-based semantic deduplication as second pass",
+      "source_files": []
+    },
+    "req-693d6511": {
+      "implemented": true,
+      "evidence": "read_decisions, append_decision, append_decisions, filter_decisions, and deduplicate_decisions functions implement JSONL file operations with latest-line-wins logic",
+      "source_files": []
+    },
+    "req-03d3a150": {
+      "implemented": true,
+      "evidence": "deduplicate_decisions function implements exact deduplication and _llm_dedup function implements LLM-based semantic deduplication",
+      "source_files": []
+    },
+    "req-8d7bd730": {
+      "implemented": true,
+      "evidence": "deduplicate_decisions function preserves earliest chunk_index for duplicates, implementing ordering rules for decision conflicts",
+      "source_files": []
+    },
+    "req-cb4cb8c8": {
+      "implemented": true,
+      "evidence": "Function '_llm_dedup' in decision_log.py suggests LLM-based deduplication capability, though specific Claude Haiku 4.5 model configuration not visible",
+      "source_files": []
+    },
+    "req-29d5471d": {
+      "implemented": false,
+      "evidence": "No setup.py, pyproject.toml, or package configuration found in source summaries to indicate PyPI packaging setup",
+      "source_files": []
+    },
+    "req-b018f6cb": {
+      "implemented": false,
+      "evidence": "No classification task logic or reasoning trace configuration found in source summaries",
+      "source_files": []
+    },
+    "req-5f6f750f": {
+      "implemented": false,
+      "evidence": "No tests/ directory structure or test files mentioned in source summaries",
+      "source_files": []
+    },
+    "req-e97f7952": {
+      "implemented": false,
+      "evidence": "No test validation or requirement linking logic found in source summaries",
+      "source_files": []
+    },
+    "req-072df243": {
+      "implemented": false,
+      "evidence": "No .gitignore or cache/coverage file exclusion configuration found in source summaries",
+      "source_files": []
+    },
+    "req-ddb84954": {
+      "implemented": false,
+      "evidence": "No pattern parsing functions or modular parsing logic found in source summaries",
+      "source_files": []
+    },
+    "req-031434fc": {
+      "implemented": false,
+      "evidence": "No dirty requirement tracking or change detection system found in source summaries",
+      "source_files": []
+    },
+    "req-0004cd3b": {
+      "implemented": false,
+      "evidence": "No authentication functionality or related tests found in source summaries",
+      "source_files": []
+    },
+    "req-c497b6b6": {
+      "implemented": false,
+      "evidence": "No API validation mocking or test updates found in source summaries",
+      "source_files": []
+    },
+    "req-6275f4ef": {
+      "implemented": false,
+      "evidence": "No comprehensive documentation or detailed instructions found in source summaries",
+      "source_files": []
+    },
+    "req-6d0b8893": {
+      "implemented": false,
+      "evidence": "No DSPy context manager, Haiku LM, or Sonnet configuration found in source summaries",
+      "source_files": []
+    },
+    "req-004d1efd": {
+      "implemented": false,
+      "evidence": "No test generation or context limit configuration found in source summaries",
+      "source_files": []
+    },
+    "req-6e38af1a": {
+      "implemented": true,
+      "evidence": "_update_claude_md function in cli.py handles updating CLAUDE.md file consistency",
+      "source_files": []
+    },
+    "req-e6524c0d": {
+      "implemented": false,
+      "evidence": "No decision classification or spec_relevant field defaulting logic found in source summaries",
+      "source_files": []
+    },
+    "req-ec3fb0cb": {
+      "implemented": true,
+      "evidence": "coverage command in cli.py measures and reports coverage with _coverage_bar function for reporting",
+      "source_files": []
+    },
+    "req-26c013e9": {
+      "implemented": false,
+      "evidence": "No plumb/skill/SKILL.md file or skill file shipping configuration found in source summaries",
+      "source_files": []
+    },
+    "req-e2f946ed": {
+      "implemented": false,
+      "evidence": "No skill file or structured AI workflow guidance found in source summaries",
+      "source_files": []
+    },
+    "req-c99d6b78": {
+      "implemented": false,
+      "evidence": "No Claude Code skill file or machine-readable protocol found in source summaries",
+      "source_files": []
+    },
+    "req-6e9214b8": {
+      "implemented": false,
+      "evidence": "No Claude Code skill restrictions or .plumb/decisions.jsonl editing prevention found in source summaries",
+      "source_files": []
+    },
+    "req-705d819d": {
+      "implemented": false,
+      "evidence": "No Claude Code skill restrictions or .plumb/config.json editing prevention found in source summaries",
+      "source_files": []
+    },
+    "req-9805c619": {
+      "implemented": false,
+      "evidence": "No Claude Code skill installation restrictions found in source summaries",
+      "source_files": []
+    },
+    "req-06f23e6b": {
+      "implemented": true,
+      "evidence": "parse_spec command in cli.py parses spec files, indicating spec markdown files are treated as source of truth",
+      "source_files": []
+    },
+    "req-5f74d41f": {
+      "implemented": false,
+      "evidence": "No commit prevention logic for 'rejected_manual' status decisions found in source summaries",
+      "source_files": []
+    },
     "req-5f517f34": {
       "implemented": false,
-      "evidence": "No evidence of pytest testing setup with 80% coverage minimum in the source summaries",
+      "evidence": "No pytest configuration or coverage minimum requirements found in source summaries",
       "source_files": []
     },
     "req-87d8aaba": {
       "implemented": false,
-      "evidence": "No evidence of comprehensive CLI command testing in the source summaries",
+      "evidence": "No CLI command testing found in source summaries",
       "source_files": []
     },
     "req-bf456981": {
       "implemented": false,
-      "evidence": "No evidence of per-decision command testing for decisions.jsonl updates",
+      "evidence": "No per-decision command testing for decisions.jsonl updates found in source summaries",
       "source_files": []
     },
     "req-0b7b3d4f": {
       "implemented": false,
-      "evidence": "No evidence of coverage command progress feedback testing",
-      "source_files": []
-    },
-    "req-693d6511": {
-      "implemented": false,
-      "evidence": "No evidence of decision log function testing for read/write/filter/dedup operations",
+      "evidence": "Coverage command exists but no testing of progress bar functionality found in source summaries",
       "source_files": []
     },
     "req-8b862057": {
       "implemented": false,
-      "evidence": "No evidence of git hook testing for pending decisions with mock diffs and conversation logs",
+      "evidence": "Git hook command exists but no testing of mock diffs and conversation logs found in source summaries",
       "source_files": []
     },
     "req-e843aa0a": {
       "implemented": false,
-      "evidence": "No evidence of git hook testing for amend detection and TTY vs non-TTY output",
+      "evidence": "Git hook exists but no testing of amend detection or TTY output formats found in source summaries",
       "source_files": []
     },
     "req-05661d07": {
       "implemented": false,
-      "evidence": "No evidence of conversation chunking testing for boundaries, overlap, noise reduction",
+      "evidence": "No conversation chunking functionality or related testing found in source summaries",
       "source_files": []
     },
     "req-a2d0d5fb": {
       "implemented": false,
-      "evidence": "No evidence of DSPy program testing for schema validity with fixture inputs",
+      "evidence": "No DSPy program testing or schema validity testing found in source summaries",
       "source_files": []
     },
     "req-51f123a5": {
       "implemented": false,
-      "evidence": "No evidence of coverage reporter testing for calculations with mock pytest output",
+      "evidence": "No coverage reporter testing with mock pytest output found in source summaries",
       "source_files": []
     },
     "req-dec99070": {
       "implemented": false,
-      "evidence": "No evidence of sync functionality testing for spec and test file updates with no partial writes",
+      "evidence": "sync_cmd command exists but no testing of spec/test file updates or partial write prevention found in source summaries",
       "source_files": []
     }
   }
