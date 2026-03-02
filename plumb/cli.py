@@ -832,3 +832,47 @@ def status():
         if stale:
             bar += "  [dim](run plumb coverage to refresh)[/dim]"
         console.print(f"[cyan]Spec-to-code:[/cyan]  {bar}")
+
+
+@cli.command()
+def migrate():
+    """Migrate from monolithic decisions.jsonl to branch-sharded layout."""
+    repo_root = find_repo_root()
+    if repo_root is None:
+        console.print("[red]Error: Not a git repository.[/red]")
+        raise SystemExit(1)
+
+    from plumb.decision_log import migrate_decisions
+    result = migrate_decisions(repo_root)
+
+    if result["already_migrated"]:
+        console.print("Already migrated to sharded layout.")
+        return
+
+    if result["migrated"] == 0:
+        console.print("No decisions to migrate.")
+    else:
+        console.print(f"[green]Migrated {result['migrated']} decisions to .plumb/decisions/main.jsonl[/green]")
+
+
+@cli.command(name="merge-decisions")
+@click.argument("branch")
+@click.option("--target", default="main", help="Target branch to merge into (default: main)")
+def merge_decisions(branch, target):
+    """Merge a branch's decisions into the target branch (default: main)."""
+    repo_root = find_repo_root()
+    if repo_root is None:
+        console.print("[red]Error: Not a git repository.[/red]")
+        raise SystemExit(1)
+
+    from plumb.decision_log import merge_branch_decisions
+    result = merge_branch_decisions(repo_root, branch, target=target)
+
+    if result.get("error"):
+        console.print(f"[red]Error: {result['error']}[/red]")
+        raise SystemExit(1)
+
+    if result["merged"] == 0:
+        console.print(f"No decisions found for branch '{branch}'.")
+    else:
+        console.print(f"[green]Merged {result['merged']} decision lines from '{branch}' into '{target}'.[/green]")

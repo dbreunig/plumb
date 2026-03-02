@@ -327,6 +327,65 @@ def delete_decisions_by_commit(repo_root: str | Path, commit_sha: str, branch: s
     return removed
 
 
+def migrate_decisions(repo_root: str | Path) -> dict:
+    """Migrate from monolithic decisions.jsonl to branch-sharded layout.
+    Reads legacy file, deduplicates, writes to decisions/main.jsonl, removes legacy file.
+    Returns summary dict."""
+    repo_root = Path(repo_root)
+    legacy_path = _decisions_path(repo_root)
+    decisions_dir = _decisions_dir(repo_root)
+
+    # Already migrated?
+    if not legacy_path.exists():
+        return {"migrated": 0, "already_migrated": decisions_dir.exists()}
+
+    # Read and deduplicate from legacy file
+    decisions = read_decisions(repo_root)  # branch=None reads legacy path
+    if not decisions:
+        legacy_path.unlink()
+        decisions_dir.mkdir(parents=True, exist_ok=True)
+        return {"migrated": 0, "already_migrated": False}
+
+    # Write deduplicated decisions to main.jsonl
+    decisions_dir.mkdir(parents=True, exist_ok=True)
+    main_path = decisions_dir / "main.jsonl"
+    with open(main_path, "w") as f:
+        for dec in decisions:
+            f.write(json.dumps(dec.model_dump()) + "\n")
+
+    # Remove legacy file
+    legacy_path.unlink()
+
+    return {"migrated": len(decisions), "already_migrated": False}
+
+
+def merge_branch_decisions(repo_root: str | Path, branch: str, target: str = "main") -> dict:
+    """Merge a branch's decisions into the target branch (default: main).
+    Appends branch file contents to target file, then deletes branch file.
+    Returns summary dict."""
+    if _sanitize_branch_name(branch) == _sanitize_branch_name(target):
+        return {"merged": 0, "error": "cannot merge main into itself"}
+
+    branch_path = _branch_decisions_path(repo_root, branch)
+    if not branch_path.exists():
+        return {"merged": 0}
+
+    branch_content = branch_path.read_text().strip()
+    if not branch_content:
+        branch_path.unlink()
+        return {"merged": 0}
+
+    line_count = len([l for l in branch_content.splitlines() if l.strip()])
+
+    target_path = _branch_decisions_path(repo_root, target)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(target_path, "a") as f:
+        f.write(branch_content + "\n")
+
+    branch_path.unlink()
+    return {"merged": line_count}
+
+
 def deduplicate_decisions(
     decisions: list[Decision],
     existing_decisions: list[Decision] | None = None,

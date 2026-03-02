@@ -16,6 +16,8 @@ from plumb.decision_log import (
     find_decision_branch,
     delete_decisions_by_commit,
     deduplicate_decisions,
+    migrate_decisions,
+    merge_branch_decisions,
     _sanitize_branch_name,
     _decisions_dir,
     _branch_decisions_path,
@@ -364,3 +366,63 @@ class TestFindDecisionBranch:
         append_decision(initialized_repo, sample_decisions[1], branch="branch-b")
         assert find_decision_branch(initialized_repo, "dec-aaa111") == "branch-a"
         assert find_decision_branch(initialized_repo, "dec-bbb222") == "branch-b"
+
+
+class TestMigrateDecisions:
+    def test_migrate_creates_sharded_dir(self, initialized_repo, sample_decisions):
+        # Write to legacy monolithic file
+        append_decisions(initialized_repo, sample_decisions)
+        result = migrate_decisions(initialized_repo)
+        assert result["migrated"] == 2
+        assert (initialized_repo / ".plumb" / "decisions" / "main.jsonl").exists()
+        assert not (initialized_repo / ".plumb" / "decisions.jsonl").exists()
+
+    def test_migrate_deduplicates(self, initialized_repo, sample_decisions):
+        # Write same decision twice (simulating update append)
+        append_decision(initialized_repo, sample_decisions[0])
+        updated = sample_decisions[0].model_copy(update={"status": "approved"})
+        append_decision(initialized_repo, updated)
+        append_decision(initialized_repo, sample_decisions[1])
+        result = migrate_decisions(initialized_repo)
+        assert result["migrated"] == 2
+        decisions = read_decisions(initialized_repo, branch="main")
+        approved = [d for d in decisions if d.id == "dec-aaa111"]
+        assert approved[0].status == "approved"
+
+    def test_migrate_idempotent(self, initialized_repo):
+        (initialized_repo / ".plumb" / "decisions").mkdir(parents=True, exist_ok=True)
+        result = migrate_decisions(initialized_repo)
+        assert result["migrated"] == 0
+        assert result["already_migrated"] is True
+
+    def test_migrate_empty_legacy(self, initialized_repo):
+        (initialized_repo / ".plumb" / "decisions.jsonl").write_text("")
+        result = migrate_decisions(initialized_repo)
+        assert result["migrated"] == 0
+
+
+class TestMergeBranchDecisions:
+    def test_merge_to_main(self, initialized_repo, sample_decisions):
+        append_decisions(initialized_repo, sample_decisions, branch="feat")
+        result = merge_branch_decisions(initialized_repo, "feat")
+        assert result["merged"] == 2
+        assert not (initialized_repo / ".plumb" / "decisions" / "feat.jsonl").exists()
+        main_decisions = read_decisions(initialized_repo, branch="main")
+        assert len(main_decisions) == 2
+
+    def test_merge_appends_to_existing_main(self, initialized_repo, sample_decisions):
+        d_main = Decision(id="dec-main1", question="Q?", decision="A.")
+        append_decision(initialized_repo, d_main, branch="main")
+        append_decisions(initialized_repo, sample_decisions, branch="feat")
+        merge_branch_decisions(initialized_repo, "feat")
+        main_decisions = read_decisions(initialized_repo, branch="main")
+        assert len(main_decisions) == 3
+
+    def test_merge_nonexistent_branch(self, initialized_repo):
+        (initialized_repo / ".plumb" / "decisions").mkdir(parents=True, exist_ok=True)
+        result = merge_branch_decisions(initialized_repo, "nonexistent")
+        assert result["merged"] == 0
+
+    def test_cannot_merge_main(self, initialized_repo):
+        result = merge_branch_decisions(initialized_repo, "main")
+        assert result["error"] == "cannot merge main into itself"
