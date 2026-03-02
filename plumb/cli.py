@@ -83,12 +83,15 @@ def init():
     )
     save_config(repo_root, cfg)
 
-    # Install pre-commit hook
+    # Install git hooks
     hooks_dir = repo_root / ".git" / "hooks"
     hooks_dir.mkdir(exist_ok=True)
     hook_path = hooks_dir / "pre-commit"
     hook_path.write_text("#!/bin/sh\nplumb hook\nexit $?\n")
     hook_path.chmod(0o755)
+    post_commit_path = hooks_dir / "post-commit"
+    post_commit_path.write_text("#!/bin/sh\nplumb post-commit\n")
+    post_commit_path.chmod(0o755)
 
     # Create default .plumbignore if it doesn't exist
     plumbignore_path = repo_root / ".plumbignore"
@@ -118,7 +121,7 @@ def init():
 
     console.print(f"\n[green]Plumb initialized successfully![/green]")
     console.print(f"  Config: .plumb/config.json")
-    console.print(f"  Hook: .git/hooks/pre-commit")
+    console.print(f"  Hooks: .git/hooks/pre-commit, post-commit")
     console.print(f"  Ignore: .plumbignore")
     console.print(f"  Skill: .claude/skills/plumb/SKILL.md")
     console.print(f"  Spec: {spec_input}")
@@ -188,6 +191,15 @@ def hook(dry_run):
     repo_root = find_repo_root()
     exit_code = run_hook(repo_root, dry_run=dry_run)
     raise SystemExit(exit_code)
+
+
+@cli.command(name="post-commit")
+def post_commit():
+    """Run the post-commit hook to update last_commit."""
+    from plumb.git_hook import run_post_commit
+
+    repo_root = find_repo_root()
+    run_post_commit(repo_root)
 
 
 @cli.command()

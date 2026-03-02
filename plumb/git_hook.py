@@ -338,14 +338,37 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
             print(_format_json_output(pending))
         return 1
 
-    # No pending decisions — run coverage, update config
+    # No pending decisions — run coverage
     try:
         from plumb.coverage_reporter import print_coverage_report
         print_coverage_report(repo_root)
     except Exception:
         pass
 
-    config.last_commit = str(repo.head.commit)
-    config.last_commit_branch = branch
-    save_config(repo_root, config)
     return 0
+
+
+def run_post_commit(repo_root: str | Path | None = None) -> None:
+    """Post-commit hook: update last_commit to the newly created commit SHA.
+
+    Called after git successfully creates a commit, so HEAD now points to
+    the actual commit (not its parent). This ensures the next pre-commit
+    hook only reads conversation since this commit.
+    """
+    try:
+        if repo_root is None:
+            repo_root = find_repo_root()
+        if repo_root is None:
+            return
+        repo_root = Path(repo_root)
+
+        config = load_config(repo_root)
+        if config is None:
+            return
+
+        repo = Repo(repo_root)
+        config.last_commit = str(repo.head.commit)
+        config.last_commit_branch = _get_branch_name(repo)
+        save_config(repo_root, config)
+    except Exception:
+        pass

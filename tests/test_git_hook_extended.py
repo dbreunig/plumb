@@ -12,6 +12,7 @@ from plumb.config import PlumbConfig, save_config, load_config, ensure_plumb_dir
 from plumb.decision_log import Decision, append_decision, read_decisions
 from plumb.git_hook import (
     run_hook,
+    run_post_commit,
     _detect_amend,
     _format_tty_output,
     _format_json_output,
@@ -120,12 +121,15 @@ class TestHookEdgeCases:
         result = run_hook(initialized_repo)
         assert result == 0
 
-    def test_hook_updates_config_on_success(self, initialized_repo):
-        """When no pending decisions, config should be updated."""
+    def test_hook_does_not_update_config(self, initialized_repo):
+        """Pre-commit hook should not update last_commit (post-commit does that)."""
         repo = Repo(initialized_repo)
         f = initialized_repo / "x.py"
         f.write_text("x=1\n")
         repo.index.add(["x.py"])
+
+        config_before = load_config(initialized_repo)
+        old_last_commit = config_before.last_commit
 
         with patch("plumb.programs.validate_api_access"), \
              patch("plumb.git_hook._analyze_diff", return_value="ok"), \
@@ -135,5 +139,40 @@ class TestHookEdgeCases:
             result = run_hook(initialized_repo)
             assert result == 0
 
+        config_after = load_config(initialized_repo)
+        assert config_after.last_commit == old_last_commit
+
+
+class TestPostCommitHook:
+    def test_updates_config_to_head(self, initialized_repo):
+        """Post-commit should set last_commit to current HEAD."""
+        repo = Repo(initialized_repo)
+        head_sha = str(repo.head.commit)
+
+        run_post_commit(initialized_repo)
+
         config = load_config(initialized_repo)
-        assert config.last_commit is not None
+        assert config.last_commit == head_sha
+
+    def test_updates_after_new_commit(self, initialized_repo):
+        """After a new commit, post-commit should point to the new SHA."""
+        repo = Repo(initialized_repo)
+        f = initialized_repo / "x.py"
+        f.write_text("x=1\n")
+        repo.index.add(["x.py"])
+        repo.index.commit("new commit")
+        new_sha = str(repo.head.commit)
+
+        run_post_commit(initialized_repo)
+
+        config = load_config(initialized_repo)
+        assert config.last_commit == new_sha
+
+    def test_no_config_is_noop(self, tmp_repo):
+        """If plumb not initialized, post-commit does nothing."""
+        run_post_commit(tmp_repo)  # should not raise
+
+    def test_no_repo_is_noop(self):
+        """If not in a git repo, post-commit does nothing."""
+        with patch("plumb.git_hook.find_repo_root", return_value=None):
+            run_post_commit()  # should not raise
