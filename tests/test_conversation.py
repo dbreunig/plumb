@@ -1,6 +1,7 @@
 import json
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 from plumb.conversation import (
     ConversationTurn,
@@ -8,6 +9,7 @@ from plumb.conversation import (
     estimate_tokens,
     locate_conversation_log,
     read_conversation_log,
+    read_conversation,
     reduce_noise,
     chunk_conversation,
 )
@@ -151,3 +153,27 @@ class TestChunkConversation:
         )
         assert "[user]: hello" in chunk.text
         assert "[assistant]: world" in chunk.text
+
+
+class TestReadConversation:
+    def test_legacy_path_used_when_config_set(self, tmp_path):
+        log = tmp_path / "conv.jsonl"
+        log.write_text(json.dumps({"role": "user", "content": "legacy", "timestamp": "2026-01-01T00:00:00Z"}))
+        turns = read_conversation(tmp_path, config_path=str(log))
+        assert len(turns) == 1
+        assert turns[0].content == "legacy"
+
+    def test_legacy_path_missing_falls_through(self, tmp_path):
+        """When config_path is set but file doesn't exist, fall through to session detection."""
+        with patch("plumb.claude_session.read_claude_sessions", return_value=[]) as mock:
+            turns = read_conversation(tmp_path, config_path="/nonexistent/log.jsonl")
+        assert turns == []
+        mock.assert_called_once_with(tmp_path, since_commit=None)
+
+    def test_auto_detect_when_no_config_path(self, tmp_path):
+        fake_turns = [ConversationTurn(role="user", content="auto")]
+        with patch("plumb.claude_session.read_claude_sessions", return_value=fake_turns) as mock:
+            turns = read_conversation(tmp_path, since_commit="abc123")
+        assert len(turns) == 1
+        assert turns[0].content == "auto"
+        mock.assert_called_once_with(tmp_path, since_commit="abc123")

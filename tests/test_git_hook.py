@@ -10,6 +10,7 @@ from git import Repo
 from plumb import PlumbAuthError
 from plumb.config import PlumbConfig, save_config, ensure_plumb_dir
 from plumb.decision_log import Decision, append_decision, read_decisions
+from plumb.programs.decision_extractor import ExtractedDecision
 from plumb.git_hook import (
     run_hook,
     _get_staged_diff,
@@ -18,6 +19,8 @@ from plumb.git_hook import (
     _get_branch_name,
     _detect_amend,
     _check_broken_refs,
+    _extract_decisions_from_conversation,
+    _extract_decisions_from_diff,
     _format_tty_output,
     _format_json_output,
 )
@@ -327,3 +330,93 @@ class TestRunHook:
              patch("plumb.coverage_reporter.print_coverage_report"):
             result = run_hook(initialized_repo)
             assert result == 0
+
+
+class TestSpecRelevantFiltering:
+    """Non-spec-relevant decisions should be filtered out during extraction."""
+
+    def test_conversation_extraction_filters_non_spec_relevant(self, initialized_repo):
+        mixed_extracted = [
+            ExtractedDecision(
+                question="Use sync or async?",
+                decision="Use sync",
+                made_by="user",
+                confidence=0.9,
+                spec_relevant=True,
+            ),
+            ExtractedDecision(
+                question="Should we commit now?",
+                decision="Yes, commit now",
+                made_by="user",
+                confidence=0.8,
+                spec_relevant=False,
+            ),
+            ExtractedDecision(
+                question="Push to main?",
+                decision="Push to main",
+                made_by="user",
+                confidence=0.7,
+                spec_relevant=False,
+            ),
+        ]
+
+        mock_chunks = [MagicMock(text="conversation text", chunk_index=0)]
+
+        with patch("plumb.git_hook.read_conversation", return_value=[MagicMock()]), \
+             patch("plumb.git_hook.reduce_noise", return_value=[MagicMock()]), \
+             patch("plumb.git_hook.chunk_conversation", return_value=mock_chunks), \
+             patch("plumb.programs.configure_dspy"), \
+             patch("plumb.programs.run_with_retries", return_value=mixed_extracted):
+            from plumb.config import load_config
+            config = load_config(initialized_repo)
+            decisions = _extract_decisions_from_conversation(
+                initialized_repo, config, "diff summary"
+            )
+            assert len(decisions) == 1
+            assert decisions[0].decision == "Use sync"
+
+    def test_diff_extraction_filters_non_spec_relevant(self):
+        mixed_extracted = [
+            ExtractedDecision(
+                question="Add caching layer?",
+                decision="Add Redis cache",
+                made_by="llm",
+                confidence=0.85,
+                spec_relevant=True,
+            ),
+            ExtractedDecision(
+                question="Run with --dry-run?",
+                decision="Use dry-run first",
+                made_by="user",
+                confidence=0.6,
+                spec_relevant=False,
+            ),
+        ]
+
+        with patch("plumb.programs.configure_dspy"), \
+             patch("plumb.programs.run_with_retries", return_value=mixed_extracted):
+            decisions = _extract_decisions_from_diff("diff summary", "main")
+            assert len(decisions) == 1
+            assert decisions[0].decision == "Add Redis cache"
+
+    def test_all_spec_relevant_keeps_all(self):
+        all_relevant = [
+            ExtractedDecision(decision="Use sync", spec_relevant=True),
+            ExtractedDecision(decision="Add cache", spec_relevant=True),
+        ]
+
+        with patch("plumb.programs.configure_dspy"), \
+             patch("plumb.programs.run_with_retries", return_value=all_relevant):
+            decisions = _extract_decisions_from_diff("diff summary", "main")
+            assert len(decisions) == 2
+
+    def test_all_non_spec_relevant_returns_empty(self):
+        none_relevant = [
+            ExtractedDecision(decision="commit now", spec_relevant=False),
+            ExtractedDecision(decision="push to main", spec_relevant=False),
+        ]
+
+        with patch("plumb.programs.configure_dspy"), \
+             patch("plumb.programs.run_with_retries", return_value=none_relevant):
+            decisions = _extract_decisions_from_diff("diff summary", "main")
+            assert len(decisions) == 0

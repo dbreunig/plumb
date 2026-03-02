@@ -12,8 +12,7 @@ from plumb import PlumbAuthError
 from plumb.config import load_config, save_config, find_repo_root
 from plumb.ignore import parse_plumbignore, is_ignored
 from plumb.conversation import (
-    locate_conversation_log,
-    read_conversation_log,
+    read_conversation,
     reduce_noise,
     chunk_conversation,
 )
@@ -112,11 +111,11 @@ def _extract_decisions_from_conversation(
     from plumb.programs import configure_dspy, run_with_retries
     from plumb.programs.decision_extractor import DecisionExtractor
 
-    log_path = locate_conversation_log(config.claude_log_path)
-    if log_path is None:
-        return []
-
-    turns = read_conversation_log(log_path, since=config.last_commit)
+    turns = read_conversation(
+        repo_root,
+        config_path=config.claude_log_path,
+        since_commit=config.last_commit,
+    )
     if not turns:
         return []
 
@@ -137,6 +136,8 @@ def _extract_decisions_from_conversation(
         except Exception:
             continue
         for ed in extracted:
+            if not ed.spec_relevant:
+                continue
             all_decisions.append(
                 Decision(
                     id=generate_decision_id(),
@@ -174,6 +175,8 @@ def _extract_decisions_from_diff(diff_summary: str, branch: str) -> list[Decisio
 
     decisions = []
     for ed in extracted:
+        if not ed.spec_relevant:
+            continue
         decisions.append(
             Decision(
                 id=generate_decision_id(),

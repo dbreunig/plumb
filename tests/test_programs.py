@@ -122,6 +122,7 @@ class TestExtractedDecision:
         ed = ExtractedDecision(decision="use sync")
         assert ed.made_by == "llm"
         assert ed.confidence == 0.5
+        assert ed.spec_relevant is True
 
     def test_full(self):
         ed = ExtractedDecision(
@@ -131,6 +132,10 @@ class TestExtractedDecision:
             confidence=0.95,
         )
         assert ed.question == "Sync or async?"
+
+    def test_spec_relevant_false(self):
+        ed = ExtractedDecision(decision="commit now", spec_relevant=False)
+        assert ed.spec_relevant is False
 
 
 class TestParsedRequirement:
