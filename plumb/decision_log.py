@@ -183,7 +183,7 @@ def deduplicate_decisions(
 
     # LLM-based semantic dedup pass (Haiku — cheap/fast)
     if use_llm and len(result) >= 1:
-        print(f"[dedup] Sending {len(result)} candidates to Haiku LLM dedup...", flush=True)
+        print(f"[dedup] Sending {len(result)} candidates to LLM dedup...", flush=True)
         result = _llm_dedup(result, existing_decisions or [])
         print(f"[dedup] After LLM dedup: {len(result)}", flush=True)
 
@@ -201,7 +201,7 @@ def _llm_dedup(
     candidates: list[Decision],
     existing_decisions: list[Decision],
 ) -> list[Decision]:
-    """Use Haiku to catch semantic duplicates that Jaccard misses."""
+    """Use LLM to catch semantic duplicates."""
     import dspy
     from plumb.programs.decision_deduplicator import DecisionDeduplicator
 
@@ -213,7 +213,7 @@ def _llm_dedup(
         _format_decision_line(i + 1, d) for i, d in enumerate(recent_existing)
     ) or "(none)"
 
-    print(f"[dedup:llm] Candidates sent to Haiku:\n{candidates_str}", flush=True)
+    print(f"[dedup:llm] Candidates sent to LLM:\n{candidates_str}", flush=True)
     print(f"[dedup:llm] Existing context ({len(recent_existing)} decisions):\n{existing_str}", flush=True)
 
     from plumb.programs import get_program_lm
@@ -226,7 +226,7 @@ def _llm_dedup(
             candidates=candidates_str, existing=existing_str
         )
 
-    print(f"[dedup:llm] Haiku returned unique_indices: {unique_indices}", flush=True)
+    print(f"[dedup:llm] LLM returned unique_indices: {unique_indices}", flush=True)
 
     # Convert 1-based indices to 0-based, filter to valid range
     valid = []

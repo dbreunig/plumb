@@ -111,17 +111,14 @@ def check_spec_to_test_coverage(repo_root: str | Path) -> tuple[int, int]:
     return (covered, len(requirements))
 
 
-def _compute_cache_key(requirements: list[dict], source_summaries: str) -> str:
-    """SHA256 of requirements + source summaries for cache invalidation."""
-    blob = json.dumps(requirements, sort_keys=True) + source_summaries
-    return hashlib.sha256(blob.encode()).hexdigest()
+def _collect_source_summaries(repo_root: Path) -> dict[str, str]:
+    """Build concise summaries of source files for LLM mapping.
 
-
-def _collect_source_summaries(repo_root: Path) -> str:
-    """Build concise summaries of source files for LLM mapping."""
+    Returns ``{relative_path: summary_text}`` dict.
+    """
     import ast
 
-    summaries: list[str] = []
+    per_file: dict[str, str] = {}
     for item in sorted(repo_root.rglob("*.py")):
         rel = str(item.relative_to(repo_root))
         if ".plumb" in rel or "test_" in item.name or rel.startswith("tests/"):
@@ -150,8 +147,41 @@ def _collect_source_summaries(repo_root: Path) -> str:
                 doc = ast.get_docstring(node) or ""
                 parts.append(f"def {node.name}: {doc[:100]}")
         if len(parts) > 1:
-            summaries.append("\n".join(parts))
-    return "\n\n".join(summaries)
+            per_file[rel] = "\n".join(parts)
+    return per_file
+
+
+def _combine_summaries(per_file: dict[str, str]) -> str:
+    """Join per-file summaries into a single string for the LLM."""
+    return "\n\n".join(per_file[k] for k in sorted(per_file))
+
+
+def _compute_per_file_hashes(per_file: dict[str, str]) -> dict[str, str]:
+    """SHA256 hash of each file's summary text."""
+    return {
+        path: hashlib.sha256(text.encode()).hexdigest()
+        for path, text in per_file.items()
+    }
+
+
+def _compute_requirements_hash(requirements: list[dict]) -> str:
+    """SHA256 of the sorted requirements JSON."""
+    blob = json.dumps(
+        [{"id": r["id"], "text": r["text"]} for r in requirements],
+        sort_keys=True,
+    )
+    return hashlib.sha256(blob.encode()).hexdigest()
+
+
+def _extract_source_files_from_evidence(
+    evidence: str, known_files: set[str],
+) -> list[str]:
+    """Match file paths mentioned in an evidence string against known files."""
+    found: list[str] = []
+    for path in known_files:
+        if path in evidence:
+            found.append(path)
+    return sorted(found)
 
 
 def check_spec_to_code_coverage(
@@ -162,7 +192,8 @@ def check_spec_to_code_coverage(
 
     When *use_llm* is False (default, used by ``plumb status``), only returns
     cached results. When True (used by ``plumb coverage``), refreshes the cache
-    if the inputs have changed.
+    using an incremental strategy — only dirty requirements and changed source
+    files are sent to the LLM.
 
     Returns (covered_count, total_count).
     """
@@ -183,46 +214,139 @@ def check_spec_to_code_coverage(
     if not requirements:
         return (0, 0)
 
-    cache_path = repo_root / ".plumb" / "code_coverage_map.json"
-    source_summaries = _collect_source_summaries(repo_root)
-    cache_key = _compute_cache_key(requirements, source_summaries)
+    # Collect per-file source summaries and compute hashes
+    per_file_summaries = _collect_source_summaries(repo_root)
+    file_hashes = _compute_per_file_hashes(per_file_summaries)
+    req_hash = _compute_requirements_hash(requirements)
+    known_files = set(per_file_summaries.keys())
 
-    # Try loading cache
+    cache_path = repo_root / ".plumb" / "code_coverage_map.json"
+    cache: dict | None = None
     if cache_path.exists():
         try:
             cache = json.loads(cache_path.read_text())
-            if cache.get("cache_key") == cache_key:
-                return (cache["covered"], cache["total"])
-        except (json.JSONDecodeError, KeyError):
-            pass
+        except (json.JSONDecodeError, Exception):
+            cache = None
+
+    # Determine if we can do an incremental update
+    full_remap = True
+    if cache and cache.get("version") == 2:
+        cached_file_hashes = cache.get("source_hashes", {})
+        cached_req_hash = cache.get("requirements_hash", "")
+        cached_results = cache.get("results", {})
+
+        if cached_req_hash == req_hash:
+            # Requirements unchanged — check which files changed
+            changed_files = {
+                f for f in file_hashes
+                if file_hashes[f] != cached_file_hashes.get(f)
+            }
+            new_files = set(file_hashes.keys()) - set(cached_file_hashes.keys())
+            deleted_files = set(cached_file_hashes.keys()) - set(file_hashes.keys())
+            all_affected_files = changed_files | new_files | deleted_files
+
+            if not all_affected_files:
+                # No file changes at all — return cached totals
+                req_ids = {r["id"] for r in requirements}
+                implemented = sum(
+                    1 for rid, res in cached_results.items()
+                    if rid in req_ids and res.get("implemented")
+                )
+                return (implemented, len(requirements))
+
+            # Determine dirty requirements
+            dirty_req_ids: set[str] = set()
+            req_id_set = {r["id"] for r in requirements}
+            for rid, res in cached_results.items():
+                if rid not in req_id_set:
+                    continue  # pruned later
+                src_files = set(res.get("source_files", []))
+                if src_files & all_affected_files:
+                    dirty_req_ids.add(rid)
+                elif not res.get("implemented"):
+                    # Unimplemented reqs might now be in a changed file
+                    dirty_req_ids.add(rid)
+            # New requirements not in cache
+            for r in requirements:
+                if r["id"] not in cached_results:
+                    dirty_req_ids.add(r["id"])
+
+            full_remap = False
 
     if not use_llm:
-        # Cache miss but we're not allowed to call LLM — return unknown
+        # Cache miss / stale — can't call LLM
+        if cache and cache.get("version") == 2 and not full_remap:
+            # Partial cache is still usable for status display
+            req_ids = {r["id"] for r in requirements}
+            implemented = sum(
+                1 for rid, res in cache.get("results", {}).items()
+                if rid in req_ids and res.get("implemented")
+            )
+            return (implemented, len(requirements))
         return (0, len(requirements))
 
-    # Run LLM mapping
+    # --- LLM mapping ---
     from plumb.programs import configure_dspy, run_with_retries
     from plumb.programs.code_coverage_mapper import CodeCoverageMapper
 
     configure_dspy()
     mapper = CodeCoverageMapper()
 
-    req_json = json.dumps([{"id": r["id"], "text": r["text"]} for r in requirements])
+    if full_remap:
+        # Full re-map: all requirements, all files
+        dirty_reqs = requirements
+        summaries_for_llm = _combine_summaries(per_file_summaries)
+    else:
+        # Incremental: only dirty requirements + changed/new file summaries
+        dirty_reqs = [r for r in requirements if r["id"] in dirty_req_ids]
+        affected_summaries = {
+            f: per_file_summaries[f]
+            for f in (changed_files | new_files)
+            if f in per_file_summaries
+        }
+        summaries_for_llm = _combine_summaries(affected_summaries) if affected_summaries else ""
+
+    req_json = json.dumps([{"id": r["id"], "text": r["text"]} for r in dirty_reqs])
 
     try:
-        results = run_with_retries(mapper, req_json, source_summaries)
+        results = run_with_retries(mapper, req_json, summaries_for_llm)
     except Exception:
         return (0, len(requirements))
 
-    implemented_ids = {r.requirement_id for r in results if r.implemented}
-    covered = sum(1 for r in requirements if r.get("id", "") in implemented_ids)
+    # Build fresh results dict from LLM output
+    fresh_results: dict[str, dict] = {}
+    for r in results:
+        fresh_results[r.requirement_id] = {
+            "implemented": r.implemented,
+            "evidence": r.evidence,
+            "source_files": _extract_source_files_from_evidence(
+                r.evidence, known_files,
+            ),
+        }
 
-    # Write cache
+    # Merge: keep cached results for clean reqs, update with fresh for dirty
+    merged_results: dict[str, dict] = {}
+    req_id_set = {r["id"] for r in requirements}
+
+    if full_remap:
+        merged_results = fresh_results
+    else:
+        for rid, res in cached_results.items():
+            if rid in req_id_set and rid not in dirty_req_ids:
+                merged_results[rid] = res
+        merged_results.update(fresh_results)
+
+    # Prune removed requirements
+    merged_results = {k: v for k, v in merged_results.items() if k in req_id_set}
+
+    covered = sum(1 for res in merged_results.values() if res.get("implemented"))
+
+    # Write v2 cache
     cache_data = {
-        "cache_key": cache_key,
-        "covered": covered,
-        "total": len(requirements),
-        "implemented_ids": sorted(implemented_ids),
+        "version": 2,
+        "source_hashes": file_hashes,
+        "requirements_hash": req_hash,
+        "results": merged_results,
     }
     try:
         cache_path.write_text(json.dumps(cache_data, indent=2) + "\n")
