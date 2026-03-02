@@ -186,7 +186,7 @@ def _text_similarity(a: str, b: str) -> float:
 def deduplicate_decisions(
     decisions: list[Decision],
     existing_decisions: list[Decision] | None = None,
-    similarity_threshold: float = 0.7,
+    similarity_threshold: float = 0.5,
 ) -> list[Decision]:
     """Collapse decisions with same question and same decision text,
     preserving the earliest chunk_index. Also filter out new decisions
@@ -206,22 +206,15 @@ def deduplicate_decisions(
             seen[key] = d
     deduped = list(seen.values())
 
-    # Cross-reference against resolved existing decisions
+    # Cross-reference against all existing decisions (pending, approved, etc.)
     if not existing_decisions:
-        return deduped
-
-    resolved = [
-        d for d in existing_decisions
-        if d.status in ("approved", "edited", "rejected")
-    ]
-    if not resolved:
         return deduped
 
     result = []
     for d in deduped:
         new_text = f"{d.question or ''} {d.decision or ''}".strip()
         is_dup = False
-        for existing in resolved:
+        for existing in existing_decisions:
             existing_text = f"{existing.question or ''} {existing.decision or ''}".strip()
             if _text_similarity(new_text, existing_text) >= similarity_threshold:
                 is_dup = True

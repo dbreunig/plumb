@@ -176,11 +176,11 @@ class TestDeduplicateDecisions:
         result = deduplicate_decisions(new, existing_decisions=existing)
         assert len(result) == 1
 
-    def test_ignores_pending_existing(self):
+    def test_filters_pending_existing(self):
         new = [Decision(id="dec-new", question="Use sync?", decision="Yes sync")]
         existing = [Decision(id="dec-old", status="pending", question="Use sync?", decision="Yes sync")]
         result = deduplicate_decisions(new, existing_decisions=existing)
-        assert len(result) == 1  # pending existing should NOT filter
+        assert len(result) == 0  # pending existing SHOULD filter
 
     def test_no_existing_decisions(self):
         new = [Decision(id="dec-1", question="Q?", decision="A.")]
