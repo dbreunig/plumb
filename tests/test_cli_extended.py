@@ -67,7 +67,7 @@ class TestReviewExtended:
             confidence=0.9,
             branch="main",
         )
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["review"], input="a\n")
@@ -81,7 +81,7 @@ class TestReviewExtended:
             decision="A.",
             made_by="llm",
         )
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo), \
              patch("plumb.cli._run_modify") as mock_modify:
@@ -97,7 +97,7 @@ class TestReviewExtended:
             decision="A.",
             made_by="llm",
         )
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["review"], input="e\nnew text\n")
@@ -111,13 +111,13 @@ class TestReviewExtended:
             decision="A.",
             made_by="llm",
         )
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["review"], input="i\n")
             assert "Ignored" in result.output
 
-        decisions = read_decisions(initialized_repo)
+        decisions = read_decisions(initialized_repo, branch="main")
         ignored = [d for d in decisions if d.id == "dec-rev4" and d.status == "ignored"]
         assert len(ignored) == 1
 
@@ -129,7 +129,7 @@ class TestReviewExtended:
             decision="A.",
             ref_status="broken",
         )
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["review"], input="i\n")
@@ -138,8 +138,8 @@ class TestReviewExtended:
     def test_review_filter_branch(self, runner, initialized_repo):
         d1 = Decision(id="dec-b1", status="pending", branch="feat")
         d2 = Decision(id="dec-b2", status="pending", branch="main")
-        append_decision(initialized_repo, d1)
-        append_decision(initialized_repo, d2)
+        append_decision(initialized_repo, d1, branch="main")
+        append_decision(initialized_repo, d2, branch="main")
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["review", "--branch", "feat"], input="i\n")
@@ -156,14 +156,14 @@ class TestModifyExtended:
     def test_modify_not_rejected(self, runner, initialized_repo):
         # plumb:req-b25a2e8d
         d = Decision(id="dec-m1", status="pending")
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["modify", "dec-m1"])
             assert "not found or not rejected" in result.output.lower() or result.exit_code == 0
 
     def test_modify_no_staged_changes(self, runner, initialized_repo):
         d = Decision(id="dec-m2", status="rejected", decision="X", rejection_reason="Y")
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["modify", "dec-m2"])
             assert "no staged" in result.output.lower() or result.exit_code == 0
@@ -180,8 +180,8 @@ class TestStatusExtended:
     def test_status_with_pending_and_broken(self, runner, initialized_repo):
         d1 = Decision(id="dec-s1", status="pending", branch="main")
         d2 = Decision(id="dec-s2", status="pending", ref_status="broken", branch="feat")
-        append_decision(initialized_repo, d1)
-        append_decision(initialized_repo, d2)
+        append_decision(initialized_repo, d1, branch="main")
+        append_decision(initialized_repo, d2, branch="main")
 
         # Write requirements
         req_path = initialized_repo / ".plumb" / "requirements.json"
@@ -208,7 +208,7 @@ class TestRunModifyInternal:
             decision="X",
             rejection_reason="Y",
         )
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
         # Stage a file
         repo = Repo(initialized_repo)
         f = initialized_repo / "new.py"
@@ -218,7 +218,7 @@ class TestRunModifyInternal:
         with patch("plumb.programs.code_modifier.CodeModifier.modify", side_effect=RuntimeError("API down")):
             _run_modify(initialized_repo, "dec-rmf")
 
-        decisions = read_decisions(initialized_repo)
+        decisions = read_decisions(initialized_repo, branch="main")
         manual = [d for d in decisions if d.id == "dec-rmf" and d.status == "rejected_manual"]
         assert len(manual) == 1
 
@@ -229,7 +229,7 @@ class TestRunModifyInternal:
             decision="X",
             rejection_reason="Y",
         )
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
         repo = Repo(initialized_repo)
         f = initialized_repo / "new2.py"
         f.write_text("x=1\n")
@@ -238,6 +238,6 @@ class TestRunModifyInternal:
         with patch("plumb.programs.code_modifier.CodeModifier.modify", return_value={}):
             _run_modify(initialized_repo, "dec-rem")
 
-        decisions = read_decisions(initialized_repo)
+        decisions = read_decisions(initialized_repo, branch="main")
         manual = [d for d in decisions if d.id == "dec-rem" and d.status == "rejected_manual"]
         assert len(manual) == 1

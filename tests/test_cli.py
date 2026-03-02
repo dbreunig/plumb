@@ -10,7 +10,7 @@ from git import Repo
 
 from plumb.cli import cli, _update_claude_md
 from plumb.config import PlumbConfig, save_config, ensure_plumb_dir, load_config
-from plumb.decision_log import Decision, append_decision, read_decisions
+from plumb.decision_log import Decision, append_decision, read_decisions, read_all_decisions
 
 
 @pytest.fixture
@@ -133,14 +133,14 @@ class TestApprove:
         # plumb:req-42c8fd3f
         # plumb:req-3a769972
         d = Decision(id="dec-test1", status="pending", decision="A")
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["approve", "dec-test1"])
             assert result.exit_code == 0
             assert "Approved" in result.output
 
-        decisions = read_decisions(initialized_repo)
+        decisions = read_decisions(initialized_repo, branch="main")
         approved = [d for d in decisions if d.id == "dec-test1" and d.status == "approved"]
         assert len(approved) == 1
 
@@ -153,16 +153,16 @@ class TestApprove:
         d1 = Decision(id="dec-all1", status="pending", decision="A")
         d2 = Decision(id="dec-all2", status="pending", decision="B")
         d3 = Decision(id="dec-done", status="approved", decision="C")
-        append_decision(initialized_repo, d1)
-        append_decision(initialized_repo, d2)
-        append_decision(initialized_repo, d3)
+        append_decision(initialized_repo, d1, branch="main")
+        append_decision(initialized_repo, d2, branch="main")
+        append_decision(initialized_repo, d3, branch="main")
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["approve", "--all"])
             assert result.exit_code == 0
             assert "Approved 2 decision(s)" in result.output
 
-        decisions = read_decisions(initialized_repo)
+        decisions = read_decisions(initialized_repo, branch="main")
         approved = [d for d in decisions if d.status == "approved"]
         assert len(approved) == 3  # 2 newly approved + 1 already approved
 
@@ -190,7 +190,7 @@ class TestReject:
         # plumb:req-74db9086
         # plumb:req-4e20343f
         d = Decision(id="dec-test2", status="pending", decision="B")
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo), \
              patch("plumb.cli._run_modify") as mock_modify:
@@ -199,7 +199,7 @@ class TestReject:
             assert "Rejected" in result.output
             mock_modify.assert_called_once_with(initialized_repo, "dec-test2")
 
-        decisions = read_decisions(initialized_repo)
+        decisions = read_decisions(initialized_repo, branch="main")
         rejected = [d for d in decisions if d.id == "dec-test2" and d.status == "rejected"]
         assert len(rejected) == 1
         assert rejected[0].rejection_reason == "bad idea"
@@ -208,14 +208,14 @@ class TestReject:
 class TestIgnore:
     def test_ignore_existing(self, runner, initialized_repo):
         d = Decision(id="dec-ign1", status="pending", decision="X")
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["ignore", "dec-ign1"])
             assert result.exit_code == 0
             assert "Ignored" in result.output
 
-        decisions = read_decisions(initialized_repo)
+        decisions = read_decisions(initialized_repo, branch="main")
         ignored = [d for d in decisions if d.id == "dec-ign1" and d.status == "ignored"]
         assert len(ignored) == 1
 
@@ -231,14 +231,14 @@ class TestEdit:
         # plumb:req-b6f2c3c1
         # plumb:req-5d3f1baf
         d = Decision(id="dec-test3", status="pending", decision="C")
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
             result = runner.invoke(cli, ["edit", "dec-test3", "new text"])
             assert result.exit_code == 0
             assert "Edited" in result.output
 
-        decisions = read_decisions(initialized_repo)
+        decisions = read_decisions(initialized_repo, branch="main")
         edited = [d for d in decisions if d.id == "dec-test3" and d.status == "edited"]
         assert len(edited) == 1
         assert edited[0].decision == "new text"

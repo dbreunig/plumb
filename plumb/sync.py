@@ -11,8 +11,9 @@ from pathlib import Path
 from plumb.config import load_config
 from plumb.decision_log import (
     Decision,
-    read_decisions,
+    read_all_decisions,
     update_decision_status,
+    find_decision_branch,
 )
 
 
@@ -164,7 +165,7 @@ def sync_decisions(
     if not config:
         return {"spec_updated": 0, "tests_generated": 0}
 
-    decisions = read_decisions(repo_root)
+    decisions = read_all_decisions(repo_root)
     now = datetime.now(timezone.utc).isoformat()
 
     # Filter to approved/edited without synced_at
@@ -323,6 +324,7 @@ def sync_decisions(
 
     # Mark decisions as synced
     for d in to_sync:
-        update_decision_status(repo_root, d.id, synced_at=now)
+        branch = find_decision_branch(repo_root, d.id)
+        update_decision_status(repo_root, d.id, branch=branch, synced_at=now)
 
     return {"spec_updated": spec_updated, "tests_generated": tests_generated}
