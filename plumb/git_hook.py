@@ -115,6 +115,7 @@ def _extract_decisions_from_conversation(
         repo_root,
         config_path=config.claude_log_path,
         since_commit=config.last_commit,
+        since_datetime=config.last_extracted_at,
     )
     if not turns:
         return []
@@ -309,7 +310,7 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
         conv_decisions = _extract_decisions_from_diff(diff_summary, branch)
 
     # 8. Merge/dedup (also filter against already-resolved decisions)
-    conv_decisions = deduplicate_decisions(conv_decisions, existing_decisions=existing_decisions)
+    conv_decisions = deduplicate_decisions(conv_decisions, existing_decisions=existing_decisions, use_llm=True)
 
     # 9. Synthesize questions for questionless decisions
     conv_decisions = _synthesize_questions(conv_decisions)
@@ -317,6 +318,8 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
     # 10. Write decisions (unless dry_run)
     if not dry_run and conv_decisions:
         append_decisions(repo_root, conv_decisions)
+        config.last_extracted_at = datetime.now(timezone.utc).isoformat()
+        save_config(repo_root, config)
 
     # 11. Check pending decisions
     if dry_run:
@@ -369,6 +372,7 @@ def run_post_commit(repo_root: str | Path | None = None) -> None:
         repo = Repo(repo_root)
         config.last_commit = str(repo.head.commit)
         config.last_commit_branch = _get_branch_name(repo)
+        config.last_extracted_at = None
         save_config(repo_root, config)
     except Exception:
         pass

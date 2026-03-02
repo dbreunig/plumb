@@ -138,20 +138,26 @@ def read_conversation(
     repo_root: Path,
     config_path: str | None = None,
     since_commit: str | None = None,
+    since_datetime: str | None = None,
 ) -> list[ConversationTurn]:
     """Unified entry point for reading conversation turns.
 
     If config_path is set and points to an existing file, use the legacy
     read_conversation_log(). Otherwise, auto-detect Claude Code session files.
+
+    since_datetime (ISO format) takes priority over since_commit when both
+    are provided, giving a tighter time bound.
     """
     if config_path:
         log_path = locate_conversation_log(config_path)
         if log_path is not None:
-            return read_conversation_log(log_path, since=since_commit)
+            return read_conversation_log(log_path, since=since_datetime or since_commit)
 
     from plumb.claude_session import read_claude_sessions
 
-    return read_claude_sessions(repo_root, since_commit=since_commit)
+    return read_claude_sessions(
+        repo_root, since_commit=since_commit, since_datetime=since_datetime
+    )
 
 
 def chunk_conversation(

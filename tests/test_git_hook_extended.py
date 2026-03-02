@@ -168,6 +168,17 @@ class TestPostCommitHook:
         config = load_config(initialized_repo)
         assert config.last_commit == new_sha
 
+    def test_clears_last_extracted_at(self, initialized_repo):
+        """Post-commit should clear last_extracted_at so next run starts fresh."""
+        config = load_config(initialized_repo)
+        config.last_extracted_at = "2026-03-01T12:00:00+00:00"
+        save_config(initialized_repo, config)
+
+        run_post_commit(initialized_repo)
+
+        config = load_config(initialized_repo)
+        assert config.last_extracted_at is None
+
     def test_no_config_is_noop(self, tmp_repo):
         """If plumb not initialized, post-commit does nothing."""
         run_post_commit(tmp_repo)  # should not raise
@@ -176,3 +187,43 @@ class TestPostCommitHook:
         """If not in a git repo, post-commit does nothing."""
         with patch("plumb.git_hook.find_repo_root", return_value=None):
             run_post_commit()  # should not raise
+
+
+class TestLastExtractedAt:
+    def test_set_after_writing_decisions(self, initialized_repo):
+        """last_extracted_at should be set after decisions are written."""
+        repo = Repo(initialized_repo)
+        f = initialized_repo / "x.py"
+        f.write_text("x=1\n")
+        repo.index.add(["x.py"])
+
+        mock_decisions = [
+            Decision(id="dec-1", status="pending", question="Q?",
+                     decision="A.", made_by="llm", confidence=0.8)
+        ]
+
+        with patch("plumb.programs.validate_api_access"), \
+             patch("plumb.git_hook._analyze_diff", return_value="ok"), \
+             patch("plumb.git_hook._extract_decisions_from_conversation", return_value=mock_decisions), \
+             patch("plumb.git_hook._synthesize_questions", return_value=mock_decisions):
+            run_hook(initialized_repo)
+
+        config = load_config(initialized_repo)
+        assert config.last_extracted_at is not None
+
+    def test_not_set_when_no_decisions(self, initialized_repo):
+        """last_extracted_at should not change when no decisions are found."""
+        repo = Repo(initialized_repo)
+        f = initialized_repo / "x.py"
+        f.write_text("x=1\n")
+        repo.index.add(["x.py"])
+
+        with patch("plumb.programs.validate_api_access"), \
+             patch("plumb.git_hook._analyze_diff", return_value="ok"), \
+             patch("plumb.git_hook._extract_decisions_from_conversation", return_value=[]), \
+             patch("plumb.git_hook._extract_decisions_from_diff", return_value=[]), \
+             patch("plumb.coverage_reporter.print_coverage_report"):
+            run_hook(initialized_repo)
+
+        config = load_config(initialized_repo)
+        assert config.last_extracted_at is None

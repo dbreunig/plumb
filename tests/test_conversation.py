@@ -168,7 +168,7 @@ class TestReadConversation:
         with patch("plumb.claude_session.read_claude_sessions", return_value=[]) as mock:
             turns = read_conversation(tmp_path, config_path="/nonexistent/log.jsonl")
         assert turns == []
-        mock.assert_called_once_with(tmp_path, since_commit=None)
+        mock.assert_called_once_with(tmp_path, since_commit=None, since_datetime=None)
 
     def test_auto_detect_when_no_config_path(self, tmp_path):
         fake_turns = [ConversationTurn(role="user", content="auto")]
@@ -176,4 +176,4 @@ class TestReadConversation:
             turns = read_conversation(tmp_path, since_commit="abc123")
         assert len(turns) == 1
         assert turns[0].content == "auto"
-        mock.assert_called_once_with(tmp_path, since_commit="abc123")
+        mock.assert_called_once_with(tmp_path, since_commit="abc123", since_datetime=None)

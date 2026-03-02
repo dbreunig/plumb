@@ -144,12 +144,14 @@ def _commit_sha_to_datetime(repo_root: Path, sha: str) -> Optional[datetime]:
 
 
 def read_claude_sessions(
-    repo_root: Path, since_commit: Optional[str] = None
+    repo_root: Path,
+    since_commit: Optional[str] = None,
+    since_datetime: Optional[str] = None,
 ) -> list[ConversationTurn]:
     """Top-level orchestrator: find and parse all relevant Claude Code session files.
 
     1. Find session directory for this repo
-    2. Convert last_commit SHA to datetime (for filtering)
+    2. Determine cutoff datetime (since_datetime takes priority over since_commit)
     3. List session files modified after that datetime
     4. Parse each file, merge turns, sort by timestamp
     """
@@ -157,17 +159,28 @@ def read_claude_sessions(
     if session_dir is None:
         return []
 
-    commit_dt: Optional[datetime] = None
-    if since_commit:
-        commit_dt = _commit_sha_to_datetime(repo_root, since_commit)
+    cutoff_dt: Optional[datetime] = None
 
-    files = list_session_files(session_dir, modified_after=commit_dt)
+    # since_datetime (from last_extracted_at) is the tighter bound
+    if since_datetime:
+        try:
+            cutoff_dt = datetime.fromisoformat(
+                since_datetime.replace("Z", "+00:00")
+            )
+        except (ValueError, TypeError):
+            pass
+
+    # Fall back to commit datetime
+    if cutoff_dt is None and since_commit:
+        cutoff_dt = _commit_sha_to_datetime(repo_root, since_commit)
+
+    files = list_session_files(session_dir, modified_after=cutoff_dt)
     if not files:
         return []
 
     all_turns: list[ConversationTurn] = []
     for f in files:
-        turns = parse_session_file(f, since=commit_dt)
+        turns = parse_session_file(f, since=cutoff_dt)
         all_turns.extend(turns)
 
     # Sort by timestamp

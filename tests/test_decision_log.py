@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch, MagicMock
 
 from plumb.decision_log import (
     Decision,
@@ -208,6 +209,35 @@ class TestDeduplicateDecisions:
         d2 = Decision(id="dec-2", question="What cache strategy?", decision="Use Redis")
         result = deduplicate_decisions([d1, d2])
         assert len(result) == 2
+
+    def test_llm_dedup_filters_semantic_duplicates(self):
+        """use_llm=True calls _llm_dedup and filters by returned indices."""
+        d1 = Decision(id="dec-1", question="Use sync?", decision="Yes, use sync")
+        d2 = Decision(id="dec-2", question="Go synchronous?", decision="Synchronous is best")
+        d3 = Decision(id="dec-3", question="Cache strategy?", decision="Use Redis")
+
+        # Mock _llm_dedup to keep only first and third candidates
+        def fake_llm_dedup(candidates, existing):
+            return [candidates[0], candidates[2]]
+
+        with patch("plumb.decision_log._llm_dedup", side_effect=fake_llm_dedup):
+            result = deduplicate_decisions([d1, d2, d3], existing_decisions=[], use_llm=True)
+
+        assert len(result) == 2
+        assert result[0].id == "dec-1"
+        assert result[1].id == "dec-3"
+
+    def test_llm_dedup_called_even_for_single_candidate(self):
+        """use_llm=True should still call LLM with 1 candidate to catch cross-ref semantic dups."""
+        d1 = Decision(id="dec-1", question="Use sync?", decision="Yes")
+
+        def fake_llm_dedup(candidates, existing):
+            return candidates  # keep it
+
+        with patch("plumb.decision_log._llm_dedup", side_effect=fake_llm_dedup) as mock_fn:
+            result = deduplicate_decisions([d1], existing_decisions=[], use_llm=True)
+        mock_fn.assert_called_once()
+        assert len(result) == 1
 
 
 class TestNormalizeText:

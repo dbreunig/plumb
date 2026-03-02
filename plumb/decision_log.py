@@ -187,11 +187,13 @@ def deduplicate_decisions(
     decisions: list[Decision],
     existing_decisions: list[Decision] | None = None,
     similarity_threshold: float = 0.5,
+    use_llm: bool = False,
 ) -> list[Decision]:
     """Collapse decisions with same question and same decision text,
     preserving the earliest chunk_index. Also filter out new decisions
     that are semantically similar to already-resolved existing decisions."""
     # Exact dedup
+    print(f"[dedup] Input: {len(decisions)} candidates, {len(existing_decisions or [])} existing", flush=True)
     seen: dict[tuple, Decision] = {}
     for d in decisions:
         key = (
@@ -205,6 +207,7 @@ def deduplicate_decisions(
         else:
             seen[key] = d
     deduped = list(seen.values())
+    print(f"[dedup] After exact dedup: {len(deduped)}", flush=True)
 
     # Within-batch similarity dedup: compare new decisions against each other
     batch_unique: list[Decision] = []
@@ -213,26 +216,84 @@ def deduplicate_decisions(
         is_dup = False
         for kept in batch_unique:
             kept_text = f"{kept.question or ''} {kept.decision or ''}".strip()
-            if _text_similarity(new_text, kept_text) >= similarity_threshold:
+            sim = _text_similarity(new_text, kept_text)
+            if sim >= similarity_threshold:
+                print(f"[dedup] Jaccard batch dup (sim={sim:.3f}): '{new_text[:60]}...'", flush=True)
                 is_dup = True
                 break
         if not is_dup:
             batch_unique.append(d)
+    print(f"[dedup] After batch Jaccard: {len(batch_unique)}", flush=True)
 
     # Cross-reference against all existing decisions (pending, approved, etc.)
-    if not existing_decisions:
-        return batch_unique
+    if existing_decisions:
+        result = []
+        for d in batch_unique:
+            new_text = f"{d.question or ''} {d.decision or ''}".strip()
+            is_dup = False
+            for existing in existing_decisions:
+                existing_text = f"{existing.question or ''} {existing.decision or ''}".strip()
+                sim = _text_similarity(new_text, existing_text)
+                if sim >= similarity_threshold:
+                    print(f"[dedup] Jaccard cross dup (sim={sim:.3f}): '{new_text[:60]}...'", flush=True)
+                    is_dup = True
+                    break
+            if not is_dup:
+                result.append(d)
+        print(f"[dedup] After cross-ref Jaccard: {len(result)}", flush=True)
+    else:
+        result = batch_unique
 
-    result = []
-    for d in batch_unique:
-        new_text = f"{d.question or ''} {d.decision or ''}".strip()
-        is_dup = False
-        for existing in existing_decisions:
-            existing_text = f"{existing.question or ''} {existing.decision or ''}".strip()
-            if _text_similarity(new_text, existing_text) >= similarity_threshold:
-                is_dup = True
-                break
-        if not is_dup:
-            result.append(d)
+    # LLM-based semantic dedup pass (Haiku — cheap/fast)
+    if use_llm and len(result) >= 1:
+        print(f"[dedup] Sending {len(result)} candidates to Haiku LLM dedup...", flush=True)
+        result = _llm_dedup(result, existing_decisions or [])
+        print(f"[dedup] After LLM dedup: {len(result)}", flush=True)
 
+    print(f"[dedup] Final: {len(result)} decisions", flush=True)
     return result
+
+
+def _format_decision_line(index: int, d: Decision) -> str:
+    q = d.question or ""
+    dec = d.decision or ""
+    return f"{index}. [Q] {q} [D] {dec}"
+
+
+def _llm_dedup(
+    candidates: list[Decision],
+    existing_decisions: list[Decision],
+) -> list[Decision]:
+    """Use Haiku to catch semantic duplicates that Jaccard misses."""
+    import dspy
+    from plumb.programs.decision_deduplicator import DecisionDeduplicator
+
+    candidates_str = "\n".join(
+        _format_decision_line(i + 1, d) for i, d in enumerate(candidates)
+    )
+    recent_existing = existing_decisions[-50:] if existing_decisions else []
+    existing_str = "\n".join(
+        _format_decision_line(i + 1, d) for i, d in enumerate(recent_existing)
+    ) or "(none)"
+
+    print(f"[dedup:llm] Candidates sent to Haiku:\n{candidates_str}", flush=True)
+    print(f"[dedup:llm] Existing context ({len(recent_existing)} decisions):\n{existing_str}", flush=True)
+
+    haiku_lm = dspy.LM("anthropic/claude-haiku-4-5-20251001", max_tokens=32000)
+    deduplicator = DecisionDeduplicator()
+    with dspy.context(lm=haiku_lm):
+        unique_indices = deduplicator(
+            candidates=candidates_str, existing=existing_str
+        )
+
+    print(f"[dedup:llm] Haiku returned unique_indices: {unique_indices}", flush=True)
+
+    # Convert 1-based indices to 0-based, filter to valid range
+    valid = []
+    for idx in unique_indices:
+        zero_based = idx - 1
+        if 0 <= zero_based < len(candidates):
+            valid.append(zero_based)
+    kept = [candidates[i] for i in valid]
+    print(f"[dedup:llm] Keeping {len(kept)}/{len(candidates)} candidates (indices {valid})", flush=True)
+    return kept

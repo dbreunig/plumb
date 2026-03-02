@@ -29,6 +29,10 @@ from plumb.programs.requirement_parser import (
     RequirementParser,
 )
 from plumb.programs.spec_updater import SpecUpdaterSignature, SpecUpdater
+from plumb.programs.decision_deduplicator import (
+    DecisionDeduplicatorSignature,
+    DecisionDeduplicator,
+)
 from plumb.programs.test_generator import TestGeneratorSignature, TestGenerator
 from plumb.programs.code_modifier import CodeModifier
 
@@ -229,6 +233,20 @@ class TestTestGeneratorModule:
     def test_has_predict(self):
         gen = TestGenerator()
         assert hasattr(gen, "predict")
+
+
+class TestDecisionDeduplicatorSignature:
+    def test_has_correct_fields(self):
+        sig = DecisionDeduplicatorSignature
+        assert "candidates" in sig.input_fields
+        assert "existing" in sig.input_fields
+        assert "unique_indices" in sig.output_fields
+
+
+class TestDecisionDeduplicatorModule:
+    def test_has_predict(self):
+        deduplicator = DecisionDeduplicator()
+        assert hasattr(deduplicator, "predict")
 
 
 class TestCodeModifier:
