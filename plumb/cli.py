@@ -512,7 +512,10 @@ def sync_cmd():
 
     from plumb.sync import sync_decisions
     try:
-        result = sync_decisions(repo_root)
+        with console.status("[bold cyan]Syncing decisions...", spinner="dots") as status:
+            def on_progress(msg):
+                status.update(f"[bold cyan]{msg}")
+            result = sync_decisions(repo_root, on_progress=on_progress)
         console.print(f"Synced: {result['spec_updated']} spec sections updated, "
                       f"{result['tests_generated']} test stubs generated.")
     except Exception as e:

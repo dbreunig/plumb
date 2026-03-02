@@ -7,9 +7,9 @@
   ],
   "claude_log_path": null,
   "initialized_at": "2026-03-01T00:32:10.439519+00:00",
-  "last_commit": "ea76483b8132296aca1990482bb7f429f3c26dff",
+  "last_commit": "74d6b53d3e8ec383a1f7b8ce40f7d8e229c81915",
   "last_commit_branch": "main",
-  "last_extracted_at": "2026-03-02T05:58:33.558341+00:00",
+  "last_extracted_at": "2026-03-02T06:16:40.882520+00:00",
   "program_models": {
     "decision_deduplicator": {
       "model": "groq/openai/gpt-oss-120b",

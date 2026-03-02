@@ -273,73 +273,106 @@ def run_hook(repo_root: str | Path | None = None, dry_run: bool = False) -> int:
 
 
 def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
+    import time
+
+    timings: list[tuple[str, float]] = []
+
+    def _timed(label):
+        """Context manager that records elapsed time for a stage."""
+        class _Timer:
+            def __enter__(self):
+                self.start = time.monotonic()
+                return self
+            def __exit__(self, *args):
+                timings.append((label, time.monotonic() - self.start))
+        return _Timer()
+
+    def _print_timings():
+        total = sum(t for _, t in timings)
+        print(f"\n[timing] Hook total: {total:.2f}s", file=sys.stderr)
+        for label, elapsed in timings:
+            pct = (elapsed / total * 100) if total > 0 else 0
+            print(f"[timing]   {label}: {elapsed:.2f}s ({pct:.0f}%)", file=sys.stderr)
+
     # 1. Load config
-    if repo_root is None:
-        repo_root = find_repo_root()
-    if repo_root is None:
-        return 0
-    repo_root = Path(repo_root)
+    with _timed("Load config"):
+        if repo_root is None:
+            repo_root = find_repo_root()
+        if repo_root is None:
+            return 0
+        repo_root = Path(repo_root)
 
-    config = load_config(repo_root)
-    if config is None:
-        return 0
+        config = load_config(repo_root)
+        if config is None:
+            return 0
 
-    repo = Repo(repo_root)
+        repo = Repo(repo_root)
 
     # 2. Get staged diff and branch (excluding plumb-managed files)
-    diff = _get_staged_diff_filtered(repo, config)
-    if not diff:
-        return 0
+    with _timed("Staged diff"):
+        diff = _get_staged_diff_filtered(repo, config)
+        if not diff:
+            return 0
 
-    branch = _get_branch_name(repo)
+        branch = _get_branch_name(repo)
 
     # 3. Amend detection
-    if _detect_amend(repo, config.last_commit):
-        delete_decisions_by_commit(repo_root, config.last_commit)
+    with _timed("Amend detection"):
+        if _detect_amend(repo, config.last_commit):
+            delete_decisions_by_commit(repo_root, config.last_commit)
 
     # 4. Check broken refs
-    existing_decisions = read_decisions(repo_root)
-    existing_decisions = _check_broken_refs(repo, existing_decisions)
+    with _timed("Check broken refs"):
+        existing_decisions = read_decisions(repo_root)
+        existing_decisions = _check_broken_refs(repo, existing_decisions)
 
     # 5. Validate API access before any LLM work
-    from plumb.programs import validate_api_access
-    validate_api_access()
+    with _timed("Validate API"):
+        from plumb.programs import validate_api_access
+        validate_api_access()
 
     # 6. Analyze diff
-    diff_summary = _analyze_diff(diff)
+    with _timed("Analyze diff"):
+        diff_summary = _analyze_diff(diff)
 
     # 7. Extract decisions from conversation (or diff-only fallback)
-    conv_decisions = _extract_decisions_from_conversation(
-        repo_root, config, diff_summary
-    )
-    if not conv_decisions:
-        conv_decisions = _extract_decisions_from_diff(diff_summary, branch)
+    with _timed("Extract decisions"):
+        conv_decisions = _extract_decisions_from_conversation(
+            repo_root, config, diff_summary
+        )
+        if not conv_decisions:
+            conv_decisions = _extract_decisions_from_diff(diff_summary, branch)
 
     # 8. Merge/dedup (also filter against already-resolved decisions)
-    conv_decisions = deduplicate_decisions(conv_decisions, existing_decisions=existing_decisions, use_llm=True)
+    with _timed("Dedup"):
+        conv_decisions = deduplicate_decisions(conv_decisions, existing_decisions=existing_decisions, use_llm=True)
 
     # 9. Synthesize questions for questionless decisions
-    conv_decisions = _synthesize_questions(conv_decisions)
+    with _timed("Synthesize questions"):
+        conv_decisions = _synthesize_questions(conv_decisions)
 
     # 10. Write decisions (unless dry_run)
-    if not dry_run and conv_decisions:
-        append_decisions(repo_root, conv_decisions)
-        config.last_extracted_at = datetime.now(timezone.utc).isoformat()
-        save_config(repo_root, config)
+    with _timed("Write decisions"):
+        if not dry_run and conv_decisions:
+            append_decisions(repo_root, conv_decisions)
+            config.last_extracted_at = datetime.now(timezone.utc).isoformat()
+            save_config(repo_root, config)
 
     # 11. Check pending decisions
-    if dry_run:
-        # In dry-run, just report what we found
-        if conv_decisions:
-            print(_format_tty_output(conv_decisions))
-        else:
-            print("No decisions detected in staged changes.")
-        return 0
+    with _timed("Check pending"):
+        if dry_run:
+            _print_timings()
+            if conv_decisions:
+                print(_format_tty_output(conv_decisions))
+            else:
+                print("No decisions detected in staged changes.")
+            return 0
 
-    all_decisions = read_decisions(repo_root)
-    pending = [d for d in all_decisions if d.status == "pending"]
+        all_decisions = read_decisions(repo_root)
+        pending = [d for d in all_decisions if d.status == "pending"]
 
     if pending:
+        _print_timings()
         is_tty = sys.stdout.isatty()
         if is_tty:
             print(_format_tty_output(pending))
@@ -348,12 +381,14 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
         return 1
 
     # No pending decisions — run coverage
-    try:
-        from plumb.coverage_reporter import print_coverage_report
-        print_coverage_report(repo_root)
-    except Exception:
-        pass
+    with _timed("Coverage report"):
+        try:
+            from plumb.coverage_reporter import print_coverage_report
+            print_coverage_report(repo_root)
+        except Exception:
+            pass
 
+    _print_timings()
     return 0
 
 

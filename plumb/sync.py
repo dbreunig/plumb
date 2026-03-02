@@ -148,7 +148,9 @@ def parse_spec_files(repo_root: str | Path) -> list[dict]:
 
 
 def sync_decisions(
-    repo_root: str | Path, decision_ids: list[str] | None = None
+    repo_root: str | Path,
+    decision_ids: list[str] | None = None,
+    on_progress: callable | None = None,
 ) -> dict:
     """Sync approved/edited decisions to spec and tests.
 
@@ -177,7 +179,12 @@ def sync_decisions(
         to_sync.append(d)
 
     if not to_sync:
+        if on_progress:
+            on_progress("No unsynced decisions found.")
         return {"spec_updated": 0, "tests_generated": 0}
+
+    if on_progress:
+        on_progress(f"Syncing {len(to_sync)} decision(s)...")
 
     configure_dspy()
     from plumb.programs.spec_updater import BatchSpecUpdater
@@ -186,6 +193,8 @@ def sync_decisions(
 
     # Group decisions by (spec_file, section) for batching
     for spec_path_str in config.spec_paths:
+        if on_progress:
+            on_progress(f"Updating spec: {spec_path_str}...")
         spec_path = repo_root / spec_path_str
         if not spec_path.is_file():
             continue
@@ -229,6 +238,9 @@ def sync_decisions(
 
         _atomic_write(spec_path, content)
 
+    if on_progress:
+        on_progress(f"Spec updated ({spec_updated} section(s)). Generating test stubs...")
+
     # Generate test stubs
     tests_generated = 0
     req_path = repo_root / ".plumb" / "requirements.json"
@@ -261,17 +273,21 @@ def sync_decisions(
             req_text = "\n".join(
                 f"- [{r['id']}] {r['text']}" for r in uncovered
             )
-            # Read some source code for context
+            # Read source code referenced by the synced decisions
             code_context = ""
-            for item in repo_root.rglob("*.py"):
-                if ".plumb" in str(item) or "test_" in item.name:
-                    continue
-                try:
-                    code_context += item.read_text() + "\n"
-                except Exception:
-                    continue
-                if len(code_context) > 5000:
-                    break
+            seen_files: set[str] = set()
+            for d in to_sync:
+                for ref in d.file_refs:
+                    if ref.file in seen_files:
+                        continue
+                    seen_files.add(ref.file)
+                    fpath = repo_root / ref.file
+                    if not fpath.is_file():
+                        continue
+                    try:
+                        code_context += fpath.read_text() + "\n"
+                    except Exception:
+                        continue
 
             try:
                 stubs = run_with_retries(
@@ -295,10 +311,15 @@ def sync_decisions(
                 pass
 
     # Re-parse spec
+    if on_progress:
+        on_progress("Re-parsing spec files...")
     try:
         parse_spec_files(repo_root)
     except Exception:
         pass
+
+    if on_progress:
+        on_progress("Marking decisions as synced...")
 
     # Mark decisions as synced
     for d in to_sync:

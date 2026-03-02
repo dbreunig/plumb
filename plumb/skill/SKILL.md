@@ -40,6 +40,7 @@ following:
    `AskUserQuestion` tool so the user sees the native multiple-choice UI.
    Present each decision with these options:
    - **Approve** (Recommended) — accept it and update the spec
+   - **Approve with edits** — modify what the decision says before approving
    - **Ignore** — not spec-relevant; discard permanently
    - **Reject** — undo this change in the staged code
 
@@ -56,6 +57,7 @@ following:
 
 3. Based on the user's selection, call the appropriate command:
    - Approve: `plumb approve <id>`
+   - Approve with edits: `plumb edit <id> "<new decision text from user>"`
    - Ignore: `plumb ignore <id>`
    - Reject: `plumb reject <id> --reason "..."`
      (modify runs automatically — no separate call needed)
