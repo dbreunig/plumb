@@ -4,13 +4,20 @@ import dspy
 
 
 class DecisionDeduplicatorSignature(dspy.Signature):
-    """Identify semantic duplicates among candidate decisions.
+    """Filter candidate decisions by removing duplicates and countermanded decisions.
 
+    Candidates are numbered in chronological order (lower index = earlier).
     Compare candidates against each other and against existing decisions.
-    Two decisions are duplicates if they express the same choice, even in
-    different words. Return only the indices of genuinely unique candidates.
-    When two candidates are duplicates, prefer the one with the lower index
-    (first occurrence)."""
+    Remove a candidate if it matches ANY of these rules:
+
+    1. DUPLICATE — expresses the same choice as another candidate or an
+       existing decision, even in different words. When two candidates are
+       duplicates, drop the higher index (keep the first occurrence).
+    2. COUNTERMANDED — a later candidate (higher index) reverses, overrides,
+       or replaces an earlier candidate on the same topic. Drop the earlier
+       candidate and keep the later one, since it reflects the final intent.
+
+    Return only the indices of candidates that survive both filters."""
 
     candidates: str = dspy.InputField(
         desc="Numbered list of candidate decisions, e.g. '1. [Q] ... [D] ...'"
@@ -19,7 +26,7 @@ class DecisionDeduplicatorSignature(dspy.Signature):
         desc="Numbered list of recent existing decisions for cross-reference"
     )
     unique_indices: list[int] = dspy.OutputField(
-        desc="Indices from candidates to keep (1-based, only genuinely unique)"
+        desc="Indices from candidates to keep (1-based, only genuinely unique and not countermanded)"
     )
 
 
