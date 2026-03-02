@@ -73,7 +73,7 @@ class TestReviewExtended:
             result = runner.invoke(cli, ["review"], input="a\n")
             assert "Approved" in result.output
 
-    def test_review_reject_no_modify(self, runner, initialized_repo):
+    def test_review_reject_auto_modifies(self, runner, initialized_repo):
         d = Decision(
             id="dec-rev2",
             status="pending",
@@ -83,9 +83,11 @@ class TestReviewExtended:
         )
         append_decision(initialized_repo, d)
 
-        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
-            result = runner.invoke(cli, ["review"], input="r\nbad\nn\n")
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo), \
+             patch("plumb.cli._run_modify") as mock_modify:
+            result = runner.invoke(cli, ["review"], input="r\nbad\n")
             assert "Rejected" in result.output
+            mock_modify.assert_called_once_with(initialized_repo, "dec-rev2")
 
     def test_review_edit_decision(self, runner, initialized_repo):
         d = Decision(
@@ -101,7 +103,7 @@ class TestReviewExtended:
             result = runner.invoke(cli, ["review"], input="e\nnew text\n")
             assert "Edited" in result.output
 
-    def test_review_skip(self, runner, initialized_repo):
+    def test_review_ignore(self, runner, initialized_repo):
         d = Decision(
             id="dec-rev4",
             status="pending",
@@ -112,8 +114,12 @@ class TestReviewExtended:
         append_decision(initialized_repo, d)
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
-            result = runner.invoke(cli, ["review"], input="s\n")
-            assert "Skipped" in result.output
+            result = runner.invoke(cli, ["review"], input="i\n")
+            assert "Ignored" in result.output
+
+        decisions = read_decisions(initialized_repo)
+        ignored = [d for d in decisions if d.id == "dec-rev4" and d.status == "ignored"]
+        assert len(ignored) == 1
 
     def test_review_with_broken_ref(self, runner, initialized_repo):
         d = Decision(
@@ -126,8 +132,8 @@ class TestReviewExtended:
         append_decision(initialized_repo, d)
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
-            result = runner.invoke(cli, ["review"], input="s\n")
-            assert "broken" in result.output.lower() or "Skipped" in result.output
+            result = runner.invoke(cli, ["review"], input="i\n")
+            assert "broken" in result.output.lower() or "Ignored" in result.output
 
     def test_review_filter_branch(self, runner, initialized_repo):
         d1 = Decision(id="dec-b1", status="pending", branch="feat")
@@ -136,7 +142,7 @@ class TestReviewExtended:
         append_decision(initialized_repo, d2)
 
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
-            result = runner.invoke(cli, ["review", "--branch", "feat"], input="s\n")
+            result = runner.invoke(cli, ["review", "--branch", "feat"], input="i\n")
             # Should only show 1 decision
             assert result.exit_code == 0
 

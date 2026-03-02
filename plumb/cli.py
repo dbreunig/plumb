@@ -158,7 +158,7 @@ This project uses Plumb to keep the spec, tests, and code in sync.
 - Run `plumb diff` before committing to preview what Plumb will capture.
 - When `git commit` is intercepted by Plumb, **use `AskUserQuestion`** to present
   each pending decision via the native multiple-choice UI. Options: Approve,
-  Reject, Approve with edits. Then run the corresponding `plumb` command.
+  Ignore, Reject. Then run the corresponding `plumb` command.
   **NEVER approve, reject, or edit decisions on the user's behalf.** This is
   non-negotiable.
 - After all decisions are resolved, re-run `git commit`.
@@ -245,8 +245,8 @@ def review(branch):
         console.print()
 
         action = click.prompt(
-            "  [a]pprove / [r]eject / [e]dit / [s]kip",
-            type=click.Choice(["a", "r", "e", "s"], case_sensitive=False),
+            "  [a]pprove / [i]gnore / [r]eject / [e]dit",
+            type=click.Choice(["a", "i", "r", "e"], case_sensitive=False),
         )
 
         now = datetime.now(timezone.utc).isoformat()
@@ -254,6 +254,9 @@ def review(branch):
             update_decision_status(repo_root, d.id, status="approved", reviewed_at=now)
             approved_ids.append(d.id)
             console.print("  [green]Approved.[/green]\n")
+        elif action == "i":
+            update_decision_status(repo_root, d.id, status="ignored", reviewed_at=now)
+            console.print("  [dim]Ignored.[/dim]\n")
         elif action == "r":
             reason = click.prompt("  Rejection reason", default="")
             update_decision_status(
@@ -261,8 +264,7 @@ def review(branch):
                 rejection_reason=reason, reviewed_at=now,
             )
             console.print("  [red]Rejected.[/red]")
-            if click.confirm("  Run plumb modify to auto-fix?", default=True):
-                _run_modify(repo_root, d.id)
+            _run_modify(repo_root, d.id)
             console.print()
         elif action == "e":
             new_text = click.prompt("  New decision text")
@@ -272,8 +274,6 @@ def review(branch):
             )
             approved_ids.append(d.id)
             console.print("  [yellow]Edited.[/yellow]\n")
-        else:
-            console.print("  Skipped.\n")
 
     if approved_ids:
         console.print(f"\n{len(approved_ids)} decision(s) resolved. "
@@ -440,6 +440,29 @@ def reject(decision_id, reason):
         raise SystemExit(1)
 
     console.print(f"[yellow]Rejected {decision_id}.[/yellow]")
+    _run_modify(repo_root, decision_id)
+
+
+@cli.command()
+@click.argument("decision_id")
+def ignore(decision_id):
+    """Ignore a decision by ID (mark as not spec-relevant)."""
+    repo_root = find_repo_root()
+    if repo_root is None:
+        console.print("[red]Error: Not a git repository.[/red]")
+        raise SystemExit(1)
+
+    now = datetime.now(timezone.utc).isoformat()
+    result = update_decision_status(
+        repo_root, decision_id,
+        status="ignored",
+        reviewed_at=now,
+    )
+    if result is None:
+        console.print(f"[red]Decision '{decision_id}' not found.[/red]")
+        raise SystemExit(1)
+
+    console.print(f"Ignored {decision_id}.")
 
 
 @cli.command()

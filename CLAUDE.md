@@ -13,7 +13,7 @@ This project uses Plumb to keep the spec, tests, and code in sync.
 - Run `plumb diff` before committing to preview what Plumb will capture.
 - When `git commit` is intercepted by Plumb, **use `AskUserQuestion`** to present
   each pending decision via the native multiple-choice UI. Options: Approve,
-  Reject, Approve with edits. Then run the corresponding `plumb` command.
+  Ignore, Reject. Then run the corresponding `plumb` command.
   **NEVER approve, reject, or edit decisions on the user's behalf.** This is
   non-negotiable.
 - After all decisions are resolved, re-run `git commit`.

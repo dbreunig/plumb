@@ -192,15 +192,37 @@ class TestReject:
         d = Decision(id="dec-test2", status="pending", decision="B")
         append_decision(initialized_repo, d)
 
-        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo), \
+             patch("plumb.cli._run_modify") as mock_modify:
             result = runner.invoke(cli, ["reject", "dec-test2", "--reason", "bad idea"])
             assert result.exit_code == 0
             assert "Rejected" in result.output
+            mock_modify.assert_called_once_with(initialized_repo, "dec-test2")
 
         decisions = read_decisions(initialized_repo)
         rejected = [d for d in decisions if d.id == "dec-test2" and d.status == "rejected"]
         assert len(rejected) == 1
         assert rejected[0].rejection_reason == "bad idea"
+
+
+class TestIgnore:
+    def test_ignore_existing(self, runner, initialized_repo):
+        d = Decision(id="dec-ign1", status="pending", decision="X")
+        append_decision(initialized_repo, d)
+
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
+            result = runner.invoke(cli, ["ignore", "dec-ign1"])
+            assert result.exit_code == 0
+            assert "Ignored" in result.output
+
+        decisions = read_decisions(initialized_repo)
+        ignored = [d for d in decisions if d.id == "dec-ign1" and d.status == "ignored"]
+        assert len(ignored) == 1
+
+    def test_ignore_nonexistent(self, runner, initialized_repo):
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
+            result = runner.invoke(cli, ["ignore", "dec-nope"])
+            assert result.exit_code != 0
 
 
 class TestEdit:

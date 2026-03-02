@@ -40,8 +40,8 @@ following:
    `AskUserQuestion` tool so the user sees the native multiple-choice UI.
    Present each decision with these options:
    - **Approve** (Recommended) — accept it and update the spec
+   - **Ignore** — not spec-relevant; discard permanently
    - **Reject** — undo this change in the staged code
-   - **Approve with edits** — modify what the decision says before approving
 
    Include the decision details in the question text:
    ```
@@ -56,30 +56,14 @@ following:
 
 3. Based on the user's selection, call the appropriate command:
    - Approve: `plumb approve <id>`
-   - Reject: `plumb reject <id> --reason "<user's reason>"` then immediately
-     call `plumb modify <id>`
-   - Approve with edits: `plumb edit <id> "<new decision text from user>"`
+   - Ignore: `plumb ignore <id>`
+   - Reject: `plumb reject <id> --reason "..."`
+     (modify runs automatically — no separate call needed)
 
    If the user approved ALL decisions with no edits, use `plumb approve --all`
    instead of approving each one individually.
 
-4. For rejections, after calling `plumb modify <id>`, parse its JSON output:
-   ```json
-   {
-     "id": "dec-abc123",
-     "result": "modified",
-     "tests_passed": true,
-     "diff": "..."
-   }
-   ```
-   - If `tests_passed` is true: show the user the diff and confirm the change
-     looks correct before proceeding.
-   - If `tests_passed` is false: inform the user that automatic modification
-     failed, show them the test output, and ask them to resolve it manually.
-     The decision status will be `rejected_manual` — the user must fix the code
-     themselves before committing.
-
-5. Once all decisions are resolved, re-run `git commit`. The hook will fire
+4. Once all decisions are resolved, re-run `git commit`. The hook will fire
    again. If there are no pending decisions it will exit 0 and the commit will
    land. If new decisions are found (rare), repeat the review process.
 
@@ -125,8 +109,9 @@ Present these gaps clearly so the user can prioritize.
 | `plumb hook` | Called automatically by pre-commit hook — do not call manually |
 | `plumb approve <id>` | User approves a decision during review |
 | `plumb approve --all` | User approves all pending decisions at once |
-| `plumb reject <id> --reason "<text>"` | User rejects a decision |
-| `plumb modify <id>` | After rejection — auto-modify staged code |
+| `plumb reject <id> --reason "<text>"` | User rejects a decision (auto-modifies code) |
+| `plumb ignore <id>` | User marks a decision as not spec-relevant |
+| `plumb modify <id>` | Called automatically by reject — do not call directly |
 | `plumb edit <id> "<text>"` | User amends decision text before approving |
 | `plumb review` | Interactive terminal review (not needed in Claude Code) |
 | `plumb sync` | Called automatically by approve/edit — updates spec and tests |
