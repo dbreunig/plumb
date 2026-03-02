@@ -193,6 +193,17 @@ def hook(dry_run):
     raise SystemExit(exit_code)
 
 
+@cli.command()
+@click.option("--dry-run", is_flag=True, help="Preview only, don't write decisions")
+def check(dry_run):
+    """Scan staged changes for decisions (alias for hook)."""
+    from plumb.git_hook import run_hook
+
+    repo_root = find_repo_root()
+    exit_code = run_hook(repo_root, dry_run=dry_run)
+    raise SystemExit(exit_code)
+
+
 @cli.command(name="post-commit")
 def post_commit():
     """Run the post-commit hook to update last_commit."""

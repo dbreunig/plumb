@@ -13,7 +13,7 @@
     "plumb/programs/__init__.py": "f97fe45ec55787f18425b7e6d41cc86db20b341f4522fcacd815e5f21465d7b9",
     "plumb/programs/code_coverage_mapper.py": "4f3867d91c38b1ea39315f7b27c68cace410ea9753b4a4ed64bebfb8d43222be",
     "plumb/programs/code_modifier.py": "a6a7f75008c8acf074bde718bb413058ce3eb530ea4c56cd29f757db143aea55",
-    "plumb/programs/decision_deduplicator.py": "bd2461d0a8d32ba37a510be7362b5bbb60ed8a76261dd7abf6d86b776aba967f",
+    "plumb/programs/decision_deduplicator.py": "7b7d7c38b4c5509482f749dca22ec7bb6d5b89fae2b497a31a25768efdb44704",
     "plumb/programs/decision_extractor.py": "3f7ef5dbf3315bc6d642709218860d70b1d30fecced3d9b6ddf8b3a6683aa241",
     "plumb/programs/diff_analyzer.py": "437d2119994f0e1149f2767a94432b75253c8350fc60263cbd87f92caa1aa4f5",
     "plumb/programs/question_synthesizer.py": "12df72304475abe9e1c70a78a9f4c5150684ef999c32f7b90b06126649bda7fe",
@@ -23,21 +23,6 @@
   },
   "requirements_hash": "a40c075a40a04833a086a1eae1e261d90f08750501389eb3e3b282a0e85d80d9",
   "results": {
-    "req-79c36afc": {
-      "implemented": false,
-      "evidence": "No pyproject.toml or setup.py found in source summaries to configure pip installability",
-      "source_files": []
-    },
-    "req-30f031dc": {
-      "implemented": false,
-      "evidence": "No pyproject.toml or setup.py found in source summaries to configure uv installability",
-      "source_files": []
-    },
-    "req-ba9f07a3": {
-      "implemented": false,
-      "evidence": "No pyproject.toml or setup.py found to define PyPI package name",
-      "source_files": []
-    },
     "req-9193c586": {
       "implemented": true,
       "evidence": "cli.py defines CLI with @click.group() and commands, creating 'plumb' command",
@@ -608,16 +593,6 @@
       "evidence": "git_hook.py calls validate_api_access before LLM operations",
       "source_files": []
     },
-    "req-96630c2a": {
-      "implemented": false,
-      "evidence": "No test files found in source summaries to verify authentication test coverage",
-      "source_files": []
-    },
-    "req-415178b1": {
-      "implemented": false,
-      "evidence": "No test files found in source summaries to verify API validation mocking",
-      "source_files": []
-    },
     "req-5436da8c": {
       "implemented": true,
       "evidence": "conversation.py ConversationTurn class has role, content, timestamp fields for JSONL",
@@ -743,31 +718,6 @@
       "evidence": "programs/spec_updater.py SpecUpdater preserves existing formatting",
       "source_files": []
     },
-    "req-0435395b": {
-      "implemented": false,
-      "evidence": "No TestGenerator class found in source summaries that takes uncovered requirements, existing tests, and code context",
-      "source_files": []
-    },
-    "req-73e41872": {
-      "implemented": false,
-      "evidence": "No TestGenerator class found that outputs pytest test stubs as Python string",
-      "source_files": []
-    },
-    "req-9e06fbf5": {
-      "implemented": false,
-      "evidence": "No TestGenerator class found that creates one function per requirement",
-      "source_files": []
-    },
-    "req-50c3ada9": {
-      "implemented": false,
-      "evidence": "No TestGenerator class found that includes TODO and pytest.skip in stubs",
-      "source_files": []
-    },
-    "req-ea418181": {
-      "implemented": false,
-      "evidence": "No TestGenerator class found that avoids overwriting existing tests",
-      "source_files": []
-    },
     "req-9e9faef3": {
       "implemented": true,
       "evidence": "All CLI commands in cli.py load config with load_config and handle missing/malformed config",
@@ -791,11 +741,6 @@
     "req-3b53e17d": {
       "implemented": true,
       "evidence": "git_hook.py continues with diff-only analysis via _extract_decisions_from_diff if conversation unavailable",
-      "source_files": []
-    },
-    "req-bcf96fa4": {
-      "implemented": false,
-      "evidence": "No test files found in source summaries to verify pytest-based testing with 80% coverage",
       "source_files": []
     },
     "req-98d8bd75": {
@@ -836,6 +781,61 @@
     "req-09b6b073": {
       "implemented": true,
       "evidence": "sync.py sync_decisions only runs via explicit user commands, never automatically",
+      "source_files": []
+    },
+    "req-79c36afc": {
+      "implemented": false,
+      "evidence": "No setup.py, pyproject.toml, or packaging configuration found in source summaries to indicate pip installability",
+      "source_files": []
+    },
+    "req-30f031dc": {
+      "implemented": false,
+      "evidence": "No packaging configuration found in source summaries to indicate uv installability",
+      "source_files": []
+    },
+    "req-ba9f07a3": {
+      "implemented": false,
+      "evidence": "No packaging metadata found in source summaries to confirm PyPI package name",
+      "source_files": []
+    },
+    "req-96630c2a": {
+      "implemented": false,
+      "evidence": "No authentication functionality or related tests found in the provided source summaries",
+      "source_files": []
+    },
+    "req-415178b1": {
+      "implemented": false,
+      "evidence": "No existing tests or API validation mocking found in the provided source summaries",
+      "source_files": []
+    },
+    "req-0435395b": {
+      "implemented": false,
+      "evidence": "No TestGenerator class found in the provided source summaries",
+      "source_files": []
+    },
+    "req-73e41872": {
+      "implemented": false,
+      "evidence": "No TestGenerator class found in the provided source summaries",
+      "source_files": []
+    },
+    "req-9e06fbf5": {
+      "implemented": false,
+      "evidence": "No TestGenerator class found in the provided source summaries",
+      "source_files": []
+    },
+    "req-50c3ada9": {
+      "implemented": false,
+      "evidence": "No TestGenerator class found in the provided source summaries",
+      "source_files": []
+    },
+    "req-ea418181": {
+      "implemented": false,
+      "evidence": "No TestGenerator class found in the provided source summaries",
+      "source_files": []
+    },
+    "req-bcf96fa4": {
+      "implemented": false,
+      "evidence": "No pytest configuration or test files found in the provided source summaries",
       "source_files": []
     }
   }
