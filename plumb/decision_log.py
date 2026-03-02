@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re as _re
 import tempfile
 import uuid
 from datetime import datetime, timezone
@@ -42,7 +43,23 @@ def generate_decision_id() -> str:
     return f"dec-{uuid.uuid4().hex[:12]}"
 
 
+def _sanitize_branch_name(branch: str) -> str:
+    """Convert branch name to filesystem-safe filename component."""
+    return _re.sub(r"[^a-zA-Z0-9._-]", "-", branch)
+
+
+def _decisions_dir(repo_root: str | Path) -> Path:
+    """Return the decisions directory: .plumb/decisions/"""
+    return Path(repo_root) / ".plumb" / "decisions"
+
+
+def _branch_decisions_path(repo_root: str | Path, branch: str) -> Path:
+    """Return the JSONL path for a specific branch."""
+    return _decisions_dir(repo_root) / f"{_sanitize_branch_name(branch)}.jsonl"
+
+
 def _decisions_path(repo_root: str | Path) -> Path:
+    """Legacy monolithic path. Used only for migration detection."""
     return Path(repo_root) / ".plumb" / "decisions.jsonl"
 
 

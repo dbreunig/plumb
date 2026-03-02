@@ -14,6 +14,9 @@ from plumb.decision_log import (
     filter_decisions,
     delete_decisions_by_commit,
     deduplicate_decisions,
+    _sanitize_branch_name,
+    _decisions_dir,
+    _branch_decisions_path,
 )
 
 
@@ -196,5 +199,34 @@ class TestDeduplicateDecisions:
             result = deduplicate_decisions([d1], existing_decisions=[], use_llm=True)
         mock_fn.assert_called_once()
         assert len(result) == 1
+
+
+class TestPathHelpers:
+    def test_sanitize_simple_branch(self):
+        assert _sanitize_branch_name("main") == "main"
+
+    def test_sanitize_slashes(self):
+        assert _sanitize_branch_name("feature/foo") == "feature-foo"
+
+    def test_sanitize_multiple_slashes(self):
+        assert _sanitize_branch_name("feature/bar/baz") == "feature-bar-baz"
+
+    def test_sanitize_special_chars(self):
+        assert _sanitize_branch_name("fix/bug#123") == "fix-bug-123"
+
+    def test_sanitize_head(self):
+        assert _sanitize_branch_name("HEAD") == "HEAD"
+
+    def test_decisions_dir(self, initialized_repo):
+        d = _decisions_dir(initialized_repo)
+        assert d == initialized_repo / ".plumb" / "decisions"
+
+    def test_branch_decisions_path(self, initialized_repo):
+        p = _branch_decisions_path(initialized_repo, "feature/foo")
+        assert p == initialized_repo / ".plumb" / "decisions" / "feature-foo.jsonl"
+
+    def test_branch_decisions_path_main(self, initialized_repo):
+        p = _branch_decisions_path(initialized_repo, "main")
+        assert p == initialized_repo / ".plumb" / "decisions" / "main.jsonl"
 
 

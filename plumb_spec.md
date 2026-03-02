@@ -133,7 +133,7 @@ This is the primary workflow. The user works inside a Claude Code session. When 
 
 1. The hook validates API access before proceeding with analysis. If API authentication fails, the hook must exit non-zero and block the commit.
 2. The hook analyzes the staged diff and the Claude Code conversation log using the unified conversation reading system that auto-detects Claude Code sessions vs legacy logs and reads from Claude Code's actual session files at `~/.claude/projects/<encoded-path>/<uuid>.jsonl`.
-3. It writes pending decisions to `decisions.jsonl` and sets the `last_extracted_at` timestamp.
+3. It writes pending decisions to branch-specific decision log files with filesystem-safe path sanitization and sets the `last_extracted_at` timestamp.
 4. It **prints a machine-readable JSON summary of pending decisions to stdout** and **exits non-zero**, aborting the commit.
 5. Claude Code's skill reads that output and begins presenting decisions to the user using AskUserQuestion format, one at a time:
    > "Plumb found 3 decisions before this commit. Here's the first one:
@@ -155,6 +155,8 @@ The conversation parser handles Claude Code's type/message schema format and con
 The system implements intelligent deduplication by first running Jaccard similarity filtering, then applying LLM deduplication as a second pass when 2 or more candidates remain, using DSPy's context manager with Haiku LM for deduplication while preserving Sonnet for other operations.
 
 The system generates complete and runnable tests rather than stub files with TODO comments. Test generation uses increased context limits to accommodate complete test code. The test generator produces fully functional test code that can be executed immediately.
+
+The legacy decisions path function is maintained for migration detection purposes while the primary system operates on branch-specific decision logs.
 ### Path 2: Committing from the terminal (Interactive Review)
 
 The user commits directly from a terminal, outside of Claude Code. The pre-commit hook fires the same way:
@@ -223,7 +225,7 @@ Called automatically by the git pre-commit hook. Not intended to be called direc
 8. Filters out decisions marked as non-spec-relevant during extraction before creating Decision records.
 9. Merges and deduplicates decisions across chunks. Deduplication checks against all existing decisions (both pending and resolved) instead of only resolved ones. Implements within-batch similarity deduplication to compare new decisions against each other using Jaccard similarity check.
 10. For each decision with no associated question, runs **Question Synthesizer** with program-specific model configuration.
-11. Writes all new decisions with `status: "pending"` to `decisions.jsonl`.
+11. Writes all new decisions with `status: "pending"` to `decisions.jsonl`. Implements decisions sharding using a TDD approach with core refactor, DuckDB integration, caller updates, new commands, and comprehensive testing coverage.
 12. Runs `plumb parse-spec` to update requirements cache for any modified spec files.
 13. **If pending decisions exist:**
     - Checks whether it is running in a TTY (interactive terminal) or as a subprocess (e.g., called by Claude Code).
