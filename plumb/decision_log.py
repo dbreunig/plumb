@@ -206,12 +206,25 @@ def deduplicate_decisions(
             seen[key] = d
     deduped = list(seen.values())
 
+    # Within-batch similarity dedup: compare new decisions against each other
+    batch_unique: list[Decision] = []
+    for d in deduped:
+        new_text = f"{d.question or ''} {d.decision or ''}".strip()
+        is_dup = False
+        for kept in batch_unique:
+            kept_text = f"{kept.question or ''} {kept.decision or ''}".strip()
+            if _text_similarity(new_text, kept_text) >= similarity_threshold:
+                is_dup = True
+                break
+        if not is_dup:
+            batch_unique.append(d)
+
     # Cross-reference against all existing decisions (pending, approved, etc.)
     if not existing_decisions:
-        return deduped
+        return batch_unique
 
     result = []
-    for d in deduped:
+    for d in batch_unique:
         new_text = f"{d.question or ''} {d.decision or ''}".strip()
         is_dup = False
         for existing in existing_decisions:

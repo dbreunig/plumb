@@ -194,6 +194,21 @@ class TestDeduplicateDecisions:
         result = deduplicate_decisions(new, existing_decisions=existing, similarity_threshold=0.5)
         assert len(result) == 0
 
+    def test_within_batch_similarity_dedup(self):
+        """Similar decisions in the same batch should be collapsed."""
+        d1 = Decision(id="dec-1", question="Use sync or async?", decision="Use sync for simplicity", chunk_index=0)
+        d2 = Decision(id="dec-2", question="Should we use sync or async?", decision="Use sync for simplicity reasons", chunk_index=1)
+        result = deduplicate_decisions([d1, d2])
+        assert len(result) == 1
+        assert result[0].id == "dec-1"  # keeps earliest
+
+    def test_within_batch_different_decisions_kept(self):
+        """Genuinely different decisions in the same batch should both survive."""
+        d1 = Decision(id="dec-1", question="Use sync or async?", decision="Use sync")
+        d2 = Decision(id="dec-2", question="What cache strategy?", decision="Use Redis")
+        result = deduplicate_decisions([d1, d2])
+        assert len(result) == 2
+
 
 class TestNormalizeText:
     def test_removes_stop_words(self):
