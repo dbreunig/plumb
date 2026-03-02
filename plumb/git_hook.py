@@ -19,11 +19,10 @@ from plumb.conversation import (
 from plumb.decision_log import (
     Decision,
     generate_decision_id,
-    read_decisions,
+    read_all_decisions,
     append_decisions,
     delete_decisions_by_commit,
     deduplicate_decisions,
-    filter_decisions,
 )
 
 
@@ -319,11 +318,11 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
     # 3. Amend detection
     with _timed("Amend detection"):
         if _detect_amend(repo, config.last_commit):
-            delete_decisions_by_commit(repo_root, config.last_commit)
+            delete_decisions_by_commit(repo_root, config.last_commit, branch=branch)
 
     # 4. Check broken refs
     with _timed("Check broken refs"):
-        existing_decisions = read_decisions(repo_root)
+        existing_decisions = read_all_decisions(repo_root)
         existing_decisions = _check_broken_refs(repo, existing_decisions)
 
     # 5. Validate API access before any LLM work
@@ -354,7 +353,7 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
     # 10. Write decisions (unless dry_run)
     with _timed("Write decisions"):
         if not dry_run and conv_decisions:
-            append_decisions(repo_root, conv_decisions)
+            append_decisions(repo_root, conv_decisions, branch=branch)
             config.last_extracted_at = datetime.now(timezone.utc).isoformat()
             save_config(repo_root, config)
 
@@ -368,7 +367,7 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
                 print("No decisions detected in staged changes.")
             return 0
 
-        all_decisions = read_decisions(repo_root)
+        all_decisions = read_all_decisions(repo_root)
         pending = [d for d in all_decisions if d.status == "pending"]
 
     if pending:

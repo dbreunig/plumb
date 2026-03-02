@@ -39,6 +39,7 @@ def initialized_repo(tmp_repo):
     spec.write_text("# Spec\n\n## Features\n\nThe system must do X.\n")
     # Create tests dir
     (tmp_repo / "tests").mkdir(exist_ok=True)
+    (tmp_repo / ".plumb" / "decisions").mkdir(exist_ok=True)
     return tmp_repo
 
 

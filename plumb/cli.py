@@ -22,10 +22,11 @@ from plumb.config import (
 from plumb.ignore import DEFAULT_PLUMBIGNORE
 from plumb.decision_log import (
     Decision,
-    read_decisions,
+    read_all_decisions,
     append_decision,
     update_decision_status,
     filter_decisions,
+    find_decision_branch,
 )
 
 console = Console()
@@ -150,7 +151,7 @@ This project uses Plumb to keep the spec, tests, and code in sync.
 
 - **Spec:** {spec_list}
 - **Tests:** {test_list}
-- **Decision log:** `.plumb/decisions.jsonl`
+- **Decision log:** `.plumb/decisions/`
 
 ### When working in this project:
 
@@ -166,7 +167,7 @@ This project uses Plumb to keep the spec, tests, and code in sync.
   commit message **after** decision review and include a list of approved
   decisions.
 - Use `plumb coverage` to identify what needs to be implemented or tested next.
-- Never edit `.plumb/decisions.jsonl` directly.
+- Never edit files in `.plumb/decisions/` directly.
 - Treat the spec markdown files as the source of truth for intended behavior.
   Plumb will keep them updated as decisions are approved.
 <!-- plumb:end -->"""
@@ -244,6 +245,9 @@ def review(branch):
 
     console.print(f"\n[bold]Plumb Review: {len(pending)} pending decision(s)[/bold]\n")
 
+    # Pre-compute branch for each decision so updates target the correct shard
+    branch_for = {d.id: find_decision_branch(repo_root, d.id) for d in pending}
+
     approved_ids = []
     for i, d in enumerate(pending, 1):
         console.print(f"[bold]Decision {i} of {len(pending)}[/bold] [{d.id}]")
@@ -265,16 +269,16 @@ def review(branch):
 
         now = datetime.now(timezone.utc).isoformat()
         if action == "a":
-            update_decision_status(repo_root, d.id, status="approved", reviewed_at=now)
+            update_decision_status(repo_root, d.id, branch=branch_for.get(d.id), status="approved", reviewed_at=now)
             approved_ids.append(d.id)
             console.print("  [green]Approved.[/green]\n")
         elif action == "i":
-            update_decision_status(repo_root, d.id, status="ignored", reviewed_at=now)
+            update_decision_status(repo_root, d.id, branch=branch_for.get(d.id), status="ignored", reviewed_at=now)
             console.print("  [dim]Ignored.[/dim]\n")
         elif action == "r":
             reason = click.prompt("  Rejection reason", default="")
             update_decision_status(
-                repo_root, d.id, status="rejected",
+                repo_root, d.id, branch=branch_for.get(d.id), status="rejected",
                 rejection_reason=reason, reviewed_at=now,
             )
             console.print("  [red]Rejected.[/red]")
@@ -283,7 +287,7 @@ def review(branch):
         elif action == "e":
             new_text = click.prompt("  New decision text")
             update_decision_status(
-                repo_root, d.id, status="edited",
+                repo_root, d.id, branch=branch_for.get(d.id), status="edited",
                 decision=new_text, reviewed_at=now,
             )
             approved_ids.append(d.id)
@@ -299,7 +303,7 @@ def _run_modify(repo_root: Path, decision_id: str) -> None:
     from plumb.programs.code_modifier import CodeModifier
     from git import Repo
 
-    decisions = read_decisions(repo_root)
+    decisions = read_all_decisions(repo_root)
     target = None
     for d in decisions:
         if d.id == decision_id:
@@ -325,6 +329,8 @@ def _run_modify(repo_root: Path, decision_id: str) -> None:
             if spec_file.is_file():
                 spec_content += spec_file.read_text()
 
+    decision_branch = find_decision_branch(repo_root, decision_id)
+
     try:
         modifier = CodeModifier()
         modifications = modifier.modify(
@@ -335,12 +341,12 @@ def _run_modify(repo_root: Path, decision_id: str) -> None:
         )
     except Exception as e:
         console.print(f"  [red]Code modification failed: {e}[/red]")
-        update_decision_status(repo_root, decision_id, status="rejected_manual")
+        update_decision_status(repo_root, decision_id, branch=decision_branch, status="rejected_manual")
         return
 
     if not modifications:
         console.print("  [yellow]No modifications produced.[/yellow]")
-        update_decision_status(repo_root, decision_id, status="rejected_manual")
+        update_decision_status(repo_root, decision_id, branch=decision_branch, status="rejected_manual")
         return
 
     # Apply modifications
@@ -363,7 +369,7 @@ def _run_modify(repo_root: Path, decision_id: str) -> None:
         # Stage modified files
         for filepath in modifications:
             repo.index.add([filepath])
-        update_decision_status(repo_root, decision_id, status="rejected_modified")
+        update_decision_status(repo_root, decision_id, branch=decision_branch, status="rejected_modified")
         if is_tty:
             console.print("  [green]Tests passed. Modified files staged.[/green]")
         else:
@@ -375,7 +381,7 @@ def _run_modify(repo_root: Path, decision_id: str) -> None:
                 "diff": diff_output,
             }))
     else:
-        update_decision_status(repo_root, decision_id, status="rejected_manual")
+        update_decision_status(repo_root, decision_id, branch=decision_branch, status="rejected_manual")
         if is_tty:
             console.print("  [red]Tests failed. Modification not staged.[/red]")
             console.print(f"  {test_result.stdout}")
@@ -412,17 +418,19 @@ def approve(decision_id, approve_all):
             console.print("[yellow]No pending decisions to approve.[/yellow]")
             return
         now = datetime.now(timezone.utc).isoformat()
+        branch_for = {d.id: find_decision_branch(repo_root, d.id) for d in pending}
         for d in pending:
             update_decision_status(
-                repo_root, d.id, status="approved", reviewed_at=now,
+                repo_root, d.id, branch=branch_for.get(d.id), status="approved", reviewed_at=now,
             )
         console.print(f"[green]Approved {len(pending)} decision(s).[/green]")
         console.print("Run [bold]plumb sync[/bold] to update spec and tests.")
         return
 
     now = datetime.now(timezone.utc).isoformat()
+    branch = find_decision_branch(repo_root, decision_id)
     result = update_decision_status(
-        repo_root, decision_id, status="approved", reviewed_at=now,
+        repo_root, decision_id, branch=branch, status="approved", reviewed_at=now,
     )
     if result is None:
         console.print(f"[red]Decision '{decision_id}' not found.[/red]")
@@ -443,8 +451,10 @@ def reject(decision_id, reason):
         raise SystemExit(1)
 
     now = datetime.now(timezone.utc).isoformat()
+    branch = find_decision_branch(repo_root, decision_id)
     result = update_decision_status(
         repo_root, decision_id,
+        branch=branch,
         status="rejected",
         rejection_reason=reason,
         reviewed_at=now,
@@ -467,8 +477,10 @@ def ignore(decision_id):
         raise SystemExit(1)
 
     now = datetime.now(timezone.utc).isoformat()
+    branch = find_decision_branch(repo_root, decision_id)
     result = update_decision_status(
         repo_root, decision_id,
+        branch=branch,
         status="ignored",
         reviewed_at=now,
     )
@@ -490,8 +502,10 @@ def edit(decision_id, text):
         raise SystemExit(1)
 
     now = datetime.now(timezone.utc).isoformat()
+    branch = find_decision_branch(repo_root, decision_id)
     result = update_decision_status(
         repo_root, decision_id,
+        branch=branch,
         status="edited",
         decision=text,
         reviewed_at=now,
@@ -781,7 +795,7 @@ def status():
         pass
 
     # Decisions
-    decisions = read_decisions(repo_root)
+    decisions = read_all_decisions(repo_root)
     pending = [d for d in decisions if d.status == "pending"]
     broken = [d for d in decisions if d.ref_status == "broken"]
 
@@ -818,3 +832,47 @@ def status():
         if stale:
             bar += "  [dim](run plumb coverage to refresh)[/dim]"
         console.print(f"[cyan]Spec-to-code:[/cyan]  {bar}")
+
+
+@cli.command()
+def migrate():
+    """Migrate from monolithic decisions.jsonl to branch-sharded layout."""
+    repo_root = find_repo_root()
+    if repo_root is None:
+        console.print("[red]Error: Not a git repository.[/red]")
+        raise SystemExit(1)
+
+    from plumb.decision_log import migrate_decisions
+    result = migrate_decisions(repo_root)
+
+    if result["already_migrated"]:
+        console.print("Already migrated to sharded layout.")
+        return
+
+    if result["migrated"] == 0:
+        console.print("No decisions to migrate.")
+    else:
+        console.print(f"[green]Migrated {result['migrated']} decisions to .plumb/decisions/main.jsonl[/green]")
+
+
+@cli.command(name="merge-decisions")
+@click.argument("branch")
+@click.option("--target", default="main", help="Target branch to merge into (default: main)")
+def merge_decisions(branch, target):
+    """Merge a branch's decisions into the target branch (default: main)."""
+    repo_root = find_repo_root()
+    if repo_root is None:
+        console.print("[red]Error: Not a git repository.[/red]")
+        raise SystemExit(1)
+
+    from plumb.decision_log import merge_branch_decisions
+    result = merge_branch_decisions(repo_root, branch, target=target)
+
+    if result.get("error"):
+        console.print(f"[red]Error: {result['error']}[/red]")
+        raise SystemExit(1)
+
+    if result["merged"] == 0:
+        console.print(f"No decisions found for branch '{branch}'.")
+    else:
+        console.print(f"[green]Merged {result['merged']} decision lines from '{branch}' into '{target}'.[/green]")

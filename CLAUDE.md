@@ -5,7 +5,7 @@ This project uses Plumb to keep the spec, tests, and code in sync.
 
 - **Spec:** plumb_spec.md
 - **Tests:** tests/
-- **Decision log:** `.plumb/decisions.jsonl`
+- **Decision log:** `.plumb/decisions/`
 
 ### When working in this project:
 
@@ -21,7 +21,7 @@ This project uses Plumb to keep the spec, tests, and code in sync.
   commit message **after** decision review and include a list of approved
   decisions.
 - Use `plumb coverage` to identify what needs to be implemented or tested next.
-- Never edit `.plumb/decisions.jsonl` directly.
+- Never edit files in `.plumb/decisions/` directly.
 - Treat the spec markdown files as the source of truth for intended behavior.
   Plumb will keep them updated as decisions are approved.
 <!-- plumb:end -->

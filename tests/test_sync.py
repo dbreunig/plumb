@@ -84,7 +84,7 @@ class TestSyncDecisions:
             decision="Use in-memory dict.",
             created_at=datetime.now(timezone.utc).isoformat(),
         )
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
 
         mock_updater = MagicMock(return_value="## Features\n\nThe system uses in-memory dict cache.\n")
         mock_parser_result = []
@@ -95,7 +95,7 @@ class TestSyncDecisions:
 
         assert result["spec_updated"] == 1
         # Decision should be marked synced
-        decisions = read_decisions(initialized_repo)
+        decisions = read_decisions(initialized_repo, branch="main")
         synced = [d for d in decisions if d.id == "dec-sync1" and d.synced_at]
         assert len(synced) == 1
 
@@ -105,21 +105,21 @@ class TestSyncDecisions:
             status="approved",
             synced_at=datetime.now(timezone.utc).isoformat(),
         )
-        append_decision(initialized_repo, d)
+        append_decision(initialized_repo, d, branch="main")
         result = sync_decisions(initialized_repo)
         assert result["spec_updated"] == 0
 
     def test_filters_by_decision_ids(self, initialized_repo):
         d1 = Decision(id="dec-yes", status="approved", decision="A")
         d2 = Decision(id="dec-no", status="approved", decision="B")
-        append_decision(initialized_repo, d1)
-        append_decision(initialized_repo, d2)
+        append_decision(initialized_repo, d1, branch="main")
+        append_decision(initialized_repo, d2, branch="main")
 
         with patch("plumb.programs.configure_dspy"), \
              patch("plumb.programs.run_with_retries", return_value="updated"):
             result = sync_decisions(initialized_repo, decision_ids=["dec-yes"])
 
-        decisions = read_decisions(initialized_repo)
+        decisions = read_decisions(initialized_repo, branch="main")
         yes_synced = [d for d in decisions if d.id == "dec-yes" and d.synced_at]
         no_synced = [d for d in decisions if d.id == "dec-no" and d.synced_at]
         assert len(yes_synced) == 1
