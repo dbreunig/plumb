@@ -17,8 +17,11 @@ from plumb.decision_log import (
     append_decision,
     append_decisions,
     read_decisions,
+    read_all_decisions,
     update_decision_status,
     filter_decisions,
+    find_decision_branch,
+    merge_branch_decisions,
 )
 from plumb.git_hook import run_hook
 
@@ -259,3 +262,41 @@ class TestHookNeverBlocks:
                    side_effect=RuntimeError("boom")):
             result = run_hook(full_repo)
             assert result == 0
+
+
+class TestDecisionShardingIntegration:
+    def test_full_lifecycle(self, initialized_repo):
+        """Test: write to branch -> read across shards -> merge to main."""
+
+        # 1. Write decisions to two branches
+        d1 = Decision(id="dec-1", status="pending", question="Q1?", decision="A1")
+        d2 = Decision(id="dec-2", status="pending", question="Q2?", decision="A2")
+        append_decision(initialized_repo, d1, branch="feature-a")
+        append_decision(initialized_repo, d2, branch="feature-b")
+
+        # 2. Cross-shard read sees both
+        all_decisions = read_all_decisions(initialized_repo)
+        assert len(all_decisions) == 2
+
+        # 3. Filter by status across shards
+        pending = filter_decisions(initialized_repo, status="pending")
+        assert len(pending) == 2
+
+        # 4. Find decision branch
+        assert find_decision_branch(initialized_repo, "dec-1") == "feature-a"
+
+        # 5. Update in correct branch
+        update_decision_status(initialized_repo, "dec-1", branch="feature-a", status="approved")
+        d = read_decisions(initialized_repo, branch="feature-a")
+        assert any(x.status == "approved" for x in d)
+
+        # 6. Merge feature-a to main
+        result = merge_branch_decisions(initialized_repo, "feature-a")
+        assert result["merged"] > 0
+
+        # 7. Main now has feature-a's decisions
+        main_decisions = read_decisions(initialized_repo, branch="main")
+        assert any(x.id == "dec-1" for x in main_decisions)
+
+        # 8. feature-a file is gone, dec-1 now found in main
+        assert find_decision_branch(initialized_repo, "dec-1") == "main"
