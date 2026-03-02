@@ -196,16 +196,22 @@ def _extract_decisions_from_diff(diff_summary: str, branch: str) -> list[Decisio
 
 def _synthesize_questions(decisions: list[Decision]) -> list[Decision]:
     """For decisions with no question, run QuestionSynthesizer."""
-    from plumb.programs import configure_dspy, run_with_retries
+    import dspy
+    from plumb.programs import configure_dspy, run_with_retries, get_program_lm
     from plumb.programs.question_synthesizer import QuestionSynthesizer
 
     configure_dspy()
     synth = QuestionSynthesizer()
+    override_lm = get_program_lm("question_synthesizer")
     result = []
     for d in decisions:
         if not d.question and d.decision:
             try:
-                question = run_with_retries(synth, d.decision)
+                if override_lm:
+                    with dspy.context(lm=override_lm):
+                        question = run_with_retries(synth, d.decision)
+                else:
+                    question = run_with_retries(synth, d.decision)
                 d = d.model_copy(update={"question": question})
             except Exception:
                 pass

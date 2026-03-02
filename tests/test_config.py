@@ -17,6 +17,7 @@ class TestPlumbConfig:
         assert cfg.test_paths == []
         assert cfg.claude_log_path is None
         assert cfg.last_commit is None
+        assert cfg.program_models == {}
 
     def test_custom_values(self):
         cfg = PlumbConfig(
@@ -32,6 +33,18 @@ class TestPlumbConfig:
         data = cfg.model_dump()
         cfg2 = PlumbConfig(**data)
         assert cfg == cfg2
+
+    def test_program_models_roundtrip(self):
+        cfg = PlumbConfig(
+            spec_paths=["a.md"],
+            program_models={
+                "decision_deduplicator": {"model": "groq/openai/gpt-oss-120b", "max_tokens": 8192},
+            },
+        )
+        data = cfg.model_dump()
+        cfg2 = PlumbConfig(**data)
+        assert cfg2.program_models["decision_deduplicator"]["model"] == "groq/openai/gpt-oss-120b"
+        assert cfg2.program_models["decision_deduplicator"]["max_tokens"] == 8192
 
 
 class TestFindRepoRoot:

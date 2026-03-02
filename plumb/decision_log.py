@@ -279,9 +279,12 @@ def _llm_dedup(
     print(f"[dedup:llm] Candidates sent to Haiku:\n{candidates_str}", flush=True)
     print(f"[dedup:llm] Existing context ({len(recent_existing)} decisions):\n{existing_str}", flush=True)
 
-    haiku_lm = dspy.LM("anthropic/claude-haiku-4-5-20251001", max_tokens=32000)
+    from plumb.programs import get_program_lm
+
+    override_lm = get_program_lm("decision_deduplicator")
+    lm = override_lm or dspy.LM("anthropic/claude-haiku-4-5-20251001", max_tokens=32000)
     deduplicator = DecisionDeduplicator()
-    with dspy.context(lm=haiku_lm):
+    with dspy.context(lm=lm):
         unique_indices = deduplicator(
             candidates=candidates_str, existing=existing_str
         )

@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, patch
 import dspy
 import pytest
 
-from plumb.programs import run_with_retries, configure_dspy, validate_api_access
+from plumb.programs import run_with_retries, configure_dspy, validate_api_access, get_program_lm
+from plumb.config import PlumbConfig, save_config, ensure_plumb_dir
 from plumb import PlumbAuthError, PlumbInferenceError
 from plumb.programs.diff_analyzer import (
     ChangeSummary,
@@ -301,3 +302,39 @@ class TestCodeModifier:
         assert "decision text" in prompt
         assert "reason text" in prompt
         assert "spec text" in prompt
+
+
+class TestGetProgramLm:
+    def test_returns_none_when_no_config(self, tmp_path):
+        """No .plumb/config.json → returns None."""
+        result = get_program_lm("decision_deduplicator", repo_root=tmp_path)
+        assert result is None
+
+    def test_returns_none_when_program_not_listed(self, tmp_repo):
+        """Config exists but program_models is empty → returns None."""
+        ensure_plumb_dir(tmp_repo)
+        cfg = PlumbConfig(spec_paths=["spec.md"])
+        save_config(tmp_repo, cfg)
+        result = get_program_lm("decision_deduplicator", repo_root=tmp_repo)
+        assert result is None
+
+    def test_returns_lm_when_override_exists(self, tmp_repo):
+        """Config has an override → returns a dspy.LM."""
+        ensure_plumb_dir(tmp_repo)
+        cfg = PlumbConfig(
+            spec_paths=["spec.md"],
+            program_models={
+                "decision_deduplicator": {"model": "openai/gpt-4o-mini", "max_tokens": 4096},
+            },
+        )
+        save_config(tmp_repo, cfg)
+        lm = get_program_lm("decision_deduplicator", repo_root=tmp_repo)
+        assert isinstance(lm, dspy.LM)
+        assert lm.model == "openai/gpt-4o-mini"
+        assert lm.kwargs["max_tokens"] == 4096
+
+    def test_returns_none_when_no_repo_root(self):
+        """No repo root found → returns None."""
+        with patch("plumb.config.find_repo_root", return_value=None):
+            result = get_program_lm("decision_deduplicator")
+            assert result is None

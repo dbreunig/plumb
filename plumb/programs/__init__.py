@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import dspy
 from dspy.adapters import XMLAdapter
@@ -40,6 +41,27 @@ def validate_api_access() -> None:
             "Plumb requires a valid Anthropic API key to analyze commits.\n"
             "Set it in a .env file or export it: export ANTHROPIC_API_KEY=your-key-here"
         )
+
+
+def get_program_lm(program_name: str, repo_root: str | Path | None = None) -> dspy.LM | None:
+    """Return a per-program LM override from config, or None for the default."""
+    from plumb.config import find_repo_root, load_config
+
+    if repo_root is None:
+        repo_root = find_repo_root()
+    if repo_root is None:
+        return None
+    cfg = load_config(repo_root)
+    if cfg is None:
+        return None
+    entry = cfg.program_models.get(program_name)
+    if entry is None:
+        return None
+    model = entry.get("model")
+    if not model:
+        return None
+    max_tokens = entry.get("max_tokens", 8192)
+    return dspy.LM(model, max_tokens=max_tokens)
 
 
 def run_with_retries(fn, *args, max_retries: int = 2, **kwargs):

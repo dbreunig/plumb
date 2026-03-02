@@ -18,6 +18,7 @@ class PlumbConfig(BaseModel):
     last_commit: Optional[str] = None
     last_commit_branch: Optional[str] = None
     last_extracted_at: Optional[str] = None
+    program_models: dict[str, dict] = Field(default_factory=dict)
 
 
 def find_repo_root(start: str | Path | None = None) -> Path | None:

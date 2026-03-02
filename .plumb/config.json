@@ -7,6 +7,17 @@
   ],
   "claude_log_path": null,
   "initialized_at": "2026-03-01T00:32:10.439519+00:00",
-  "last_commit": "06c1352ef512bcf6e251baab453a286a7c366842",
-  "last_commit_branch": "main"
+  "last_commit": "674cdcca151420562297ee79f81701d50e5cdd8c",
+  "last_commit_branch": "main",
+  "last_extracted_at": "2026-03-02T05:30:34.223672+00:00",
+  "program_models": {
+    "decision_deduplicator": {
+      "model": "groq/openai/gpt-oss-120b",
+      "max_tokens": 8192
+    },
+    "question_synthesizer": {
+      "model": "groq/openai/gpt-oss-120b",
+      "max_tokens": 8192
+    }
+  }
 }
