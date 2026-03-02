@@ -201,6 +201,78 @@ class TestDeduplicateDecisions:
         assert len(result) == 1
 
 
+class TestBranchScopedRead:
+    def test_read_empty_branch(self, initialized_repo):
+        result = read_decisions(initialized_repo, branch="feature-x")
+        assert result == []
+
+    def test_read_specific_branch(self, initialized_repo, sample_decisions):
+        append_decisions(initialized_repo, sample_decisions, branch="feature-x")
+        result = read_decisions(initialized_repo, branch="feature-x")
+        assert len(result) == 2
+
+    def test_read_branch_isolation(self, initialized_repo, sample_decisions):
+        append_decisions(initialized_repo, [sample_decisions[0]], branch="branch-a")
+        append_decisions(initialized_repo, [sample_decisions[1]], branch="branch-b")
+        a = read_decisions(initialized_repo, branch="branch-a")
+        b = read_decisions(initialized_repo, branch="branch-b")
+        assert len(a) == 1
+        assert a[0].id == "dec-aaa111"
+        assert len(b) == 1
+        assert b[0].id == "dec-bbb222"
+
+    def test_latest_line_wins_within_branch(self, initialized_repo, sample_decisions):
+        append_decision(initialized_repo, sample_decisions[0], branch="main")
+        updated = sample_decisions[0].model_copy(update={"status": "approved"})
+        append_decision(initialized_repo, updated, branch="main")
+        result = read_decisions(initialized_repo, branch="main")
+        assert len(result) == 1
+        assert result[0].status == "approved"
+
+
+class TestBranchScopedWrite:
+    def test_append_creates_decisions_dir(self, initialized_repo):
+        d = Decision(id="dec-1", question="Q?", decision="A.")
+        append_decision(initialized_repo, d, branch="new-branch")
+        assert (initialized_repo / ".plumb" / "decisions" / "new-branch.jsonl").exists()
+
+    def test_append_multiple_to_branch(self, initialized_repo, sample_decisions):
+        append_decisions(initialized_repo, sample_decisions, branch="feat")
+        result = read_decisions(initialized_repo, branch="feat")
+        assert len(result) == 2
+
+
+class TestBranchScopedUpdate:
+    def test_update_in_branch(self, initialized_repo, sample_decisions):
+        append_decision(initialized_repo, sample_decisions[0], branch="feat")
+        result = update_decision_status(
+            initialized_repo, "dec-aaa111", branch="feat", status="approved"
+        )
+        assert result is not None
+        assert result.status == "approved"
+        decisions = read_decisions(initialized_repo, branch="feat")
+        assert decisions[0].status == "approved"
+
+    def test_update_not_found_in_branch(self, initialized_repo, sample_decisions):
+        append_decision(initialized_repo, sample_decisions[0], branch="feat")
+        result = update_decision_status(
+            initialized_repo, "dec-aaa111", branch="other", status="approved"
+        )
+        assert result is None
+
+
+class TestBranchScopedDelete:
+    def test_delete_by_commit_in_branch(self, initialized_repo):
+        d1 = Decision(id="dec-1", commit_sha="sha111")
+        d2 = Decision(id="dec-2", commit_sha="sha222")
+        append_decisions(initialized_repo, [d1, d2], branch="feat")
+        removed = delete_decisions_by_commit(initialized_repo, "sha111", branch="feat")
+        assert removed == 1
+        remaining = read_decisions(initialized_repo, branch="feat")
+        assert len(remaining) == 1
+        assert remaining[0].id == "dec-2"
+
+
 class TestPathHelpers:
     def test_sanitize_simple_branch(self):
         assert _sanitize_branch_name("main") == "main"

@@ -63,9 +63,13 @@ def _decisions_path(repo_root: str | Path) -> Path:
     return Path(repo_root) / ".plumb" / "decisions.jsonl"
 
 
-def read_decisions(repo_root: str | Path) -> list[Decision]:
-    """Read decisions.jsonl, returning latest-line-wins deduped list."""
-    path = _decisions_path(repo_root)
+def read_decisions(repo_root: str | Path, branch: str | None = None) -> list[Decision]:
+    """Read decisions.jsonl, returning latest-line-wins deduped list.
+
+    When *branch* is given, read from the branch-scoped shard file.
+    When *branch* is None, read from the legacy monolithic file.
+    """
+    path = _branch_decisions_path(repo_root, branch) if branch else _decisions_path(repo_root)
     if not path.exists():
         return []
     by_id: dict[str, Decision] = {}
@@ -82,18 +86,26 @@ def read_decisions(repo_root: str | Path) -> list[Decision]:
     return list(by_id.values())
 
 
-def append_decision(repo_root: str | Path, decision: Decision) -> None:
-    """Append a single decision line to decisions.jsonl."""
-    path = _decisions_path(repo_root)
-    path.parent.mkdir(exist_ok=True)
+def append_decision(repo_root: str | Path, decision: Decision, branch: str | None = None) -> None:
+    """Append a single decision line to decisions.jsonl.
+
+    When *branch* is given, write to the branch-scoped shard file.
+    When *branch* is None, write to the legacy monolithic file.
+    """
+    path = _branch_decisions_path(repo_root, branch) if branch else _decisions_path(repo_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a") as f:
         f.write(json.dumps(decision.model_dump()) + "\n")
 
 
-def append_decisions(repo_root: str | Path, decisions: list[Decision]) -> None:
-    """Append multiple decision lines."""
-    path = _decisions_path(repo_root)
-    path.parent.mkdir(exist_ok=True)
+def append_decisions(repo_root: str | Path, decisions: list[Decision], branch: str | None = None) -> None:
+    """Append multiple decision lines.
+
+    When *branch* is given, write to the branch-scoped shard file.
+    When *branch* is None, write to the legacy monolithic file.
+    """
+    path = _branch_decisions_path(repo_root, branch) if branch else _decisions_path(repo_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a") as f:
         for dec in decisions:
             f.write(json.dumps(dec.model_dump()) + "\n")
@@ -102,11 +114,16 @@ def append_decisions(repo_root: str | Path, decisions: list[Decision]) -> None:
 def update_decision_status(
     repo_root: str | Path,
     decision_id: str,
+    branch: str | None = None,
     **updates,
 ) -> Decision | None:
     """Update a decision by appending a new line with updated fields.
+
+    When *branch* is given, read from and write to the branch-scoped shard.
+    When *branch* is None, use the legacy monolithic file.
+
     Returns the updated decision, or None if not found."""
-    decisions = read_decisions(repo_root)
+    decisions = read_decisions(repo_root, branch=branch)
     target = None
     for d in decisions:
         if d.id == decision_id:
@@ -117,7 +134,7 @@ def update_decision_status(
     updated_data = target.model_dump()
     updated_data.update(updates)
     updated = Decision(**updated_data)
-    append_decision(repo_root, updated)
+    append_decision(repo_root, updated, branch=branch)
     return updated
 
 
@@ -138,10 +155,14 @@ def filter_decisions(
     return result
 
 
-def delete_decisions_by_commit(repo_root: str | Path, commit_sha: str) -> int:
+def delete_decisions_by_commit(repo_root: str | Path, commit_sha: str, branch: str | None = None) -> int:
     """Delete decisions matching a commit SHA by rewriting the file.
+
+    When *branch* is given, rewrite the branch-scoped shard file.
+    When *branch* is None, rewrite the legacy monolithic file.
+
     Returns number of lines removed."""
-    path = _decisions_path(repo_root)
+    path = _branch_decisions_path(repo_root, branch) if branch else _decisions_path(repo_root)
     if not path.exists():
         return 0
     lines = path.read_text().splitlines()
