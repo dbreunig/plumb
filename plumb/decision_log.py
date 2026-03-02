@@ -138,21 +138,154 @@ def update_decision_status(
     return updated
 
 
+def read_all_decisions(repo_root: str | Path) -> list[Decision]:
+    """Read and deduplicate decisions across ALL branch JSONL files using DuckDB.
+
+    Returns latest-line-wins deduplication by decision ID across every shard.
+    """
+    decisions_dir = _decisions_dir(repo_root)
+    if not decisions_dir.exists():
+        return []
+    jsonl_files = list(decisions_dir.glob("*.jsonl"))
+    if not jsonl_files:
+        return []
+
+    import duckdb
+
+    glob_pattern = str(decisions_dir / "*.jsonl")
+    try:
+        conn = duckdb.connect(":memory:")
+        query = f"""
+            WITH raw AS (
+                SELECT *, ROW_NUMBER() OVER () AS _line_num
+                FROM read_json_auto('{glob_pattern}', format='newline_delimited')
+            ),
+            deduped AS (
+                SELECT *, ROW_NUMBER() OVER (PARTITION BY id ORDER BY _line_num DESC) AS _rn
+                FROM raw
+            )
+            SELECT * EXCLUDE (_line_num, _rn) FROM deduped WHERE _rn = 1
+        """
+        rel = conn.execute(query)
+        columns = [desc[0] for desc in rel.description]
+        rows = rel.fetchall()
+        conn.close()
+    except Exception:
+        return []
+
+    decisions = []
+    for row in rows:
+        raw = dict(zip(columns, row))
+        # Convert DuckDB/numpy types to Python native types
+        cleaned = _clean_duckdb_row(raw)
+        try:
+            decisions.append(Decision(**cleaned))
+        except Exception:
+            continue
+    return decisions
+
+
+def _clean_duckdb_row(raw: dict) -> dict:
+    """Convert DuckDB result row values to Python-native types for Pydantic."""
+    import math
+
+    cleaned = {}
+    for key, value in raw.items():
+        if key == "rowid":
+            continue
+        value = _to_python_native(value)
+        # Convert NaN to None
+        if isinstance(value, float) and math.isnan(value):
+            value = None
+        # Handle file_refs: DuckDB returns list of dicts or structs
+        if key == "file_refs" and isinstance(value, list):
+            converted_refs = []
+            for item in value:
+                if isinstance(item, dict):
+                    # Convert inner values too
+                    item = {k: _to_python_native(v) for k, v in item.items()}
+                    converted_refs.append(FileRef(**item))
+                elif isinstance(item, (list, tuple)):
+                    # Struct as tuple: (file, lines)
+                    converted_refs.append(FileRef(file=str(item[0]), lines=list(item[1]) if len(item) > 1 else []))
+                else:
+                    converted_refs.append(item)
+            value = converted_refs
+        # Handle related_requirement_ids: DuckDB may return as special list type
+        elif key == "related_requirement_ids" and value is not None:
+            if isinstance(value, (list, tuple)):
+                value = [str(v) for v in value]
+            else:
+                value = []
+        cleaned[key] = value
+    return cleaned
+
+
+def _to_python_native(value):
+    """Convert numpy/DuckDB scalar types to Python builtins."""
+    import math
+
+    if value is None:
+        return None
+    # Handle numpy types if numpy is available
+    try:
+        import numpy as np
+        if isinstance(value, (np.integer,)):
+            return int(value)
+        if isinstance(value, (np.floating,)):
+            f = float(value)
+            return None if math.isnan(f) else f
+        if isinstance(value, (np.bool_,)):
+            return bool(value)
+        if isinstance(value, np.ndarray):
+            return value.tolist()
+    except ImportError:
+        pass
+    # Handle DuckDB list types
+    if hasattr(value, "tolist"):
+        return value.tolist()
+    if isinstance(value, list):
+        return [_to_python_native(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _to_python_native(v) for k, v in value.items()}
+    return value
+
+
 def filter_decisions(
     repo_root: str | Path,
     status: str | None = None,
     branch: str | None = None,
 ) -> list[Decision]:
-    """Filter decisions by status and/or branch."""
-    decisions = read_decisions(repo_root)
+    """Filter decisions by status and/or branch.
+
+    When *branch* is given, read from that single branch file (fast, no DuckDB).
+    When *branch* is None, use read_all_decisions() to query across all shards.
+    """
+    if branch is not None:
+        decisions = read_decisions(repo_root, branch=branch)
+    else:
+        decisions = read_all_decisions(repo_root)
     result = []
     for d in decisions:
         if status and d.status != status:
             continue
-        if branch and d.branch != branch:
-            continue
         result.append(d)
     return result
+
+
+def find_decision_branch(repo_root: str | Path, decision_id: str) -> str | None:
+    """Find which branch file contains a decision ID.
+
+    Returns the branch name (file stem) or None if not found.
+    """
+    decisions_dir = _decisions_dir(repo_root)
+    if not decisions_dir.exists():
+        return None
+    for jsonl_file in decisions_dir.glob("*.jsonl"):
+        content = jsonl_file.read_text()
+        if f'"id": "{decision_id}"' in content or f'"id":"{decision_id}"' in content:
+            return jsonl_file.stem
+    return None
 
 
 def delete_decisions_by_commit(repo_root: str | Path, commit_sha: str, branch: str | None = None) -> int:

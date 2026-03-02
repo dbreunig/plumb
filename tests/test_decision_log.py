@@ -8,10 +8,12 @@ from plumb.decision_log import (
     FileRef,
     generate_decision_id,
     read_decisions,
+    read_all_decisions,
     append_decision,
     append_decisions,
     update_decision_status,
     filter_decisions,
+    find_decision_branch,
     delete_decisions_by_commit,
     deduplicate_decisions,
     _sanitize_branch_name,
@@ -108,8 +110,8 @@ class TestUpdateDecisionStatus:
 
 class TestFilterDecisions:
     def test_filter_by_status(self, initialized_repo, sample_decisions):
-        append_decisions(initialized_repo, sample_decisions)
-        update_decision_status(initialized_repo, "dec-aaa111", status="approved")
+        append_decisions(initialized_repo, sample_decisions, branch="main")
+        update_decision_status(initialized_repo, "dec-aaa111", branch="main", status="approved")
         pending = filter_decisions(initialized_repo, status="pending")
         assert len(pending) == 1
         assert pending[0].id == "dec-bbb222"
@@ -117,7 +119,8 @@ class TestFilterDecisions:
     def test_filter_by_branch(self, initialized_repo, sample_decisions):
         d1 = sample_decisions[0].model_copy(update={"branch": "feat"})
         d2 = sample_decisions[1].model_copy(update={"branch": "main"})
-        append_decisions(initialized_repo, [d1, d2])
+        append_decision(initialized_repo, d1, branch="feat")
+        append_decision(initialized_repo, d2, branch="main")
         feat = filter_decisions(initialized_repo, branch="feat")
         assert len(feat) == 1
         assert feat[0].id == "dec-aaa111"
@@ -302,3 +305,62 @@ class TestPathHelpers:
         assert p == initialized_repo / ".plumb" / "decisions" / "main.jsonl"
 
 
+class TestReadAllDecisions:
+    def test_empty_directory(self, initialized_repo):
+        (initialized_repo / ".plumb" / "decisions").mkdir(parents=True, exist_ok=True)
+        result = read_all_decisions(initialized_repo)
+        assert result == []
+
+    def test_reads_across_branches(self, initialized_repo, sample_decisions):
+        append_decision(initialized_repo, sample_decisions[0], branch="branch-a")
+        append_decision(initialized_repo, sample_decisions[1], branch="branch-b")
+        result = read_all_decisions(initialized_repo)
+        assert len(result) == 2
+        ids = {d.id for d in result}
+        assert ids == {"dec-aaa111", "dec-bbb222"}
+
+    def test_dedup_across_branches(self, initialized_repo, sample_decisions):
+        append_decision(initialized_repo, sample_decisions[0], branch="branch-a")
+        updated = sample_decisions[0].model_copy(update={"status": "approved"})
+        append_decision(initialized_repo, updated, branch="branch-a")
+        result = read_all_decisions(initialized_repo)
+        assert len(result) == 1
+        assert result[0].status == "approved"
+
+    def test_reads_single_branch(self, initialized_repo, sample_decisions):
+        append_decisions(initialized_repo, sample_decisions, branch="main")
+        result = read_all_decisions(initialized_repo)
+        assert len(result) == 2
+
+
+class TestFilterDecisionsCrossShard:
+    def test_filter_across_branches_by_status(self, initialized_repo, sample_decisions):
+        append_decision(initialized_repo, sample_decisions[0], branch="branch-a")
+        d2_approved = sample_decisions[1].model_copy(update={"status": "approved"})
+        append_decision(initialized_repo, d2_approved, branch="branch-b")
+        pending = filter_decisions(initialized_repo, status="pending")
+        assert len(pending) == 1
+        assert pending[0].id == "dec-aaa111"
+
+    def test_filter_single_branch(self, initialized_repo, sample_decisions):
+        append_decisions(initialized_repo, sample_decisions, branch="feat")
+        result = filter_decisions(initialized_repo, status="pending", branch="feat")
+        assert len(result) == 2
+
+
+class TestFindDecisionBranch:
+    def test_find_in_branch(self, initialized_repo, sample_decisions):
+        append_decision(initialized_repo, sample_decisions[0], branch="feat")
+        result = find_decision_branch(initialized_repo, "dec-aaa111")
+        assert result == "feat"
+
+    def test_not_found(self, initialized_repo):
+        (initialized_repo / ".plumb" / "decisions").mkdir(parents=True, exist_ok=True)
+        result = find_decision_branch(initialized_repo, "dec-nonexist")
+        assert result is None
+
+    def test_find_across_multiple_branches(self, initialized_repo, sample_decisions):
+        append_decision(initialized_repo, sample_decisions[0], branch="branch-a")
+        append_decision(initialized_repo, sample_decisions[1], branch="branch-b")
+        assert find_decision_branch(initialized_repo, "dec-aaa111") == "branch-a"
+        assert find_decision_branch(initialized_repo, "dec-bbb222") == "branch-b"
