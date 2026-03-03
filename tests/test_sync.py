@@ -8,7 +8,6 @@ from plumb.decision_log import Decision, append_decision, read_decisions
 from plumb.sync import (
     _generate_requirement_id,
     _atomic_write,
-    find_spec_section,
     sync_decisions,
     parse_spec_files,
 )
@@ -49,22 +48,6 @@ class TestAtomicWrite:
         f.write_text("old")
         _atomic_write(f, "new")
         assert f.read_text() == "new"
-
-
-class TestFindSpecSection:
-    def test_single_section(self):
-        content = "# Title\n\nSome content here."
-        text, start, end = find_spec_section(content, "content")
-        assert "Some content" in text
-
-    def test_multiple_sections(self):
-        content = "# Intro\n\nGeneral stuff.\n\n## Auth\n\nLogin tokens expire.\n\n## API\n\nREST endpoints."
-        text, start, end = find_spec_section(content, "tokens expire login")
-        assert "Login tokens" in text or "tokens expire" in text
-
-    def test_empty_content(self):
-        text, start, end = find_spec_section("", "anything")
-        assert text == ""
 
 
 class TestSyncDecisions:

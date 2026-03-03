@@ -29,7 +29,7 @@ from plumb.programs.requirement_parser import (
     RequirementParserSignature,
     RequirementParser,
 )
-from plumb.programs.spec_updater import SpecUpdaterSignature, SpecUpdater
+from plumb.programs.spec_updater import WholeFileSpecUpdaterSignature, WholeFileSpecUpdater
 from plumb.programs.decision_deduplicator import (
     DecisionDeduplicatorSignature,
     DecisionDeduplicator,
@@ -182,13 +182,13 @@ class TestRequirementParserSignature:
         assert "requirements" in sig.output_fields
 
 
-class TestSpecUpdaterSignature:
+class TestWholeFileSpecUpdaterSignature:
     def test_has_correct_fields(self):
-        sig = SpecUpdaterSignature
-        assert "spec_section" in sig.input_fields
-        assert "decision" in sig.input_fields
-        assert "question" in sig.input_fields
-        assert "updated_section" in sig.output_fields
+        sig = WholeFileSpecUpdaterSignature
+        assert "spec_content" in sig.input_fields
+        assert "decisions_text" in sig.input_fields
+        assert "section_updates_json" in sig.output_fields
+        assert "new_sections_json" in sig.output_fields
 
 
 class TestTestGeneratorSignature:
@@ -224,9 +224,9 @@ class TestRequirementParserModule:
         assert hasattr(parser, "predict")
 
 
-class TestSpecUpdaterModule:
+class TestWholeFileSpecUpdaterModule:
     def test_has_predict(self):
-        updater = SpecUpdater()
+        updater = WholeFileSpecUpdater()
         assert hasattr(updater, "predict")
 
 

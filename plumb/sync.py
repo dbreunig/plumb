@@ -36,47 +36,6 @@ def _atomic_write(path: Path, content: str) -> None:
         raise
 
 
-def find_spec_section(spec_content: str, decision_text: str) -> tuple[str, int, int]:
-    """Locate the most relevant markdown section for a decision.
-    Returns (section_text, start_line, end_line).
-    Falls back to returning the entire content if no section match."""
-    lines = spec_content.split("\n")
-    sections: list[tuple[str, int, int]] = []
-    current_start = 0
-    current_header = ""
-
-    for i, line in enumerate(lines):
-        if re.match(r"^#{1,4}\s", line):
-            if i > current_start:
-                sections.append(
-                    ("\n".join(lines[current_start:i]), current_start, i)
-                )
-            current_start = i
-            current_header = line
-
-    # Last section
-    if current_start < len(lines):
-        sections.append(
-            ("\n".join(lines[current_start:]), current_start, len(lines))
-        )
-
-    if not sections:
-        return (spec_content, 0, len(lines))
-
-    # Simple relevance: pick section with most word overlap with decision
-    decision_words = set(decision_text.lower().split())
-    best_section = sections[0]
-    best_score = 0
-    for sec_text, start, end in sections:
-        sec_words = set(sec_text.lower().split())
-        score = len(decision_words & sec_words)
-        if score > best_score:
-            best_score = score
-            best_section = (sec_text, start, end)
-
-    return best_section
-
-
 def extract_outline(content: str) -> list[str]:
     """Extract markdown headers from content, preserving order."""
     return [line for line in content.split("\n") if re.match(r"^#{1,6}\s", line)]
