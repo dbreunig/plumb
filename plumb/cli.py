@@ -32,6 +32,33 @@ from plumb.decision_log import (
 console = Console()
 
 
+def _find_spec_suggestions(repo_root: Path) -> list[str]:
+    """Scan repo root for markdown files/dirs, respecting .plumbignore."""
+    from plumb.ignore import parse_plumbignore, is_ignored
+
+    patterns = parse_plumbignore(repo_root)
+    suggestions: list[str] = []
+
+    # Top-level .md files
+    for f in sorted(repo_root.glob("*.md")):
+        rel = f.name
+        if not is_ignored(rel, patterns):
+            suggestions.append(rel)
+
+    # Directories containing .md files (one level deep)
+    for d in sorted(repo_root.iterdir()):
+        if not d.is_dir() or d.name.startswith("."):
+            continue
+        rel = d.name + "/"
+        if is_ignored(rel, patterns) or is_ignored(d.name, patterns):
+            continue
+        md_count = len(list(d.rglob("*.md")))
+        if md_count > 0:
+            suggestions.append(f"{d.name}/  ({md_count} .md file{'s' if md_count != 1 else ''})")
+
+    return suggestions
+
+
 @click.group()
 def cli():
     """Plumb: Keep spec, tests, and code in sync."""

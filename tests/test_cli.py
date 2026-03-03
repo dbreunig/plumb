@@ -8,7 +8,7 @@ import pytest
 from click.testing import CliRunner
 from git import Repo
 
-from plumb.cli import cli, _update_claude_md
+from plumb.cli import cli, _update_claude_md, _find_spec_suggestions
 from plumb.config import PlumbConfig, save_config, ensure_plumb_dir, load_config
 from plumb.decision_log import Decision, append_decision, read_decisions, read_all_decisions
 
@@ -280,3 +280,31 @@ class TestDiff:
              patch("plumb.git_hook.run_hook", return_value=0):
             result = runner.invoke(cli, ["diff"])
             assert result.exit_code == 0
+
+
+class TestFindSpecSuggestions:
+    def test_finds_md_files(self, tmp_repo):
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        (tmp_repo / "design.md").write_text("# Design\n")
+        suggestions = _find_spec_suggestions(tmp_repo)
+        assert "spec.md" in suggestions
+        assert "design.md" in suggestions
+
+    def test_finds_dirs_with_md_files(self, tmp_repo):
+        specs_dir = tmp_repo / "specs"
+        specs_dir.mkdir()
+        (specs_dir / "a.md").write_text("# A\n")
+        (specs_dir / "b.md").write_text("# B\n")
+        suggestions = _find_spec_suggestions(tmp_repo)
+        assert any("specs/" in s for s in suggestions)
+
+    def test_excludes_plumbignored_files(self, tmp_repo):
+        (tmp_repo / "README.md").write_text("# Readme\n")
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        suggestions = _find_spec_suggestions(tmp_repo)
+        assert not any("README.md" in s for s in suggestions)
+        assert any("spec.md" in s for s in suggestions)
+
+    def test_empty_repo_no_suggestions(self, tmp_repo):
+        suggestions = _find_spec_suggestions(tmp_repo)
+        assert suggestions == []
