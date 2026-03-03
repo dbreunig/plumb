@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import shutil
@@ -146,7 +147,6 @@ def init():
         test_path.mkdir(parents=True, exist_ok=True)
 
     # Pytest detection
-    import importlib.util
     if importlib.util.find_spec("pytest") is None:
         console.print(
             "\n[yellow]Note: pytest was not detected. Currently, plumb only supports pytest.\n"
