@@ -82,6 +82,61 @@ def extract_outline(content: str) -> list[str]:
     return [line for line in content.split("\n") if re.match(r"^#{1,6}\s", line)]
 
 
+def _normalize_header(header: str) -> str:
+    """Normalize a markdown header for comparison: lowercase, collapse whitespace."""
+    return re.sub(r"\s+", " ", header.strip().lower())
+
+
+def _parse_sections(content: str) -> list[tuple[str, str]]:
+    """Parse markdown into [(header_line, body_text), ...].
+    Content before the first header gets header=""."""
+    sections: list[tuple[str, str]] = []
+    current_header = ""
+    current_lines: list[str] = []
+
+    for line in content.split("\n"):
+        if re.match(r"^#{1,6}\s", line):
+            sections.append((current_header, "\n".join(current_lines)))
+            current_header = line
+            current_lines = []
+        else:
+            current_lines.append(line)
+
+    sections.append((current_header, "\n".join(current_lines)))
+    return sections
+
+
+def apply_section_updates(content: str, updates: list[dict]) -> str:
+    """Apply section edits by matching headers. Returns updated content.
+    Each update is {"header": "## X", "content": "new body text"}."""
+    if not updates:
+        return content
+
+    # Build lookup: normalized_header -> new_content
+    update_map: dict[str, str] = {}
+    for u in updates:
+        update_map[_normalize_header(u["header"])] = u["content"]
+
+    sections = _parse_sections(content)
+    result_parts: list[str] = []
+
+    for header, body in sections:
+        norm = _normalize_header(header)
+        if norm in update_map:
+            new_body = update_map[norm]
+            # Ensure body starts with a blank line after header
+            if new_body and not new_body.startswith("\n"):
+                new_body = "\n" + new_body
+            result_parts.append(header + new_body)
+        else:
+            if header:
+                result_parts.append(header + body)
+            else:
+                result_parts.append(body)
+
+    return "\n".join(result_parts)
+
+
 def parse_spec_files(repo_root: str | Path) -> list[dict]:
     """Read markdown spec files, run RequirementParser, assign stable IDs,
     write requirements.json."""
