@@ -284,7 +284,7 @@ class TestSpecToCodeCoverage:
         ]
 
         with patch("plumb.programs.configure_dspy"), \
-             patch("plumb.programs.run_with_retries", return_value=mock_results):
+             patch("plumb.programs.run_chunked_mapper", return_value=mock_results):
             covered, total = check_spec_to_code_coverage(
                 initialized_repo, use_llm=True
             )
@@ -412,7 +412,7 @@ class TestSpecToCodeCoverage:
         ]
 
         with patch("plumb.programs.configure_dspy"), \
-             patch("plumb.programs.run_with_retries", return_value=mock_results) as mock_run:
+             patch("plumb.programs.run_chunked_mapper", return_value=mock_results) as mock_run:
             covered, total = check_spec_to_code_coverage(
                 initialized_repo, use_llm=True,
             )
@@ -421,8 +421,8 @@ class TestSpecToCodeCoverage:
         # NOT the clean req B
         assert mock_run.call_count == 1
         call_args = mock_run.call_args
-        req_json_sent = json.loads(call_args[0][1])
-        sent_ids = {r["id"] for r in req_json_sent}
+        req_json_sent = call_args[0][1]
+        sent_ids = {r["id"] for r in json.loads(req_json_sent)}
         assert sent_ids == {"req-aaa11111", "req-ccc33333"}
         assert "req-bbb22222" not in sent_ids
 
@@ -484,13 +484,13 @@ class TestSpecToCodeCoverage:
         ]
 
         with patch("plumb.programs.configure_dspy"), \
-             patch("plumb.programs.run_with_retries", return_value=mock_results) as mock_run:
+             patch("plumb.programs.run_chunked_mapper", return_value=mock_results) as mock_run:
             covered, total = check_spec_to_code_coverage(
                 initialized_repo, use_llm=True,
             )
 
-        req_json_sent = json.loads(mock_run.call_args[0][1])
-        sent_ids = {r["id"] for r in req_json_sent}
+        req_json_sent = mock_run.call_args[0][1]
+        sent_ids = {r["id"] for r in json.loads(req_json_sent)}
         assert "req-bbb22222" in sent_ids  # unimplemented was rechecked
         assert covered == 2
         assert total == 2
@@ -525,15 +525,15 @@ class TestSpecToCodeCoverage:
         ]
 
         with patch("plumb.programs.configure_dspy"), \
-             patch("plumb.programs.run_with_retries", return_value=mock_results) as mock_run:
+             patch("plumb.programs.run_chunked_mapper", return_value=mock_results) as mock_run:
             covered, total = check_spec_to_code_coverage(
                 initialized_repo, use_llm=True,
             )
 
         # Full re-map should have been called (all requirements)
         assert mock_run.call_count == 1
-        req_json_sent = json.loads(mock_run.call_args[0][1])
-        assert len(req_json_sent) == 1
+        req_json_sent = mock_run.call_args[0][1]
+        assert len(json.loads(req_json_sent)) == 1
 
         # Cache should now be v2
         new_cache = json.loads(cache_path.read_text())

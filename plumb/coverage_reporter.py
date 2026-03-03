@@ -184,6 +184,44 @@ def _extract_source_files_from_evidence(
     return sorted(found)
 
 
+def merge_coverage_results(
+    per_chunk_results: list[list],
+) -> list:
+    """Merge CodeCoverageMapper results across chunks.
+
+    OR semantics: implemented=True in any chunk wins.
+    Evidence strings are joined (deduplicated).
+    """
+    from plumb.programs.code_coverage_mapper import RequirementCoverage
+
+    if len(per_chunk_results) == 1:
+        return per_chunk_results[0]
+
+    by_id: dict[str, dict] = {}
+    for chunk_results in per_chunk_results:
+        for r in chunk_results:
+            if r.requirement_id not in by_id:
+                by_id[r.requirement_id] = {
+                    "implemented": r.implemented,
+                    "evidence_parts": [r.evidence] if r.evidence else [],
+                }
+            else:
+                entry = by_id[r.requirement_id]
+                if r.implemented:
+                    entry["implemented"] = True
+                if r.evidence and r.evidence not in entry["evidence_parts"]:
+                    entry["evidence_parts"].append(r.evidence)
+
+    return [
+        RequirementCoverage(
+            requirement_id=rid,
+            implemented=data["implemented"],
+            evidence="; ".join(data["evidence_parts"]),
+        )
+        for rid, data in by_id.items()
+    ]
+
+
 def check_spec_to_code_coverage(
     repo_root: str | Path,
     use_llm: bool = False,
@@ -286,30 +324,33 @@ def check_spec_to_code_coverage(
         return (0, len(requirements))
 
     # --- LLM mapping ---
-    from plumb.programs import configure_dspy, run_with_retries
+    from plumb.programs import configure_dspy, run_chunked_mapper
     from plumb.programs.code_coverage_mapper import CodeCoverageMapper
 
     configure_dspy()
     mapper = CodeCoverageMapper()
 
     if full_remap:
-        # Full re-map: all requirements, all files
         dirty_reqs = requirements
-        summaries_for_llm = _combine_summaries(per_file_summaries)
+        items = list(per_file_summaries.items())
     else:
-        # Incremental: only dirty requirements + changed/new file summaries
         dirty_reqs = [r for r in requirements if r["id"] in dirty_req_ids]
-        affected_summaries = {
-            f: per_file_summaries[f]
+        items = [
+            (f, per_file_summaries[f])
             for f in (changed_files | new_files)
             if f in per_file_summaries
-        }
-        summaries_for_llm = _combine_summaries(affected_summaries) if affected_summaries else ""
+        ]
 
     req_json = json.dumps([{"id": r["id"], "text": r["text"]} for r in dirty_reqs])
 
+    def _combine(chunk):
+        return "\n\n".join(text for _, text in chunk)
+
     try:
-        results = run_with_retries(mapper, req_json, summaries_for_llm)
+        results = run_chunked_mapper(
+            mapper, req_json, items, budget=60000,
+            combine_fn=_combine, merge_fn=merge_coverage_results,
+        )
     except Exception:
         return (0, len(requirements))
 
