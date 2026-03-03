@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "plumb-dev"
-version = "0.2.1"
+version = "0.2.2"
 description = "Keep spec, tests, and code in sync during AI-assisted development"
 readme = "README.md"
 requires-python = ">=3.10"

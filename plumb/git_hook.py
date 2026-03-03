@@ -379,14 +379,6 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
             print(_format_json_output(pending))
         return 1
 
-    # No pending decisions — run coverage
-    with _timed("Coverage report"):
-        try:
-            from plumb.coverage_reporter import print_coverage_report
-            print_coverage_report(repo_root)
-        except Exception:
-            pass
-
     _print_timings()
     return 0
 

@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -312,6 +313,67 @@ class TestInitPytestDetection:
             result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
             assert result.exit_code == 0
             assert "pytest was not detected" not in result.output
+
+    def test_collect_only_succeeds_with_valid_tests(self, runner, tmp_repo):
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        tests_dir = tmp_repo / "tests"
+        tests_dir.mkdir(exist_ok=True)
+        (tests_dir / "test_foo.py").write_text("def test_foo(): pass\n")
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.subprocess.run", return_value=MagicMock(returncode=0)):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            assert result.exit_code == 0
+
+    def test_collect_only_fails_aborts_init(self, runner, tmp_repo):
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        tests_dir = tmp_repo / "tests"
+        tests_dir.mkdir(exist_ok=True)
+        (tests_dir / "test_bad.py").write_text("def test_bad(): pass\n")
+        mock_result = MagicMock(returncode=1, stdout="ERRORS!\n", stderr="ImportError\n")
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.subprocess.run", return_value=mock_result):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            assert result.exit_code != 0
+            assert "pytest failed to collect tests" in result.output
+            assert not (tmp_repo / ".plumb" / "config.json").exists()
+
+    def test_collect_only_skipped_for_empty_test_dir(self, runner, tmp_repo):
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        (tmp_repo / "tests").mkdir(exist_ok=True)
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.subprocess.run") as mock_run:
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            assert result.exit_code == 0
+            mock_run.assert_not_called()
+
+    def test_collect_only_skipped_when_pytest_missing(self, runner, tmp_repo):
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        tests_dir = tmp_repo / "tests"
+        tests_dir.mkdir(exist_ok=True)
+        (tests_dir / "test_foo.py").write_text("def test_foo(): pass\n")
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.importlib.util") as mock_importlib, \
+             patch("plumb.cli.subprocess.run") as mock_run:
+            mock_importlib.find_spec.return_value = None
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            assert result.exit_code == 0
+            mock_run.assert_not_called()
+
+    def test_collect_only_timeout_is_warning(self, runner, tmp_repo):
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        tests_dir = tmp_repo / "tests"
+        tests_dir.mkdir(exist_ok=True)
+        (tests_dir / "test_foo.py").write_text("def test_foo(): pass\n")
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="pytest", timeout=30)):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            assert result.exit_code == 0
+            assert "timed out" in result.output
 
 
 class TestInitValidation:

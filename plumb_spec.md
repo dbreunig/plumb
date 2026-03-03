@@ -41,7 +41,7 @@ uv add plumb-dev
 
 The package name on PyPI is `plumb-dev`. The CLI command is `plumb`.
 
-The package includes a comprehensive project description sourced from the README.md file to provide clear information on PyPI about the library's purpose and functionality.
+The package includes a comprehensive project description sourced from the README.md file to provide clear information on PyPI about the library's purpose and functionality. README.md is included in the project configuration in pyproject.toml.
 ## Test-Requirement Linking
 Tests must support two formats for linking to requirements:- Comment-based markers using `# plumb:req-XXXXXXXX` format
 - Function name-based linking using `test_req_XXXXXXXX_` format
@@ -167,13 +167,21 @@ Initializes Plumb in the current git repository.
 3. Prompts the user (interactively) to:
    - Provide a path to a spec file or directory of spec markdown files. Validates that the path exists and contains `.md` files. Uses recursive search (rglob) to find markdown files within directories and suggests discovered spec files.
    - Provide a path to a test file or test directory. Validates that the path exists. Scans repository for test directories and files to provide suggestions.
-4. Writes `.plumb/config.json` with the provided paths.
-5. Creates a `.plumbignore` file in the project root if it does not exist.
-6. Installs the git pre-commit hook by writing a script to `.git/hooks/pre-commit` that calls `plumb hook`. Sets the script as executable.
-7. Installs the Claude Code skill locally by copying `plumb/skill/SKILL.md` to `.claude/skills/plumb/SKILL.md` in the project root. Creates `.claude/skills/plumb/` directories if they do not exist. This is a project-local installation only — Plumb never writes to the user's global `~/.claude/` directory.
-8. Appends a Plumb status block to `CLAUDE.md` at the project root (creating `CLAUDE.md` if it does not exist). See **CLAUDE.md Integration**.
-9. Runs `plumb parse-spec` to do an initial parse of the spec into requirements.
-10. Prints a confirmation summary to the terminal, including confirmation that the skill was installed at `.claude/skills/plumb/SKILL.md`.
+4. Validates pytest test collection:
+   - Checks that pytest is installed
+   - Verifies test files exist at the specified path
+   - Runs `pytest --collect-only` to ensure tests can be collected
+   - Handles test_path as either directory or single file using is_dir() vs is_file() checks
+   - Skips collection validation for empty test directories to avoid false positives
+   - On collection failure, displays both stdout and stderr to help user debug and fails fast with SystemExit(1)
+   - Treats infrastructure issues like TimeoutExpired and FileNotFoundError as warnings, not blocking errors
+5. Writes `.plumb/config.json` with the provided paths.
+6. Creates a `.plumbignore` file in the project root if it does not exist.
+7. Installs the git pre-commit hook by writing a script to `.git/hooks/pre-commit` that calls `plumb hook`. Sets the script as executable.
+8. Installs the Claude Code skill locally by copying `plumb/skill/SKILL.md` to `.claude/skills/plumb/SKILL.md` in the project root. Creates `.claude/skills/plumb/` directories if they do not exist. This is a project-local installation only — Plumb never writes to the user's global `~/.claude/` directory.
+9. Appends a Plumb status block to `CLAUDE.md` at the project root (creating `CLAUDE.md` if it does not exist). See **CLAUDE.md Integration**.
+10. Runs `plumb parse-spec` to do an initial parse of the spec into requirements.
+11. Prints a confirmation summary to the terminal, including confirmation that the skill was installed at `.claude/skills/plumb/SKILL.md`.
 
 **Config schema (`.plumb/config.json`):**
 ```json
@@ -222,11 +230,9 @@ Called automatically by the git pre-commit hook. Not intended to be called direc
       }
       ```
     - **Exits non-zero** in both cases, aborting the commit.
-14. **If no pending decisions exist:** Runs `plumb coverage`, prints a brief summary, updates `last_commit` and `last_commit_branch` in `config.json`, and **exits 0**, allowing the commit to proceed.
+14. **If no pending decisions exist:** Updates `last_commit` and `last_commit_branch` in `config.json`, and **exits 0**, allowing the commit to proceed.
 
 **The hook must never exit non-zero due to an internal Plumb error.** If Plumb itself fails, it prints a warning to stderr and exits 0 so the commit is not blocked.
-
----
 ### `plumb hook --dry-run`
 Runs the full hook analysis on staged changes but does not write to `decisions.jsonl` and always exits 0. Equivalent to `plumb diff`. Intended for testing and preview.
 ---

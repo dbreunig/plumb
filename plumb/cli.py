@@ -146,12 +146,41 @@ def init():
         console.print(f"[yellow]Warning: Path '{test_input}' does not exist. Creating it.[/yellow]")
         test_path.mkdir(parents=True, exist_ok=True)
 
-    # Pytest detection
-    if importlib.util.find_spec("pytest") is None:
+    # Pytest compatibility check
+    pytest_installed = importlib.util.find_spec("pytest") is not None
+    if not pytest_installed:
         console.print(
             "\n[yellow]Note: pytest was not detected. Currently, plumb only supports pytest.\n"
             "Install it with: pip install pytest[/yellow]\n"
         )
+    else:
+        if test_path.is_dir():
+            test_files = list(test_path.rglob("test_*.py")) + list(test_path.rglob("*_test.py"))
+        elif test_path.is_file() and (test_path.name.startswith("test_") or test_path.name.endswith("_test.py")):
+            test_files = [test_path]
+        else:
+            test_files = []
+        if test_files:
+            try:
+                collect_result = subprocess.run(
+                    [sys.executable, "-m", "pytest", "--collect-only", "-q", str(test_path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                if collect_result.returncode != 0:
+                    console.print("\n[red]Error: pytest failed to collect tests from your test directory.[/red]")
+                    console.print("[red]Fix the issues below before initializing plumb:[/red]\n")
+                    if collect_result.stdout.strip():
+                        console.print(collect_result.stdout.strip())
+                    if collect_result.stderr.strip():
+                        console.print(collect_result.stderr.strip())
+                    console.print("\n[yellow]Hint: Run 'pytest --collect-only' manually to debug.[/yellow]")
+                    raise SystemExit(1)
+            except subprocess.TimeoutExpired:
+                console.print("[yellow]Warning: pytest collection timed out. Skipping validation.[/yellow]")
+            except FileNotFoundError:
+                console.print("[yellow]Warning: Could not run pytest. Skipping validation.[/yellow]")
 
     # --- Progress spinner for setup steps ---
     with console.status("[bold cyan]Initializing plumb...", spinner="dots") as status:
