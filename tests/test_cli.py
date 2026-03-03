@@ -8,7 +8,7 @@ import pytest
 from click.testing import CliRunner
 from git import Repo
 
-from plumb.cli import cli, _update_claude_md, _find_spec_suggestions
+from plumb.cli import cli, _update_claude_md, _find_spec_suggestions, _find_test_suggestions
 from plumb.config import PlumbConfig, save_config, ensure_plumb_dir, load_config
 from plumb.decision_log import Decision, append_decision, read_decisions, read_all_decisions
 
@@ -307,4 +307,25 @@ class TestFindSpecSuggestions:
 
     def test_empty_repo_no_suggestions(self, tmp_repo):
         suggestions = _find_spec_suggestions(tmp_repo)
+        assert suggestions == []
+
+
+class TestFindTestSuggestions:
+    def test_finds_tests_dir(self, tmp_repo):
+        tests_dir = tmp_repo / "tests"
+        tests_dir.mkdir()
+        (tests_dir / "test_foo.py").write_text("def test_foo(): pass\n")
+        (tests_dir / "test_bar.py").write_text("def test_bar(): pass\n")
+        suggestions = _find_test_suggestions(tmp_repo)
+        assert any("tests/" in s for s in suggestions)
+
+    def test_finds_test_dir(self, tmp_repo):
+        test_dir = tmp_repo / "test"
+        test_dir.mkdir()
+        (test_dir / "test_a.py").write_text("def test_a(): pass\n")
+        suggestions = _find_test_suggestions(tmp_repo)
+        assert any("test/" in s for s in suggestions)
+
+    def test_no_test_dirs(self, tmp_repo):
+        suggestions = _find_test_suggestions(tmp_repo)
         assert suggestions == []

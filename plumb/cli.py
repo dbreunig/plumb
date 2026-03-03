@@ -59,6 +59,21 @@ def _find_spec_suggestions(repo_root: Path) -> list[str]:
     return suggestions
 
 
+def _find_test_suggestions(repo_root: Path) -> list[str]:
+    """Scan repo root for test directories/files."""
+    suggestions: list[str] = []
+    for name in ["tests", "test"]:
+        d = repo_root / name
+        if d.is_dir():
+            test_files = list(d.rglob("test_*.py")) + list(d.rglob("*_test.py"))
+            count = len(test_files)
+            if count > 0:
+                suggestions.append(f"{name}/  ({count} test file{'s' if count != 1 else ''})")
+            else:
+                suggestions.append(f"{name}/")
+    return suggestions
+
+
 @click.group()
 def cli():
     """Plumb: Keep spec, tests, and code in sync."""
