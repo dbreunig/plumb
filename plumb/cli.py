@@ -104,6 +104,47 @@ def cli():
     pass
 
 
+def _init_clone_setup(repo_root: Path, cfg: PlumbConfig) -> None:
+    """Set up plumb on a freshly cloned repo that already has .plumb/ config."""
+    console.print("[cyan]Plumb is already initialized in this repo.[/cyan]")
+    console.print("[cyan]Setting up for this machine...[/cyan]\n")
+
+    with console.status("[bold cyan]Setting up plumb...", spinner="dots") as status:
+        # Install git hooks (may be missing after clone)
+        status.update("[bold cyan]Installing git hooks...")
+        hooks_dir = repo_root / ".git" / "hooks"
+        hooks_dir.mkdir(exist_ok=True)
+        hook_path = hooks_dir / "pre-commit"
+        hook_path.write_text("#!/bin/sh\nplumb hook\nexit $?\n")
+        hook_path.chmod(0o755)
+        post_commit_path = hooks_dir / "post-commit"
+        post_commit_path.write_text("#!/bin/sh\nplumb post-commit\n")
+        post_commit_path.chmod(0o755)
+
+        # Verify API access
+        status.update("[bold cyan]Verifying API access...")
+        from plumb.programs import validate_api_access
+        from plumb import PlumbAuthError
+
+        try:
+            validate_api_access()
+        except PlumbAuthError as e:
+            console.print(f"\n[red]API verification failed:[/red] {e}\n")
+            console.print("[yellow]To fix this:[/yellow]")
+            console.print("  1. Create a .env file in the repo root")
+            console.print("  2. Add your API key: ANTHROPIC_API_KEY=sk-ant-...")
+            console.print("  3. Run 'plumb init' again\n")
+            raise SystemExit(1)
+
+    console.print("[green]Git hooks installed.[/green]")
+    console.print("[green]API access verified.[/green]\n")
+
+    # Run coverage report
+    console.print("[cyan]Running coverage report...[/cyan]\n")
+    from plumb.coverage_reporter import print_coverage_report
+    print_coverage_report(repo_root)
+
+
 @cli.command()
 def init():
     """Initialize Plumb in the current git repository."""
@@ -111,6 +152,12 @@ def init():
     if repo_root is None:
         console.print("[red]Error: Not a git repository.[/red]")
         raise SystemExit(1)
+
+    # Check if plumb is already initialized (e.g., cloning existing repo)
+    existing_config = load_config(repo_root)
+    if existing_config is not None:
+        _init_clone_setup(repo_root, existing_config)
+        return
 
     # --- Collect user input (before spinner) ---
 
