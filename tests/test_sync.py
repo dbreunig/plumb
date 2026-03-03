@@ -86,11 +86,18 @@ class TestSyncDecisions:
         )
         append_decision(initialized_repo, d, branch="main")
 
-        mock_updater = MagicMock(return_value="## Features\n\nThe system uses in-memory dict cache.\n")
-        mock_parser_result = []
+        call_count = [0]
+
+        def mock_run(fn, *args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                # WholeFileSpecUpdater returns (updates, new_sections)
+                return [{"header": "## Features", "content": "The system uses in-memory dict cache.\n"}], []
+            # parse_spec_files parser
+            return []
 
         with patch("plumb.programs.configure_dspy"), \
-             patch("plumb.programs.run_with_retries", side_effect=[mock_updater.return_value, mock_parser_result]):
+             patch("plumb.programs.run_with_retries", side_effect=mock_run):
             result = sync_decisions(initialized_repo)
 
         assert result["spec_updated"] == 1
@@ -115,8 +122,17 @@ class TestSyncDecisions:
         append_decision(initialized_repo, d1, branch="main")
         append_decision(initialized_repo, d2, branch="main")
 
+        call_count = [0]
+
+        def mock_run(fn, *args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                # WholeFileSpecUpdater returns (updates, new_sections)
+                return [{"header": "## Features", "content": "Updated.\n"}], []
+            return []
+
         with patch("plumb.programs.configure_dspy"), \
-             patch("plumb.programs.run_with_retries", return_value="updated"):
+             patch("plumb.programs.run_with_retries", side_effect=mock_run):
             result = sync_decisions(initialized_repo, decision_ids=["dec-yes"])
 
         decisions = read_decisions(initialized_repo, branch="main")
@@ -188,3 +204,84 @@ class TestParseSpecFiles:
         assert len(result) == 1
         assert result[0]["created_at"] is not None
         assert result[0]["last_seen_commit"] is None
+
+
+class TestSyncDecisionsWholeFile:
+    """Tests for the whole-file spec update path."""
+
+    def test_calls_whole_file_updater_once_per_file(self, initialized_repo):
+        """Multiple decisions should result in one updater call, not N."""
+        d1 = Decision(id="dec-wf1", status="approved",
+                      question="Auth method?", decision="JWT tokens.",
+                      created_at=datetime.now(timezone.utc).isoformat())
+        d2 = Decision(id="dec-wf2", status="approved",
+                      question="Cache strategy?", decision="In-memory dict.",
+                      created_at=datetime.now(timezone.utc).isoformat())
+        append_decision(initialized_repo, d1, branch="main")
+        append_decision(initialized_repo, d2, branch="main")
+
+        updater_call_count = [0]
+
+        def mock_run(fn, *args, **kwargs):
+            from plumb.programs.spec_updater import WholeFileSpecUpdater
+            if isinstance(fn, WholeFileSpecUpdater):
+                updater_call_count[0] += 1
+                return [{"header": "## Features", "content": "Updated features.\n"}], []
+            return []
+
+        with patch("plumb.programs.configure_dspy"), \
+             patch("plumb.programs.run_with_retries", side_effect=mock_run):
+            result = sync_decisions(initialized_repo)
+
+        assert updater_call_count[0] == 1  # One call, not two
+        assert result["spec_updated"] >= 1
+
+    def test_handles_new_sections_with_outline_merge(self, initialized_repo):
+        """When new sections are returned, outline merger should be called."""
+        d = Decision(id="dec-ns1", status="approved",
+                     question="Add caching?", decision="Yes, Redis.",
+                     created_at=datetime.now(timezone.utc).isoformat())
+        append_decision(initialized_repo, d, branch="main")
+
+        call_sequence = []
+
+        def mock_run(fn, *args, **kwargs):
+            from plumb.programs.spec_updater import WholeFileSpecUpdater, OutlineMerger
+            if isinstance(fn, WholeFileSpecUpdater):
+                call_sequence.append("updater")
+                return [], [{"header": "## Cache", "content": "Redis cache.\n"}]
+            elif isinstance(fn, OutlineMerger):
+                call_sequence.append("merger")
+                return ["# Spec", "## Features", "## Cache"]
+            return []
+
+        with patch("plumb.programs.configure_dspy"), \
+             patch("plumb.programs.run_with_retries", side_effect=mock_run):
+            result = sync_decisions(initialized_repo)
+
+        assert "updater" in call_sequence
+        assert "merger" in call_sequence
+
+    def test_fallback_appends_when_merger_fails(self, initialized_repo):
+        """When outline merger fails, new sections should be appended at end."""
+        d = Decision(id="dec-fb1", status="approved",
+                     question="Add logging?", decision="Yes, structured logging.",
+                     created_at=datetime.now(timezone.utc).isoformat())
+        append_decision(initialized_repo, d, branch="main")
+
+        def mock_run(fn, *args, **kwargs):
+            from plumb.programs.spec_updater import WholeFileSpecUpdater, OutlineMerger
+            if isinstance(fn, WholeFileSpecUpdater):
+                return [], [{"header": "## Logging", "content": "Structured logging.\n"}]
+            elif isinstance(fn, OutlineMerger):
+                raise Exception("LLM failed")
+            return []
+
+        with patch("plumb.programs.configure_dspy"), \
+             patch("plumb.programs.run_with_retries", side_effect=mock_run):
+            result = sync_decisions(initialized_repo)
+
+        # Section should still be added (fallback appends at end)
+        spec_content = (initialized_repo / "spec.md").read_text()
+        assert "## Logging" in spec_content
+        assert "Structured logging." in spec_content

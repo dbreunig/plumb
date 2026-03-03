@@ -291,11 +291,19 @@ def sync_decisions(
         on_progress(f"Syncing {len(to_sync)} decision(s)...")
 
     configure_dspy()
-    from plumb.programs.spec_updater import BatchSpecUpdater
-    batch_updater = BatchSpecUpdater()
+    from plumb.programs.spec_updater import WholeFileSpecUpdater, OutlineMerger
+    updater = WholeFileSpecUpdater()
+    merger = OutlineMerger()
     spec_updated = 0
 
-    # Group decisions by (spec_file, section) for batching
+    # Format all decisions once
+    decision_lines = []
+    for i, d in enumerate(to_sync, 1):
+        decision_lines.append(
+            f"{i}. Question: {d.question or 'N/A'}\n   Decision: {d.decision or 'N/A'}"
+        )
+    decisions_text = "\n".join(decision_lines)
+
     for spec_path_str in config.spec_paths:
         if on_progress:
             on_progress(f"Updating spec: {spec_path_str}...")
@@ -305,40 +313,40 @@ def sync_decisions(
 
         content = spec_path.read_text()
 
-        # Map each decision to its target section
-        section_decisions: dict[tuple[int, int], list[Decision]] = {}
-        for d in to_sync:
-            _, start, end = find_spec_section(content, d.decision or "")
-            key = (start, end)
-            section_decisions.setdefault(key, []).append(d)
+        # Single LLM call for the whole file
+        try:
+            section_updates, new_sections = run_with_retries(
+                updater, content, decisions_text
+            )
+        except Exception:
+            continue
 
-        # Process sections in reverse order so replacements don't shift line numbers
-        for (start, end) in sorted(section_decisions.keys(), reverse=True):
-            decisions_in_section = section_decisions[(start, end)]
-            lines = content.split("\n")
-            section_text = "\n".join(lines[start:end])
+        # Apply updates to existing sections
+        if section_updates:
+            content = apply_section_updates(content, section_updates)
+            spec_updated += len(section_updates)
 
-            # Format all decisions for this section into a single prompt
-            decision_lines = []
-            for i, d in enumerate(decisions_in_section, 1):
-                decision_lines.append(
-                    f"{i}. Question: {d.question or 'N/A'}\n   Decision: {d.decision or 'N/A'}"
-                )
-            decisions_text = "\n".join(decision_lines)
-
+        # Handle new sections via outline merge
+        if new_sections:
+            current_outline = extract_outline(content)
+            new_headers = "\n".join(s["header"] for s in new_sections)
             try:
-                updated_section = run_with_retries(
-                    batch_updater,
-                    section_text,
-                    decisions_text,
+                merged_outline = run_with_retries(
+                    merger, "\n".join(current_outline), new_headers
                 )
             except Exception:
+                # Fallback: append new sections at end
+                for s in new_sections:
+                    body = s["content"]
+                    if body and not body.startswith("\n"):
+                        body = "\n" + body
+                    content = content.rstrip("\n") + "\n\n" + s["header"] + body
+                spec_updated += len(new_sections)
+                _atomic_write(spec_path, content)
                 continue
 
-            # Replace section in content
-            new_lines = lines[:start] + updated_section.split("\n") + lines[end:]
-            content = "\n".join(new_lines)
-            spec_updated += len(decisions_in_section)
+            content = insert_new_sections(content, new_sections, merged_outline)
+            spec_updated += len(new_sections)
 
         _atomic_write(spec_path, content)
 

@@ -438,7 +438,17 @@ def _llm_dedup(
     candidates_str = "\n".join(
         _format_decision_line(i + 1, d) for i, d in enumerate(candidates)
     )
-    recent_existing = existing_decisions[-50:] if existing_decisions else []
+    # Smart selection: always include all approved/synced decisions (validated
+    # choices must never be re-proposed), then fill remaining capacity with
+    # recent unresolved decisions.
+    max_existing = 200
+    if existing_decisions:
+        approved = [d for d in existing_decisions if d.status in ("approved", "edited", "synced")]
+        others = [d for d in existing_decisions if d.status not in ("approved", "edited", "synced")]
+        remaining_cap = max(0, max_existing - len(approved))
+        recent_existing = approved + others[-remaining_cap:] if remaining_cap else approved
+    else:
+        recent_existing = []
     existing_str = "\n".join(
         _format_decision_line(i + 1, d) for i, d in enumerate(recent_existing)
     ) or "(none)"
