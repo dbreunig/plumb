@@ -258,7 +258,15 @@ class TestStatus:
 
 
 class TestSync:
-    def test_sync_command(self, runner, initialized_repo):
+    def test_sync_no_decisions(self, runner, initialized_repo):
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
+            result = runner.invoke(cli, ["sync"])
+            assert result.exit_code == 0
+            assert "No unsynced decisions" in result.output
+
+    def test_sync_with_decisions(self, runner, initialized_repo):
+        d = Decision(id="dec-sync1", status="approved", decision="A")
+        append_decision(initialized_repo, d, branch="main")
         with patch("plumb.cli.find_repo_root", return_value=initialized_repo), \
              patch("plumb.sync.sync_decisions", return_value={"spec_updated": 0, "tests_generated": 0}):
             result = runner.invoke(cli, ["sync"])

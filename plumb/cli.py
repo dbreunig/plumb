@@ -626,6 +626,13 @@ def sync_cmd():
         console.print("[red]Error: Not a git repository.[/red]")
         raise SystemExit(1)
 
+    # Check for unsynced decisions before doing expensive work
+    decisions = read_all_decisions(repo_root)
+    to_sync = [d for d in decisions if d.status in ("approved", "edited") and not d.synced_at]
+    if not to_sync:
+        console.print("No unsynced decisions to sync.")
+        return
+
     from plumb.sync import sync_decisions
     try:
         with console.status("[bold cyan]Syncing decisions...", spinner="dots") as status:
