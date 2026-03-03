@@ -1,4 +1,4 @@
-from plumb.sync import extract_outline, apply_section_updates
+from plumb.sync import extract_outline, apply_section_updates, insert_new_sections
 
 
 class TestExtractOutline:
@@ -45,3 +45,29 @@ class TestApplySectionUpdates:
         assert "New B." in result
         assert "Old A." not in result
         assert "Old B." not in result
+
+
+class TestInsertNewSections:
+    def test_inserts_after_anchor(self):
+        content = "# Title\n\nIntro.\n\n## Auth\n\nLogin.\n\n## API\n\nEndpoints.\n"
+        new_sections = [{"header": "## Cache", "content": "Redis cache.\n"}]
+        merged_outline = ["# Title", "## Auth", "## Cache", "## API"]
+        result = insert_new_sections(content, new_sections, merged_outline)
+        # Cache should appear between Auth and API
+        auth_pos = result.index("## Auth")
+        cache_pos = result.index("## Cache")
+        api_pos = result.index("## API")
+        assert auth_pos < cache_pos < api_pos
+
+    def test_inserts_at_end(self):
+        content = "# Title\n\nIntro.\n\n## Auth\n\nLogin.\n"
+        new_sections = [{"header": "## API", "content": "Endpoints.\n"}]
+        merged_outline = ["# Title", "## Auth", "## API"]
+        result = insert_new_sections(content, new_sections, merged_outline)
+        assert "## API" in result
+        assert result.index("## Auth") < result.index("## API")
+
+    def test_no_new_sections(self):
+        content = "# Title\n\nStuff.\n"
+        result = insert_new_sections(content, [], ["# Title"])
+        assert result == content

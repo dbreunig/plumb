@@ -137,6 +137,49 @@ def apply_section_updates(content: str, updates: list[dict]) -> str:
     return "\n".join(result_parts)
 
 
+def insert_new_sections(
+    content: str, new_sections: list[dict], merged_outline: list[str]
+) -> str:
+    """Insert new sections into content at positions determined by merged_outline.
+    Each new_section is {"header": "## X", "content": "body text"}.
+    merged_outline is the full desired header order including existing + new."""
+    if not new_sections:
+        return content
+
+    new_headers = {_normalize_header(s["header"]) for s in new_sections}
+    new_by_header = {_normalize_header(s["header"]): s for s in new_sections}
+
+    sections = _parse_sections(content)
+
+    # Build ordered list of (header, body) from merged outline
+    existing_by_norm = {}
+    for header, body in sections:
+        if header:
+            existing_by_norm[_normalize_header(header)] = (header, body)
+
+    result_parts: list[str] = []
+
+    # Add any preamble (content before first header)
+    for header, body in sections:
+        if not header:
+            result_parts.append(body)
+            break
+
+    for outline_header in merged_outline:
+        norm = _normalize_header(outline_header)
+        if norm in new_headers:
+            s = new_by_header[norm]
+            section_content = s["content"]
+            if section_content and not section_content.startswith("\n"):
+                section_content = "\n" + section_content
+            result_parts.append(s["header"] + section_content)
+        elif norm in existing_by_norm:
+            header, body = existing_by_norm[norm]
+            result_parts.append(header + body)
+
+    return "\n".join(result_parts)
+
+
 def parse_spec_files(repo_root: str | Path) -> list[dict]:
     """Read markdown spec files, run RequirementParser, assign stable IDs,
     write requirements.json."""
