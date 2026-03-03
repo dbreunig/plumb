@@ -1,8 +1,6 @@
 
 # Plumb: Specification
-**Version:** 0.4.0-draft  **Purpose:** This document is the authoritative spec for the Plumb Python library. It is intended to be fed to Claude Code to guide implementation. Implement exactly what is described here — no more, no less.
-
----
+**Version:** 0.2.0  **Purpose:** This document is the authoritative spec for the Plumb Python library. It is intended to be fed to Claude Code to guide implementation. Implement exactly what is described here — no more, no less.
 ## Overview
 Plumb is a Python library and CLI tool that keeps three artifacts in sync throughout a software project's lifecycle:
 1. **The Spec** — one or more markdown files describing intended behavior as human-readable requirements
