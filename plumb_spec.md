@@ -94,6 +94,8 @@ Plumb integrates with git hooks to automatically trigger workflows based on repo
 ```
 
 DSPy programs support program-specific model configuration through a model configuration array in config.json. Pattern parsing logic is modularized into separate functions for reusability across programs, including an extract_outline function that extracts markdown headers from content.
+
+The programs module includes token estimation, chunking, and concurrent mapper functionality to handle large datasets by breaking them into token-budget-sized chunks. The system uses chunked mapping with ThreadPoolExecutor for concurrent processing and supports different merge strategies for result combination.
 ### `.plumb/` Directory
 Plumb stores all state in a `.plumb/` folder at the root of the user's repository. This folder should be committed to version control.
 ```
@@ -164,8 +166,8 @@ Initializes Plumb in the current git repository.
 1. Checks that the current directory is a git repository. Exits with an error if not.
 2. Creates the `.plumb/` directory if it does not exist.
 3. Prompts the user (interactively) to:
-   - Provide a path to a spec file or directory of spec markdown files. Validates that the path exists and contains `.md` files.
-   - Provide a path to a test file or test directory. Validates that the path exists.
+   - Provide a path to a spec file or directory of spec markdown files. Validates that the path exists and contains `.md` files. Uses recursive search (rglob) to find markdown files within directories and suggests discovered spec files.
+   - Provide a path to a test file or test directory. Validates that the path exists. Scans repository for test directories and files to provide suggestions.
 4. Writes `.plumb/config.json` with the provided paths.
 5. Creates a `.plumbignore` file in the project root if it does not exist.
 6. Installs the git pre-commit hook by writing a script to `.git/hooks/pre-commit` that calls `plumb hook`. Sets the script as executable.
@@ -185,8 +187,6 @@ Initializes Plumb in the current git repository.
   "last_commit_branch": null
 }
 ```
-
----
 ### `plumb hook`
 Called automatically by the git pre-commit hook. Not intended to be called directly by users, but must work if called manually.
 **Behavior:**
@@ -324,16 +324,17 @@ Modifies the staged code to satisfy a rejected decision. This is the automatic c
 ### `plumb sync`
 Updates the spec and tests to reflect all approved and edited decisions. Can be run manually or is called automatically by `plumb approve` and `plumb edit`.
 **Behavior:**
-1. Reads decisions from `decisions.jsonl` with status `approved` or `edited` that have not yet been synced (no `synced_at` timestamp).
-2. For each spec file:
+1. Adds early exit check to avoid expensive operations when no unsynced decisions exist.
+2. Reads decisions from `decisions.jsonl` with status `approved` or `edited` that have not yet been synced (no `synced_at` timestamp).
+3. For each spec file:
    - Runs **WholeFileSpecUpdater**: processes all decisions affecting the spec file together and returns section_updates for existing sections and new_sections for brand new sections
    - If new_sections is non-empty, runs **OutlineMerger** to determine proper positioning of new sections within the spec structure
-   - Writes the updated spec file to disk (temp file → rename).
-3. Runs **Test Generator**: generates organized tests for requirements not covered by existing tests. Tests are organized by functionality with proper requirement links in the format `test_<req_id>_<description>`. The generator reads only source files referenced by `file_refs` on synced decisions for context.
-4. Writes generated tests to `test_generated.py` (temp file → rename).
-5. Runs `plumb parse-spec` to re-cache requirements.
-6. Sets `synced_at` on each processed decision.
-7. Prints a summary of spec sections updated and test files created.
+   - Writes the updated spec file to disk (temp file → rename). Fixes newline formatting by ensuring proper newlines between section headers and body content.
+4. Runs **Test Generator**: generates organized tests for requirements not covered by existing tests. Tests are organized by functionality with proper requirement links in the format `test_<req_id>_<description>`. The generator reads only source files referenced by `file_refs` on synced decisions for context.
+5. Writes generated tests to `test_generated.py` (temp file → rename).
+6. Runs `plumb parse-spec` to re-cache requirements.
+7. Sets `synced_at` on each processed decision.
+8. Prints a summary of spec sections updated and test files created.
 
 **Default Configuration:**
 - Uses `.plumbignore` file with default patterns for documentation, build files, and IDE configurations to exclude irrelevant files from processing.
@@ -345,9 +346,10 @@ Parses all spec markdown files into an explicit list of requirements and caches 
 3. Assigns each requirement a stable ID based on a hash of its content.
 4. Writes results to `.plumb/requirements.json`. Requirements with matching hashes are not re-processed, preserving existing metadata including `created_at` and `last_seen_commit` timestamps.
 5. Uses regex patterns `PLUMB_MARKER_RE` and `FUNC_NAME_RE` to extract requirement IDs from test files for coverage mapping.
-6. Processes all requirements and AST summaries of every non-test `.py` file through the CodeCoverageMapper in batch operations.
-7. Implements granular per-file hashing with structured v2 cache format that tracks individual requirement results for efficient cache invalidation.
-8. Extracts source file paths from evidence strings using pattern matching against known files to determine requirement-to-file mappings.
+6. Processes all requirements and AST summaries of every non-test `.py` file through the CodeCoverageMapper using chunked mapping approach to avoid context overflow. Uses fan-out chunking to group source files under token budget (default 60000 tokens) and broadcasts requirements to each chunk.
+7. Implements granular per-file hashing with structured v2 cache format that tracks individual requirement results for efficient cache invalidation. Preserves existing incremental caching logic by applying chunking inside the LLM call after dirty requirements are determined.
+8. Extracts source file paths from evidence strings using pattern matching against known files to determine requirement-to-file mappings. Uses greedy packing to group source/test summaries into chunks and ThreadPoolExecutor for concurrent chunk processing.
+9. Merges results from multiple chunks using custom logic that ORs 'implemented' flags and concatenates evidence strings per requirement_id.
 
 **Requirements cache schema:**
 ```json
@@ -363,8 +365,6 @@ Parses all spec markdown files into an explicit list of requirements and caches 
   }
 ]
 ```
-
----
 ### `plumb coverage`
 Reports coverage across all three dimensions.
 **Behavior:**
@@ -686,15 +686,13 @@ Called via the Anthropic API directly with a structured prompt. Plumb applies th
 ---
 ## Testing Plumb Itself
 pytest, 80% coverage minimum for v0.1.0.
-- `cli.py`: all commands run without error given valid inputs; per-decision commands update `decisions.jsonl` correctly; coverage command provides progress feedback with progress bar and status text
+- `cli.py`: all commands run without error given valid inputs; per-decision commands update `decisions.jsonl` correctly; coverage command provides progress feedback with progress bar and status text; spec and test suggestion functions cover various directory scenarios
 - `decision_log.py`: read/write/filter/dedup on `.jsonl`; latest-line-wins logic for status updates
 - `git_hook.py`: hook produces correct pending decisions given mock diffs and conversation logs; amend detection; TTY vs non-TTY output formats
 - `conversation.py`: correct chunk boundaries, overlap, noise reduction, metadata; oversized chunks split at tool call boundaries
-- `programs/`: each DSPy program produces correctly structured output given fixture inputs (schema validity, not LLM quality)
+- `programs/`: each DSPy program produces correctly structured output given fixture inputs (schema validity, not LLM quality); comprehensive test suite for chunking functionality covering token estimation, item chunking, and chunked mapper execution scenarios
 - `coverage_reporter.py`: correct calculations given mock pytest output
-- `sync.py`: spec and test files updated correctly given approved decisions; no partial writes
-
----
+- `sync.py`: spec and test files updated correctly given approved decisions; no partial writes; newline formatting tests covering both apply_section_updates() and insert_new_sections() functions
 ## Out of Scope for v0.1.0
 - Web UI or dashboard- Support for non-Python projects or non-pytest test frameworks
 - Multi-user or team sync features

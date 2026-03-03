@@ -81,3 +81,87 @@ def run_with_retries(fn, *args, max_retries: int = 2, **kwargs):
     raise PlumbInferenceError(
         f"LLM inference failed after {max_retries + 1} attempts: {last_error}"
     )
+
+
+def estimate_tokens(text: str) -> int:
+    """Rough token count: 1 token per 4 characters."""
+    return len(text) // 4
+
+
+def chunk_items(
+    items: list[tuple[str, str]], budget: int,
+) -> list[list[tuple[str, str]]]:
+    """Greedy bin-pack (key, text) pairs into chunks under a token budget.
+
+    Items that exceed the budget on their own get a dedicated chunk (never dropped).
+    """
+    if not items:
+        return []
+    chunks: list[list[tuple[str, str]]] = []
+    current: list[tuple[str, str]] = []
+    current_tokens = 0
+    for item in items:
+        item_tokens = estimate_tokens(item[1])
+        if current and current_tokens + item_tokens > budget:
+            chunks.append(current)
+            current = [item]
+            current_tokens = item_tokens
+        else:
+            current.append(item)
+            current_tokens += item_tokens
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def run_chunked_mapper(
+    mapper,
+    requirements_json: str,
+    items: list[tuple[str, str]],
+    budget: int,
+    combine_fn,
+    merge_fn=None,
+) -> list:
+    """Fan-out mapper calls across chunked items, broadcasting requirements.
+
+    *combine_fn(chunk)* converts a chunk (list of (key, text) tuples) into the
+    single string the mapper expects as its second argument.
+
+    *merge_fn(list_of_result_lists)* reduces per-chunk results into a single
+    list.  Default: flat concatenation.
+    """
+    if not items:
+        return []
+
+    req_tokens = estimate_tokens(requirements_json)
+    item_budget = max(budget - req_tokens, 1)
+    chunks = chunk_items(items, item_budget)
+
+    if len(chunks) == 1:
+        combined = combine_fn(chunks[0])
+        return run_with_retries(mapper, requirements_json, combined)
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def _call_chunk(chunk):
+        combined = combine_fn(chunk)
+        return run_with_retries(mapper, requirements_json, combined)
+
+    per_chunk_results: list[list] = [None] * len(chunks)
+    with ThreadPoolExecutor() as executor:
+        future_to_idx = {
+            executor.submit(_call_chunk, chunk): i
+            for i, chunk in enumerate(chunks)
+        }
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            per_chunk_results[idx] = future.result()
+
+    if merge_fn is not None:
+        return merge_fn(per_chunk_results)
+
+    # Default: flatten
+    merged: list = []
+    for results in per_chunk_results:
+        merged.extend(results)
+    return merged

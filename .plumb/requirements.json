@@ -1,20 +1,47 @@
 [
   {
-    "id": "req-fe44ea61",
+    "id": "req-7b8e6597",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "Plumb must be installable via both pip and uv using the package name 'plumb-dev' on PyPI with CLI command 'plumb'",
+    "text": "Plumb must be installable via both pip and uv using the package name 'plumb-dev'",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-43c5a045",
+    "id": "req-88c76f2d",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The system must support two formats for linking tests to requirements: comment-based markers using '# plumb:req-XXXXXXXX' format and function name-based linking using 'test_req_XXXXXXXX_' format",
+    "text": "The CLI command must be 'plumb'",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-2e041992",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Tests must support comment-based markers using '# plumb:req-XXXXXXXX' format for linking to requirements",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-9c06e1fd",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Tests must support function name-based linking using 'test_req_XXXXXXXX_' format for linking to requirements",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-437e0812",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Both linking formats must be supported for backwards compatibility",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -23,7 +50,7 @@
     "source_section": "",
     "text": "The system must filter for spec-relevant content during decision extraction in both conversation analysis and diff analysis methods",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -32,7 +59,7 @@
     "source_section": "",
     "text": "The system must implement semantic similarity checking to handle duplicate or similar decisions effectively",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -41,7 +68,7 @@
     "source_section": "",
     "text": "Classification tasks must not generate reasoning traces to maintain optimal performance",
     "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -50,7 +77,7 @@
     "source_section": "",
     "text": "LLM-based deduplication must utilize Claude Haiku 4.5 as the designated model",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -59,1537 +86,25 @@
     "source_section": "",
     "text": "The deduplicate_decisions() function must accept a use_llm parameter that defaults to False",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-98dd58df",
+    "id": "req-8ce944c2",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "Plumb must integrate with git hooks to automatically trigger workflows based on repository events",
+    "text": "The system must support loading environment variables from .env files to manage configuration settings",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-4f9c64e6",
+    "id": "req-175dd28e",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "Plumb must store all state in a '.plumb/' folder at the root of the user's repository that should be committed to version control",
+    "text": "The plumb init command must create a .env file in the project directory",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-abadd9eb",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must track which requirements have been modified and only send dirty (changed) requirements to the mapper for processing",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-6815181e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The hook must validate API access before proceeding with analysis and exit non-zero to block the commit if API authentication fails",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-a29959c2",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must analyze the staged diff and Claude Code conversation log using the unified conversation reading system",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-7fae093c",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must write pending decisions to branch-specific decision log files with filesystem-safe path sanitization",
-    "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-a0697827",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must print a machine-readable JSON summary of pending decisions to stdout and exit non-zero when pending decisions exist",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-62a379d7",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must include explicit safeguards to never approve, reject, or edit decisions on the user's behalf",
-    "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-f46dfc91",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Users must be able to approve multiple pending decisions efficiently using the '--all' flag with the approve command",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-59f5ea14",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The commit must only land when there are zero pending decisions",
-    "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-c39774bd",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must raise a custom PlumbAuthError exception when API authentication fails that alerts the user and provides clear instructions",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-22ba4c3f",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "API key validation must be implemented as a separate validate_api_access function that is called before all LLM operations",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-d0c7f17e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must support environment variable management using .env files with python-dotenv dependency",
-    "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-6b69ddec",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must use gitignore-style patterns for ignore functionality, with default patterns used when no .plumbignore file exists",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-2b431001",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The conversation parser must handle Claude Code's type/message schema format and convert tool usage blocks to text format '[tool: Name] description'",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-c3c1c482",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must implement intelligent deduplication by first running Jaccard similarity filtering, then applying LLM deduplication as a second pass when 2 or more candidates remain",
-    "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-bbfe3eea",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must generate complete and runnable tests rather than stub files with TODO comments",
-    "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-71dae592",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The test generator must produce fully functional test code that can be executed immediately and only run if tests don't already exist",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-da235efb",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must provide read_all_decisions() as the primary API function for accessing decisions across all branches",
-    "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-a198d0f7",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must implement spec updates using a single LLM call per spec file with an output schema containing section_updates and new_sections",
-    "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-7afaa9e3",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The legacy decisions path function must be maintained for migration detection purposes while the primary system operates on branch-specific decision logs",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-722b84c4",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must analyze the staged diff and read Claude Code's native session files directly from auto-detected paths",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-bbcbc0c8",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must extract prescriptive choices while excluding observations and diagnostics",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-e77017a8",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must implement within-batch similarity deduplication to prevent duplicate decisions in the same batch",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-28cae62b",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must use both last_commit datetime and last_extracted_at timestamp as cutoffs, taking the later of the two to determine which conversations to process",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-d0ae4744",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must pass current decisions and recent decisions from the last couple commits to the deduplication pass using a context window of 200 decisions",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-9bb4d963",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must prioritize approved/synced decisions over recent ones in the comparison set",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-dbbf9e79",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must use exact deduplication and LLM-based semantic deduplication with groq/openai/gpt-oss-120b configured for both decision_deduplicator and question_synthesizer",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-ba82f16e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb init' command must check that the current directory is a git repository and exit with an error if not",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-27fc5507",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb init' command must create the '.plumb/' directory if it does not exist",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-592d6626",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb init' command must prompt the user interactively to provide paths to spec files and test files, validating that the paths exist",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-cdb6e08d",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb init' command must write '.plumb/config.json' with the provided paths",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-cf21da47",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb init' command must create a '.plumbignore' file in the project root if it does not exist",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-654ff315",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb init' command must install the git pre-commit hook by writing a script to '.git/hooks/pre-commit' that calls 'plumb hook' and sets the script as executable",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-d98a3989",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb init' command must install the Claude Code skill locally by copying 'plumb/skill/SKILL.md' to '.claude/skills/plumb/SKILL.md' in the project root",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-8f9a1069",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb init' command must append a Plumb status block to 'CLAUDE.md' at the project root, creating 'CLAUDE.md' if it does not exist",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-5eef4544",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb init' command must run 'plumb parse-spec' to do an initial parse of the spec into requirements",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-e988fd3c",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb init' command must print a confirmation summary to the terminal, including confirmation that the skill was installed",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-a7166a08",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must read '.plumb/config.json' and exit 0 silently if not found",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-4f5a2a78",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must get the current staged diff via 'git diff --cached'",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-79bb16eb",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must get the current branch name",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-348d49a0",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must detect amends by comparing the HEAD commit's parent SHA to last_commit",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-fb3c569c",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must detect broken references by checking all SHAs in decisions.jsonl against git history",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-0f0284ee",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must run the Diff Analysis DSPy program on the staged diff",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-0749e2dc",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must attempt to locate and read the Claude Code conversation log",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-dc037049",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must filter out decisions marked as non-spec-relevant during extraction",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-5e29b7db",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must merge and deduplicate decisions across chunks using DuckDB for cross-shard queries",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-bbe184dd",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must run Question Synthesizer for each decision with no associated question",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-08f82e5e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must write all new decisions with status 'pending' to decisions.jsonl",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-6ed1af0e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must run 'plumb parse-spec' to update requirements cache for any modified spec files",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-5fdd7c57",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must check whether it is running in a TTY or as a subprocess when pending decisions exist",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-962babc0",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must print human-readable summary in TTY mode and machine-readable JSON in non-TTY mode",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-9e19db8e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must exit non-zero when pending decisions exist, aborting the commit",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-be20911f",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook' command must run 'plumb coverage' and update config when no pending decisions exist, then exit 0",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-8ee91280",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The hook must never exit non-zero due to an internal Plumb error",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-05715e33",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb hook --dry-run' command must run the full hook analysis on staged changes but not write to decisions.jsonl and always exit 0",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-e0a747ec",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb diff' command must preview what Plumb will capture from currently staged changes in read-only mode",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-0e5e4307",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb diff' command must read staged changes via 'git diff --cached'",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-7aebe0da",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb diff' command must run Diff Analysis on the staged diff",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-56ac488d",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb diff' command must read and chunk the conversation log if available",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-1855c28e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb diff' command must run Decision Extraction per chunk",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-6bca4090",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb diff' command must print a preview to the terminal with summary and estimated decisions",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-0ac9251b",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb diff' command must make no writes to '.plumb/'",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-836aeef2",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb review' command must provide interactive review of pending decisions for terminal use",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-ca53e97b",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb review' command must read '.plumb/decisions.jsonl' and filter for status == 'pending'",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-89ae1015",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb review' command must accept an optional '--branch <name>' flag to filter by branch",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-4eb827a0",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb review' command must print 'No pending decisions.' and exit 0 if no pending decisions exist",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-7a01773e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb review' command must display decision details and prompt the user for approve, reject, edit, or skip",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-b7b56e8a",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb review' command must run 'plumb sync' for all approved/edited decisions after all decisions are resolved",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-3b251052",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb review' command must default spec_relevant field to True when LLM classification is uncertain",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-f64e421a",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb approve <id>' command must approve a single decision by ID and update its status to 'approved' in decisions.jsonl",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-1f8222cd",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb approve <id>' command must run 'plumb sync' for that decision only",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-ecbb8cec",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb reject <id>' command must reject a single decision by ID and update its status to 'rejected' with recorded reason",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-99448476",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb reject <id>' command must not modify code or spec",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-43fc6638",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb edit <id>' command must replace the decision text for a given decision ID with user-provided text",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-e91b701d",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb edit <id>' command must update status to 'edited' and run 'plumb sync' for that decision only",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-f5a65407",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb modify <id>' command must modify the staged code to satisfy a rejected decision",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-23704b4b",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb modify <id>' command must read the decision object and verify status == 'rejected'",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-a267b0c1",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb modify <id>' command must read the staged diff and call the Claude API with modification instructions",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-01af3e63",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb modify <id>' command must apply the proposed modification to the staged files",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-a5bf123a",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb modify <id>' command must run pytest on the test suite to verify tests still pass after modification",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-6c5306e3",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb modify <id>' command must stage modifications only if tests pass and update decision status accordingly",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-651ae000",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb modify <id>' command must return machine-readable JSON result in non-TTY mode",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-e4fc7e36",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Plumb must never commit modifications, only stage them",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-05f23454",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb sync' command must update the spec and tests to reflect all approved and edited decisions",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-13549037",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb sync' command must read decisions with status 'approved' or 'edited' that have not yet been synced",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-fdea82d8",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb sync' command must run WholeFileSpecUpdater for each spec file processing all decisions together",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-b7106e2a",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb sync' command must run OutlineMerger if new_sections is non-empty to determine proper positioning",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-e713c300",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb sync' command must write updated spec files to disk using temp file \u2192 rename",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-74f4eee3",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb sync' command must run Test Generator to generate organized tests for uncovered requirements",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-d370cea3",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb sync' command must write generated tests to test_generated.py using temp file \u2192 rename",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-6067b3c2",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb sync' command must run 'plumb parse-spec' to re-cache requirements",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-6951f1cb",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb sync' command must set synced_at on each processed decision",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-12e589d9",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb sync' command must print a summary of spec sections updated and test files created",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-4f15a58e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb parse-spec' command must parse all spec markdown files into an explicit list of requirements and cache them",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-d105f4cf",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb parse-spec' command must read all markdown files in spec_paths from config.json",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-ba8a0dcb",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb parse-spec' command must run Requirement Parser for each file or paragraph block",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-1146e58e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb parse-spec' command must assign each requirement a stable ID based on a hash of its content",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-6646e0e5",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb parse-spec' command must write results to '.plumb/requirements.json'",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-3c41a117",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb parse-spec' command must preserve existing metadata for requirements with matching hashes",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-5482f912",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb parse-spec' command must use regex patterns to extract requirement IDs from test files for coverage mapping",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-f26df2cf",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb parse-spec' command must process all requirements and AST summaries through CodeCoverageMapper in batch operations",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-5eb83cf3",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb parse-spec' command must implement granular per-file hashing with structured v2 cache format",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-4751b103",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb parse-spec' command must extract source file paths from evidence strings using pattern matching",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-7dec6d46",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb coverage' command must report coverage across all three dimensions: code, spec-to-test, and spec-to-code",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-28bf1021",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb coverage' command must run 'pytest --cov' and parse output for code coverage",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-d323f457",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb coverage' command must check whether tests reference or map to each requirement for spec-to-test coverage",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-4013e050",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb coverage' command must check whether each requirement has a corresponding implementation for spec-to-code coverage",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-6e5bb560",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb coverage' command must print a formatted table using rich",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-90adfd1e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb coverage' command must use LLM calls to refresh the requirements cache for accurate coverage analysis",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-7082232e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb coverage' command must measure and report coverage improvement achieved by marker injection",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-6cf085cd",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The 'plumb status' command must print a human-readable summary including tracked files, requirements, tests, pending decisions, broken references, last sync commit, and coverage summary",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-609eae97",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Plumb must ship with a Claude Code skill file at 'plumb/skill/SKILL.md' that is copied to '.claude/SKILL.md' in the project root during init",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-d914459f",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The skill file must provide structured guidance for AI-assisted development workflow",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-f9255c60",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The skill file must teach Claude Code the Plumb workflow and provide machine-readable protocol for parsing hook output",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-fc71ef5d",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The system must support reading Claude Code native session files with JSONL parsing from the '~/.claude/projects/' directory structure",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-2453992d",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The '.claude/' directory and 'SKILL.md' should be committed to version control so all contributors get the skill automatically",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-bfe7ec22",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "'plumb init' must append a specific Plumb status block to 'CLAUDE.md' delimited by comment markers",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-59d6fdf0",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Plumb must be configurable in '.plumb/config.json' under 'claude_log_path'",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-88d173f1",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "If Claude log path is not set, Plumb must attempt to auto-detect using common Claude Code log locations",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-dc617343",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "If Claude log is not found, Plumb must skip conversation analysis and note 'conversation_available': false",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-14c755f4",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Plumb must read only turns recorded after the 'last_commit' timestamp in config.json",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-10e30492",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Session files must be pre-filtered by modification time to avoid reading old files",
-    "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-061cd59a",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The conversation parser must handle the native session JSONL format with type/message schema used by Claude Code",
-    "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-bae0c458",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Chunking must be performed in conversation.py before any DSPy program is called with no LLM involvement",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-8fbfbf83",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The primary unit for chunking must be user turn: one user message plus all following assistant turns up to the next user message",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-085eadbf",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "If a chunk exceeds 6,000 tokens, it must be split at tool call boundaries or at the midpoint of the largest assistant turn",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-1f719d59",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Chunking must prepend the final assistant turn of the previous chunk as a header to the next chunk",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-d095474c",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Before chunking, tool result turns longer than 500 tokens that appear to be raw file reads must be replaced with '[file read: <filename>]'",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-1887de32",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Assistant messages that span multiple JSONL entries must be properly parsed and reassembled",
-    "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-16218abd",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "DecisionExtractor must be called once per chunk with diff_summary passed identically to every call",
-    "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-526ef3ed",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Results must be merged after all chunks with near-duplicate decisions collapsed into one, preserving the earliest chunk_index",
-    "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-dc30db1d",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "On amends, the pre-commit hook must compare HEAD's parent SHA to last_commit and delete decisions where commit_sha == last_commit before re-running analysis",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-e90842a0",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "On every hook run, all stored SHAs must be checked against git history and unreachable SHAs flagged 'ref_status': 'broken'",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-c37e50cc",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Plumb must not attempt to re-map decisions to new SHAs after a rebase",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-37fd24cf",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Users must review and re-resolve broken-reference decisions manually",
-    "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-9efad91f",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The decision log must be append-only with existing lines never modified in place",
-    "ambiguous": false,
-    "created_at": "2026-03-03T03:58:06.111765+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-fcf73031",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Status updates must be written as new lines with the same id, with the latest line for a given id being canonical",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-150ddd31",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "DiffAnalyzer must take raw unified diff string as input and output list of change summaries with files_changed, summary, and change_type",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-ce9232f3",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "DiffAnalyzer must group related changes into logical units and not invent meaning",
-    "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-188f944d",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "DecisionExtractor must take chunk and diff_summary as input and output list of decision objects with question, decision, made_by, related_diff_summary, and confidence",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-bdb3231a",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "DecisionExtractor must extract explicit and implicit decisions but not extract trivial decisions like variable naming or import ordering",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-0e5c1e89",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "QuestionSynthesizer must take a decision object with no associated question as input and output a plain-English question framing the decision",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-bb93c5fa",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "RequirementParser must take markdown string as input and output list of requirement objects with text and ambiguous fields",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-386628ea",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "RequirementParser must use rules: atomic statements, active voice, no duplicates, with vague statements flagged ambiguous: true",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-b53ce8b4",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "SpecUpdater must take spec_section and decision as input and output updated markdown for that section",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-f5fd5069",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "SpecUpdater must capture the result of decision as natural requirement with no reference to the decision itself and preserve existing formatting",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-f8be8bb2",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "TestGenerator must take requirements, existing_tests, and code_context as input and output runnable pytest test code as a Python string",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-84aeda7a",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "TestGenerator must create one function per requirement with descriptive names, real assertions against actual code, no pytest.skip() or TODO comments, and no overwriting existing tests",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-dccace22",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "CodeModifier must be implemented as Claude API call (not DSPy) for open-ended code modification",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-353db955",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "CodeModifier must take staged diff, rejected decision, rejection reason, and current spec as input and output modified file contents",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-9e9faef3",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "All CLI commands must fail gracefully with clear error message if config.json is missing or malformed",
-    "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-51a294a4",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "All DSPy programs must retry on LLM failure (max 2 retries) then raise PlumbInferenceError with human-readable message",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-a82e5e59",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The git hook must never exit non-zero due to an internal Plumb error",
-    "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-fe4e63c5",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "File writes must use temp file \u2192 rename to avoid partial writes",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-390fc27e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "If conversation log is unavailable, Plumb must continue with diff-only analysis (not an error)",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-a4ea6bb8",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "If plumb modify test run fails, Plumb must not stage the modification and update decision status to rejected_manual",
-    "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-da73bbcc",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The plumb status command must operate in cache-only mode to avoid making LLM calls",
-    "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-e3da267e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The plumb coverage command must display progress using an in-place updating spinner, then print the final results table",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-d8f2007e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Session file reading must be optimized by pre-filtering based on file modification times to skip files that cannot contain relevant conversations",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-ff21a8b2",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Plumb must be tested with pytest with 80% coverage minimum for v0.1.0",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-2f916375",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "cli.py must be tested for all commands running without error given valid inputs and per-decision commands updating decisions.jsonl correctly",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-a9eb0b0e",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "decision_log.py must be tested for read/write/filter/dedup on .jsonl and latest-line-wins logic for status updates",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-45729b25",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "git_hook.py must be tested for hook producing correct pending decisions, amend detection, and TTY vs non-TTY output formats",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-5d97b164",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "conversation.py must be tested for correct chunk boundaries, overlap, noise reduction, metadata, and oversized chunk splitting",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-b59e5ea7",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "programs/ must be tested for each DSPy program producing correctly structured output given fixture inputs",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-04cc94b0",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "coverage_reporter.py must be tested for correct calculations given mock pytest output",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-9220869f",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "sync.py must be tested for spec and test files updated correctly given approved decisions with no partial writes",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-d7d2d2d7",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "Plumb must support loading environment variables from .env files to manage configuration settings",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
-    "last_seen_commit": null
-  },
-  {
-    "id": "req-ed0730a6",
-    "source_file": "plumb_spec.md",
-    "source_section": "",
-    "text": "The plumb init command must create a .env file in the project directory to facilitate environment-based configuration management",
-    "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1598,7 +113,7 @@
     "source_section": "",
     "text": "The system must support ANTHROPIC_API_KEY configuration through both environment variables and .env files",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1607,7 +122,7 @@
     "source_section": "",
     "text": "Tests must be linked to requirements through requirement ID comments to establish traceability between test functions and specific requirements",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1616,7 +131,7 @@
     "source_section": "",
     "text": "All tests must be organized in the tests/ directory with specific test files for each component",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1625,16 +140,25 @@
     "source_section": "",
     "text": "Tests without requirement links must be treated as sync violations that indicate either missing requirements or unnecessary tests",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-a6cfd950",
+    "id": "req-b3af883e",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The system must provide a 'check' command as an alias for manual decision scanning",
+    "text": "The system must support file ignore patterns through a '.plumbignore' file",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d85fdf59",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must provide a '--all' command option for the 'plumb approve' command to approve all changes at once",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1643,7 +167,16 @@
     "source_section": "",
     "text": "Generated cache and coverage files must be excluded from commits",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-8e836859",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must include a 'check' command as an alias for manual decision scanning",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1652,7 +185,7 @@
     "source_section": "",
     "text": "Plumb must handle conversations that span multiple Claude Code session files by reading and merging them chronologically",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:58:06.111765+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1661,16 +194,25 @@
     "source_section": "",
     "text": "The sync command must provide progress indicators with status updates to give users feedback during operation",
     "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-68722a55",
+    "id": "req-9a53d050",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The workflow must require an explicit sync step after approving decisions, with staging of sync output before re-committing changes",
+    "text": "The workflow must require an explicit sync step after approving decisions",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-c301a547",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must stage sync output before re-committing changes",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1679,7 +221,7 @@
     "source_section": "",
     "text": "The system must use a branch-sharded structure for decision logs",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1688,7 +230,7 @@
     "source_section": "",
     "text": "The system must provide CLI commands for merging decision logs from different branches",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1697,7 +239,7 @@
     "source_section": "",
     "text": "Users must be able to migrate existing decision logs from the old monolithic format to the new branch-sharded layout through dedicated CLI commands",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1706,7 +248,7 @@
     "source_section": "",
     "text": "The plumb merge-decisions <branch> command must allow users to merge decisions from feature branches back to main",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1715,25 +257,34 @@
     "source_section": "",
     "text": "A find_decision_branch() function must help locate which branch file contains a specific decision ID",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-a88424b2",
+    "id": "req-f306efbc",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The WholeFileSpecUpdater must take full spec content and decisions as input, and output section_updates for existing sections and new_sections for brand new sections",
+    "text": "The core LLM integration must be designed with a WholeFileSpecUpdater that takes full spec content and decisions as input",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-191132d7",
+    "id": "req-61ddd8a0",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The WholeFileSpecUpdater must accept rewriting whole sections instead of making surgical edits for markdown specs",
+    "text": "The WholeFileSpecUpdater must output section_updates for existing sections and new_sections for brand new sections",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-f2d81c91",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The approach must accept rewriting whole sections instead of making surgical edits for markdown specs",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1742,52 +293,124 @@
     "source_section": "",
     "text": "An OutlineMerger component must handle structural changes when new sections need to be added or content needs reordering",
     "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-04de71bc",
+    "id": "req-e4c1679c",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The system must include helper functions for DuckDB result type conversion, using _clean_duckdb_row() and _to_python_native() functions",
+    "text": "The system must include helper functions for DuckDB result type conversion",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-ebf78dd2",
+    "id": "req-65849e21",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "Comprehensive test coverage must be implemented for migration and merge functionality, including edge cases and error conditions",
+    "text": "The system must use _clean_duckdb_row() and _to_python_native() functions to convert DuckDB result types to Python native types for Pydantic compatibility",
     "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-0657f78d",
+    "id": "req-4acb9940",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "DSPy programs must support program-specific model configuration through a model configuration array in config.json",
+    "text": "The system must implement comprehensive test coverage for migration and merge functionality, including edge cases and error conditions",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-6b854d63",
+    "id": "req-1c4d546f",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "Pattern parsing logic must be modularized into separate functions for reusability across programs, including an extract_outline function",
+    "text": "Plumb must solve a bounded problem and be holdable in a single programmer's head",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-588d11fd",
+    "id": "req-8ad25430",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The system must implement multi-stage deduplication using exact matching, Jaccard similarity, and LLM semantic analysis to catch different types of duplicates",
+    "text": "All LLM-powered functions must be implemented as DSPy programs, not open-ended agents",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-f9d51be6",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Plumb must use the Anthropic Claude SDK via the user's existing account as its inference provider",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-0f3e453b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Claude Sonnet 4.6 must serve as the default model for all programs",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-f8773a0f",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Plumb must operate as a git hook and CLI tool without changing how the user writes code",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d77d06ac",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The pre-commit hook must ensure that every committed state has been reviewed and approved",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-a721721f",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "A commit must represent a fully reconciled snapshot of spec, tests, and code",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-8f77912a",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Plumb must use Claude Code session data when available",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-849bea7f",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "When Claude Code session data is not available, Plumb must fall back to diff-only analysis",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-ecab5cc5",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must prevent duplicate decisions through a multi-stage pipeline using exact matching, Jaccard similarity, and LLM semantic analysis",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1796,7 +419,7 @@
     "source_section": "",
     "text": "Only prescriptive choices that affect system design, behavior, architecture, or data models must be captured as decisions",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1805,7 +428,7 @@
     "source_section": "",
     "text": "Process observations, tooling choices, and diagnostic findings must be filtered out",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1814,7 +437,7 @@
     "source_section": "",
     "text": "Spec updates must use a search-and-replace approach with edits containing old_text/new_text pairs rather than full section replacement",
     "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1823,124 +446,232 @@
     "source_section": "",
     "text": "Section updates must use exact header matching first, then fall back to normalized matching for minor variations in header formatting",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-f66d3cc9",
+    "id": "req-c4c942fd",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The status display must include a visual bar chart representation for coverage statistics",
+    "text": "The system must integrate with git hooks to automatically trigger workflows based on repository events",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-a2c8cc9c",
+    "id": "req-0657f78d",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The status display must use Rich's Status spinner that updates in-place for progress indication",
+    "text": "DSPy programs must support program-specific model configuration through a model configuration array in config.json",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-3f44ad59",
+    "id": "req-fbc55122",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "After commit completion, the post-commit hook must clear the last_extracted_at timestamp to reset the filter for future extractions",
+    "text": "Pattern parsing logic must be modularized into separate functions for reusability across programs",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-1b9d40fb",
+    "id": "req-f6b56157",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The system must include comprehensive documentation for the Plumb skill with detailed instructions for managing spec/test/code alignment and decision review processes",
+    "text": "The system must include an extract_outline function that extracts markdown headers from content",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-fd548a9e",
+    "id": "req-a7186d68",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The system must use DSPy's context manager with Haiku LM for deduplication while preserving Sonnet for other operations",
+    "text": "The programs module must include token estimation, chunking, and concurrent mapper functionality to handle large datasets",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-025617be",
+    "id": "req-b0253818",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The deduplication process must prioritize approved and synced decisions over recent ones in the comparison set and use an expanded context window of 200 decisions instead of 50",
+    "text": "The system must use chunked mapping with ThreadPoolExecutor for concurrent processing",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-5ddf02e6",
+    "id": "req-8fe4d884",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "Test generation must use increased context limits to accommodate complete test code",
+    "text": "The system must support different merge strategies for result combination",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-f0903a96",
+    "id": "req-0b90e74a",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The review command must pre-compute decision branches to optimize performance and ensure correct shard targeting for updates",
+    "text": "Plumb must store all state in a .plumb/ folder at the root of the user's repository",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-0ebf5393",
+    "id": "req-746ebee3",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "Users must be able to migrate from the monolithic decision file to the sharded layout using the plumb migrate command",
+    "text": "The .plumb/ folder must be committed to version control",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-8983b860",
+    "id": "req-eea300b9",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The system must keep edit operations simple without complex operation sets and accept the risk of unintended edits in exchange for performance gains",
+    "text": "The system must track which requirements have been modified and only send dirty requirements to the mapper for processing",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-de9dcf8f",
+    "id": "req-46f52276",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "Structural reasoning for section placement must be kept separate from content generation to maintain clarity",
+    "text": "The hook must validate API access before proceeding with analysis",
     "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-a756777b",
+    "id": "req-83898562",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "Source summaries must be structured as per-file mappings to enable granular tracking",
+    "text": "If API authentication fails, the hook must exit non-zero and block the commit",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:58:06.111765+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-787fa6f3",
+    "id": "req-b45b3862",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "All documentation files including SKILL files and CLAUDE.md must be kept consistent with the same sync workflow requirements",
+    "text": "The hook must analyze the staged diff and the Claude Code conversation log using the unified conversation reading system",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:58:06.111765+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-94cc46f2",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must auto-detect Claude Code sessions vs legacy logs",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-a93f8739",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must read from Claude Code's actual session files at ~/.claude/projects/<encoded-path>/<uuid>.jsonl",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-22696c3d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The hook must write pending decisions to branch-specific decision log files with filesystem-safe path sanitization",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-240b423a",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The hook must set the last_extracted_at timestamp",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-b5714325",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The hook must print a machine-readable JSON summary of pending decisions to stdout and exit non-zero, aborting the commit",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-1b8d9118",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Claude Code's skill must read that output and begin presenting decisions to the user using AskUserQuestion format, one at a time",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-bdd82be0",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The skill must call the appropriate per-decision command based on user response",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-62a379d7",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must include explicit safeguards to never approve, reject, or edit decisions on the user's behalf",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-70efecfc",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Decision operations must support branch-specific handling through branch parameter support",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-4b8c9aca",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "For rejected decisions, the skill must invoke plumb modify <id>",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-a26ab279",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Once all decisions are resolved, the skill must re-run git commit",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-59f5ea14",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The commit must only land when there are zero pending decisions",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
@@ -1949,79 +680,2122 @@
     "source_section": "",
     "text": "The system must draft commit messages after decision review and include the list of approved decisions",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:06:30.508481+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-0d67e077",
+    "id": "req-cc9d890b",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "When multiple session files exist, the system must use the most recent session file by modification time or match the current session ID for session selection",
+    "text": "When API authentication fails, the system must raise a custom PlumbAuthError exception",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-93cd910f",
+    "id": "req-62303611",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The conversation log reader must work seamlessly across different repositories without requiring additional user setup or configuration overhead",
+    "text": "The PlumbAuthError must alert the user and provide clear instructions to set their API key",
     "ambiguous": false,
-    "created_at": "2026-03-03T03:58:06.111765+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-aeadfd0b",
+    "id": "req-222ddbbd",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "When parsing session files, the system must skip assistant entries that contain 'thinking' blocks, have 'isSidechain: true', or have 'isMeta: true'",
+    "text": "API key validation must be implemented as a separate validate_api_access function",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-7918c316",
+    "id": "req-2b7249bd",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "Rejected decisions must be marked with 'ignored' status rather than being deleted from the system",
+    "text": "The validate_api_access function must be called before all LLM operations",
     "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-84c4bd35",
+    "id": "req-96630c2a",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "All CLI operations must require explicit user commands and the system shall not perform automatic synchronization or background operations without direct user instruction",
+    "text": "All authentication functionality must have comprehensive test coverage",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-23b93491",
+    "id": "req-b49be1ff",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The sync operation must identify and use the correct decision branch when marking decisions as synced",
+    "text": "Existing tests must be updated to mock API validation calls to ensure test suites remain unaffected",
     "ambiguous": false,
-    "created_at": "2026-03-03T04:48:39.423844+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-9cf4dfd5",
+    "id": "req-bf52fc71",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "When handling decision conflicts, the system must use opposite ordering rules: for duplicate decisions, keep the earlier one (lower index); for countermanded decisions, keep the later one (higher index)",
+    "text": "The system must use gitignore-style patterns for ignore functionality",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   },
   {
-    "id": "req-40dee423",
+    "id": "req-0528aa41",
     "source_file": "plumb_spec.md",
     "source_section": "",
-    "text": "The system must use section-header-keyed full replacement instead of search-and-replace for markdown spec editing",
+    "text": "Default patterns must be used when no .plumbignore file exists",
     "ambiguous": false,
-    "created_at": "2026-03-03T05:01:16.675909+00:00",
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-ee5e4ab1",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "After commit completion, the post-commit hook must clear the last_extracted_at timestamp",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-3878d570",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The conversation parser must handle Claude Code's type/message schema format",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-a5977ebb",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The conversation parser must convert tool usage blocks to text format '[tool: Name] description' for consistency",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-b267f5d2",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must include comprehensive documentation for the Plumb skill",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d31c8656",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must implement intelligent deduplication by first running Jaccard similarity filtering",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-2b9b0310",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "LLM deduplication must be applied as a second pass when 2 or more candidates remain",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-fd548a9e",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must use DSPy's context manager with Haiku LM for deduplication while preserving Sonnet for other operations",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-bfd0ba5b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The deduplication process must prioritize approved and synced decisions over recent ones in the comparison set",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-ca3831fd",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must use an expanded context window of 200 decisions instead of 50 for more comprehensive duplicate detection",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-bbfe3eea",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must generate complete and runnable tests rather than stub files with TODO comments",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-5ddf02e6",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Test generation must use increased context limits to accommodate complete test code",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-e28fe1db",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The test generator must produce fully functional test code that can be executed immediately",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-7d0ca084",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The test generator must only run if tests don't already exist",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-da235efb",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must provide read_all_decisions() as the primary API function for accessing decisions across all branches",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-f0903a96",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The review command must pre-compute decision branches to optimize performance and ensure correct shard targeting for updates",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-0ebf5393",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Users must be able to migrate from the monolithic decision file to the sharded layout using the plumb migrate command",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-9fa3c5c5",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must implement spec updates using a single LLM call per spec file",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-e436c817",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The output schema must contain section_updates and new_sections",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-6f9ee9d8",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must make a second call only when new_sections is non-empty",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-5afa15a7",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Structural reasoning for section placement must be kept separate from content generation",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-869374c9",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must keep edit operations simple without complex operation sets",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-4e1b972d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must accept the risk of unintended edits in exchange for performance gains while mitigating through clear prompting",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-86327b73",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The legacy decisions path function must be maintained for migration detection purposes",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d33fb2bc",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The hook must analyze the staged diff and read Claude Code's native session files directly from auto-detected paths",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-bbcbc0c8",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must extract prescriptive choices while excluding observations and diagnostics",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-c417e44f",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Within-batch similarity deduplication must prevent duplicate decisions in the same batch",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-44a64359",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Time awareness must use both last_commit datetime and last_extracted_at timestamp as cutoffs",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-8ba347f8",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must take the later of the two timestamps to determine which conversations to process",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-1972ebc2",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The hook must write pending decisions to decisions.jsonl, passing current decisions and recent decisions from the last couple commits to the deduplication pass",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-35457627",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must use exact deduplication and LLM-based semantic deduplication",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-a756777b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Source summaries must be structured as per-file mappings to enable granular tracking",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-787fa6f3",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "All documentation files including SKILL files and CLAUDE.md must be kept consistent with the same sync workflow requirements",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-faad83ce",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must check that the current directory is a git repository and exit with an error if not",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-27edd42d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must create the .plumb/ directory if it does not exist",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-91a665b6",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must prompt the user interactively to provide a path to a spec file or directory of spec markdown files",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-06131444",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must validate that the spec path exists and contains .md files",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-c1f5274f",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must use recursive search (rglob) to find markdown files within directories and suggest discovered spec files",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-45552710",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must prompt the user to provide a path to a test file or test directory and validate that the path exists",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-e1f47c3c",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must scan repository for test directories and files to provide suggestions",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-1a094799",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must write .plumb/config.json with the provided paths",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-bf4411bf",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must create a .plumbignore file in the project root if it does not exist",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-ca4321b1",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must install the git pre-commit hook by writing a script to .git/hooks/pre-commit that calls plumb hook",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-cc3bdd12",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must set the pre-commit hook script as executable",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-33b8caf9",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must install the Claude Code skill locally by copying plumb/skill/SKILL.md to .claude/skills/plumb/SKILL.md in the project root",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-948d13b6",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must create .claude/skills/plumb/ directories if they do not exist",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-13646c4b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must only perform project-local installation and never write to the user's global ~/.claude/ directory",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-caf43aa6",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must append a Plumb status block to CLAUDE.md at the project root",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-c67575fb",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must create CLAUDE.md if it does not exist",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-26d23d84",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must run plumb parse-spec to do an initial parse of the spec into requirements",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d8a3939d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must print a confirmation summary to the terminal, including confirmation that the skill was installed at .claude/skills/plumb/SKILL.md",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-72b62bed",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must read .plumb/config.json and exit 0 silently if not found",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-bafc9fa8",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must get the current staged diff via git diff --cached",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-c5fc9f66",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must get the current branch name",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-7b18f61d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must detect amends by comparing the HEAD commit's parent SHA to last_commit",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-13c66175",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must delete decisions in decisions.jsonl where commit_sha == last_commit before re-running analysis when amend is detected",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-9366118b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must detect broken references by checking all SHAs in decisions.jsonl against git history",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-0deace02",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must flag unreachable SHAs with 'ref_status': 'broken' and include a warning in output",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-1f63047b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must run the Diff Analysis DSPy program on the staged diff",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-acc96b17",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must attempt to locate and read the Claude Code conversation log",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-dba849cd",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If conversation log is found, plumb hook must read and chunk turns since last_commit timestamp",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-05e8f2c6",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must use unified conversation reading interface to support multiple sessions",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-5b3e1b17",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must merge conversation turns from all relevant session files modified after the last commit and sort chronologically",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d922da8a",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must handle multi-line assistant responses that span multiple JSONL lines",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-58fba9e1",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must convert tool_use blocks to '[tool: Name] description' format in conversation turns",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-b5e95f2b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must run Decision Extraction per chunk when conversation log is found",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-a21ff129",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If conversation log is not found, plumb hook must skip conversation analysis and note 'conversation_available': false in each decision object",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-7cd1e714",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must filter out decisions marked as non-spec-relevant during extraction before creating Decision records",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-cc309d37",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must merge and deduplicate decisions across chunks using DuckDB for cross-shard queries",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-b74b17a4",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Deduplication must check against all existing decisions (both pending and resolved) instead of only resolved ones",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-7c8ae0ee",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must implement within-batch similarity deduplication to compare new decisions against each other using Jaccard similarity check",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-697533d4",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "For each decision with no associated question, plumb hook must run Question Synthesizer with program-specific model configuration",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-a236365d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must write all new decisions with status: 'pending' to decisions.jsonl",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-1583438b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must implement decisions sharding using a TDD approach with core refactor, DuckDB integration, caller updates, new commands, and comprehensive testing coverage",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-5f742072",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must run plumb parse-spec to update requirements cache for any modified spec files",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-7c46db62",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must batch spec updates across all decisions instead of running spec update for each individual decision",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-3c6a8dea",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must use search-and-replace pairs pattern for spec updates",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-5cc13ef0",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "LLM must return list of {old_text, new_text} operations instead of rewriting entire sections",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-492c3d57",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must implement a two-tier approach for spec updates: Tier 1 for existing section updates and Tier 2 for structural changes",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-5a494006",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "For structural changes, plumb hook must use outline-first approach where LLM returns updated header outline first, then fills in content for new sections",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-630a8665",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must create OutlineMerger signature for conditional second call that takes current outline and new headers, returns merged outline with proper positioning",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-8c30bbe5",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If pending decisions exist, plumb hook must check whether it is running in a TTY or as a subprocess",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-be3bc21d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "In TTY mode, plumb hook must print a human-readable summary of pending decisions with instructions to run plumb review",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-2799568d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "In non-TTY mode, plumb hook must print a machine-readable JSON object to stdout",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-b7483e0e",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook must exit non-zero in both cases when pending decisions exist, aborting the commit",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-e2b8175e",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If no pending decisions exist, plumb hook must run plumb coverage, print a brief summary, update last_commit and last_commit_branch in config.json, and exit 0",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-8ee91280",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The hook must never exit non-zero due to an internal Plumb error",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-30d47a01",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If Plumb itself fails, it must print a warning to stderr and exit 0 so the commit is not blocked",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-fa2b82bc",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb hook --dry-run must run the full hook analysis on staged changes but not write to decisions.jsonl and always exit 0",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-1efee139",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb diff must read staged changes via git diff --cached",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-cc554120",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb diff must run Diff Analysis on the staged diff",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-450b451e",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb diff must read and chunk the conversation log (turns since last_commit) if available",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-94fa46d9",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb diff must run Decision Extraction per chunk",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-4b8461ac",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb diff must print a preview to the terminal including summary of staged code changes, estimated number of decisions, and brief description of each estimated decision",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-8953913c",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb diff must make no writes to .plumb/",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-40e0dce9",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb review must read .plumb/decisions.jsonl, filtering for status == 'pending'",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-e70021ee",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb review must accept an optional --branch <name> flag to filter by branch",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-3d39d41b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "When multiple session files exist, plumb review must use the most recent session file by modification time or match the current session ID for session selection",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-519b59f0",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If no pending decisions exist, plumb review must print 'No pending decisions.' and exit 0",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-27e66a3a",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "For each pending decision, plumb review must display the framing question, decision made, branch, file and line references, ref_status, and most related current spec text",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d9731257",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb review must prompt the user with options: [a]pprove, [r]eject, [e]dit, [s]kip",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-a699217f",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "For reject option, plumb review must prompt for reason and optionally run plumb modify <id> automatically",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-0777324d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "For edit option, plumb review must allow user to provide replacement decision text",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-caf07232",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "After all decisions are resolved, plumb review must run plumb sync for all approved/edited decisions",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-12dac66a",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Decision classification must default spec_relevant field to True to ensure decisions pass through for user review when LLM classification is uncertain",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d4eaa6b5",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb approve <id> must approve a single decision by ID and update its status to 'approved' in decisions.jsonl",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-51f06652",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb approve <id> must then run plumb sync for that decision only",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-cb968d6c",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The status display must include a visual bar chart representation for coverage statistics and use Rich's Status spinner that updates in-place for progress indication",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-6b124406",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb reject <id> [--reason '<text>'] must reject a single decision by ID and update its status to 'rejected' and record the reason",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-87c1366e",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb reject must not modify code or spec",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d39a2666",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb edit <id> '<new decision text>' must replace the decision text for a given decision ID with the user-provided text",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-441f49f9",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb edit must update status to 'edited' and then run plumb sync for that decision only",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-871343e0",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb modify <id> must modify the staged code to satisfy a rejected decision",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d75124fb",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb modify must read the decision object for <id> from decisions.jsonl and verify status == 'rejected'",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-938c8765",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb modify must read the staged diff",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-901f2865",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb modify must call the Claude API with the staged diff, decision made, rejection reason, current spec, and instruction to modify staged code",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-162d9bf0",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb modify must apply the proposed modification to the staged files",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d2152bfb",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb modify must run pytest on the test suite to verify that tests still pass after modification",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-438b117d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If tests pass, plumb modify must print the resulting diff, stage the modified files, and update decision status to 'rejected_modified'",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-9640a20f",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If tests fail, plumb modify must print the failure output, not stage the modification, prompt user to resolve manually, and update decision status to 'rejected_manual'",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-53520b79",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "In non-TTY mode, plumb modify must return a machine-readable JSON result",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-1a50a171",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb must never commit the modification and only stage it",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d24bd2d1",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb sync must add early exit check to avoid expensive operations when no unsynced decisions exist",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-0f3a158a",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb sync must read decisions from decisions.jsonl with status 'approved' or 'edited' that have not yet been synced",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-6f486f84",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "For each spec file, plumb sync must run WholeFileSpecUpdater processing all decisions affecting the spec file together",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-f084b481",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "WholeFileSpecUpdater must return section_updates for existing sections and new_sections for brand new sections",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-9b66984b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If new_sections is non-empty, plumb sync must run OutlineMerger to determine proper positioning of new sections within the spec structure",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-82dc3bc4",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb sync must write the updated spec file to disk using temp file \u2192 rename",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-0a87f4fc",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb sync must fix newline formatting by ensuring proper newlines between section headers and body content",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-ea611ecc",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb sync must run Test Generator to generate organized tests for requirements not covered by existing tests",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-f2b2d620",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Tests must be organized by functionality with proper requirement links in the format test_<req_id>_<description>",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-5594c2d9",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The generator must read only source files referenced by file_refs on synced decisions for context",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-a2f68bdb",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb sync must write generated tests to test_generated.py using temp file \u2192 rename",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-06342f24",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb sync must run plumb parse-spec to re-cache requirements",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-e314fd4f",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb sync must set synced_at on each processed decision",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-1fb47cf5",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb sync must print a summary of spec sections updated and test files created",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-0212e0ac",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb sync must use .plumbignore file with default patterns for documentation, build files, and IDE configurations to exclude irrelevant files from processing",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-b3844050",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb parse-spec must read all markdown files in spec_paths from config.json",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-f37d7950",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "For each file or paragraph block, plumb parse-spec must run Requirement Parser to produce explicit, testable requirement statements",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-09dfc5aa",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb parse-spec must assign each requirement a stable ID based on a hash of its content",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-0256d633",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb parse-spec must write results to .plumb/requirements.json",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-109ad433",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Requirements with matching hashes must not be re-processed, preserving existing metadata including created_at and last_seen_commit timestamps",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-9849b5eb",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb parse-spec must use regex patterns PLUMB_MARKER_RE and FUNC_NAME_RE to extract requirement IDs from test files for coverage mapping",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-79be045a",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb parse-spec must process all requirements and AST summaries of every non-test .py file through the CodeCoverageMapper using chunked mapping approach",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d8daba7e",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb parse-spec must use fan-out chunking to group source files under token budget (default 60000 tokens) and broadcast requirements to each chunk",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-5306be27",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb parse-spec must implement granular per-file hashing with structured v2 cache format that tracks individual requirement results for efficient cache invalidation",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-540ce2f9",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb parse-spec must preserve existing incremental caching logic by applying chunking inside the LLM call after dirty requirements are determined",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-08497ba3",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb parse-spec must extract source file paths from evidence strings using pattern matching against known files to determine requirement-to-file mappings",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-1ed44dec",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb parse-spec must use greedy packing to group source/test summaries into chunks and ThreadPoolExecutor for concurrent chunk processing",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-62422150",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb parse-spec must merge results from multiple chunks using custom logic that ORs 'implemented' flags and concatenates evidence strings per requirement_id",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-4e251d08",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb coverage must run pytest --cov and parse output to report line coverage percentage",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-38a18ebb",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "For spec-to-test coverage, plumb coverage must check whether a test references or maps to each requirement in the cache using string-matching to look for requirement IDs",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-aa441ce5",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb coverage must scan for link markers in test files to determine coverage",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-29180eff",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb coverage must report count and percentage covered for spec-to-test coverage",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-342ca58b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "For spec-to-code coverage, plumb coverage must use the requirements cache to check whether each requirement has a corresponding implementation by using string-matching to look for requirement IDs in source files",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-38aa0d40",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb coverage must report gaps in spec-to-code coverage",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-a9b444e0",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb coverage must print a formatted table using rich",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d3c4a32f",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb coverage must use LLM calls to refresh the requirements cache for accurate coverage analysis",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-42d6ea3a",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb coverage must measure and report coverage improvement achieved by marker injection",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-c7f0491f",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb status must print tracked spec files and total requirements, number of tests, pending decisions with branch breakdown if spanning multiple branches, decisions with broken git references, last sync commit, and coverage summary",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-8c5b25b4",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Plumb must ship with a Claude Code skill file at plumb/skill/SKILL.md",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-1f73348d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "During plumb init, the skill file must be copied to .claude/SKILL.md in the project root as a project-local installation only",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-7c5534bf",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The skill must never be installed globally",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-8a055bdf",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Claude Code must automatically read files in .claude/ at the start of each session",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d914459f",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The skill file must provide structured guidance for AI-assisted development workflow",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-6c5cff9b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The skill file must teach Claude Code the Plumb workflow so it can guide the user naturally through the development process",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-fda06c41",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The skill file must provide the machine-readable protocol for parsing hook output and calling per-decision commands during conversational review",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-f57e6f6e",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The system must support reading Claude Code native session files with JSONL parsing from the ~/.claude/projects/ directory structure",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-37b09243",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Conversation logs must be located in the real session JSONL files using the format ~/.claude/projects/<project>/<session-uuid>.jsonl",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-4183f881",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The .claude/ directory and SKILL.md must be committed to version control so all contributors to the project get the skill automatically",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d77b9cd4",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "plumb init must append a specific Plumb status block to CLAUDE.md delimited by comment markers so future Plumb commands can update it without affecting surrounding content",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-41d4e45d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If claude_log_path is not set, Plumb must attempt to auto-detect using common Claude Code log locations",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-6bdbb096",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If conversation log is not found, Plumb must skip conversation analysis, note 'conversation_available': false in each decision, print a warning, and continue with diff-only analysis",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-94dff2bc",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The log must be a JSONL file where each line is a turn with at minimum role, content, and timestamp",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-df781741",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Session files must be pre-filtered by modification time to avoid reading old files, then individual entries filtered by timestamp",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-12bbabfd",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Plumb must read only turns recorded after the last_commit timestamp in config.json",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-061cd59a",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The conversation parser must handle the native session JSONL format with type/message schema used by Claude Code",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-6f16a9a1",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Chunking must be performed in conversation.py before any DSPy program is called with no LLM involved",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-68f4361d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Chunks must be created deterministically",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-fcf965d0",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The primary unit must be user turn - a chunk is one user message plus all following assistant turns up to but not including the next user message",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-5fc5b454",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If a chunk exceeds 6,000 tokens, it must be split at tool call boundaries",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-ebc37f9a",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If no tool call boundary exists, chunks must be split at the midpoint of the largest assistant turn",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-00caf97d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The final assistant turn of the previous chunk must be prepended as a header to the next chunk",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-8e144fc9",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "One turn of overlap must preserve continuity without meaningfully increasing size",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-90d31c64",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Before chunking, tool result turns longer than 500 tokens whose content appears to be a raw file read must be replaced with '[file read: <filename>]'",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-1887de32",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Assistant messages that span multiple JSONL entries must be properly parsed and reassembled",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-4b3e0fd2",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "DecisionExtractor must be called once per chunk with the diff_summary passed identically to every call",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-526ef3ed",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Results must be merged after all chunks with near-duplicate decisions collapsed into one, preserving the earliest chunk_index",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-1fe4c337",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The pre-commit hook must fire on amends",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-509ab736",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "To prevent duplicates on amends: compare HEAD's parent SHA to last_commit and if equal, delete decisions where commit_sha == last_commit before re-running analysis",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-880151e4",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "On every hook run, all stored SHAs must be checked against git history",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-b396df65",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Unreachable SHAs must be flagged 'ref_status': 'broken'",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-b834e6a1",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Plumb must not attempt to re-map decisions to new SHAs",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-52b8a99b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The user must review and re-resolve broken-reference decisions manually",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-9efad91f",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The decision log must be append-only with existing lines never modified in place",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-2aaba138",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Status updates must be written as new lines with the same id",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-b2576545",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The latest line for a given id must be canonical",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-df77970c",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "commit_sha must be null until the commit lands and populated by the hook on the second pass when no pending decisions remain and the commit proceeds",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-150ddd31",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "DiffAnalyzer must take raw unified diff string as input and output list of change summaries with files_changed, summary, and change_type",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-ce9232f3",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "DiffAnalyzer must group related changes into logical units and not invent meaning",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-0cf06417",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "DecisionExtractor must take chunk and diff_summary as input and output list of decision objects with question, decision, made_by, related_diff_summary, confidence",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-156b8f13",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "DecisionExtractor must extract explicit and implicit decisions and not extract trivial decisions like variable naming or import ordering",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-3930b6be",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "QuestionSynthesizer must take a decision object with no associated question as input and output a plain-English question framing the decision for a developer",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-bb93c5fa",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "RequirementParser must take markdown string as input and output list of requirement objects with text and ambiguous fields",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-26d777ca",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "RequirementParser must use atomic statements, active voice, no duplicates, and flag vague statements as ambiguous: true and exclude unless user approves",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-556cb007",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "SpecUpdater must take spec_section (markdown) and decision (approved decision object) as input and output updated markdown for that section",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-b170221d",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "SpecUpdater must capture result of decision as natural requirement with no reference to the decision itself and preserve existing formatting",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-def8ae99",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "TestGenerator must take requirements (uncovered), existing_tests (file contents), and code_context (relevant source) as input and output runnable pytest test code as a Python string",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-50ab8293",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "TestGenerator must use one function per requirement, descriptive names (test_<req_id>_<description>), tests with real assertions against actual code under test, no pytest.skip() or # TODO: implement, and no overwriting existing tests",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-760e44b2",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "CodeModifier must use Claude API (not DSPy) and take staged diff, rejected decision, rejection reason, and current spec as input and output modified file contents that satisfy the rejection while remaining consistent with the spec",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-94cb093b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "All CLI commands must fail gracefully with a clear error message if config.json is missing or malformed",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-6a36a406",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "All DSPy programs must retry on LLM failure (max 2 retries) then raise PlumbInferenceError with a human-readable message",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-a82e5e59",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The git hook must never exit non-zero due to an internal Plumb error",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-f29b8aee",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Hook failures must print a warning to stderr and exit 0",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-8c29e2a6",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "File writes (spec updates, test generation) must use temp file \u2192 rename to avoid partial writes",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-b68098a2",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If conversation log is unavailable, Plumb must continue with diff-only analysis and this is not an error",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-a4ea6bb8",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "If plumb modify test run fails, Plumb must not stage the modification and update decision status to rejected_manual",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-da73bbcc",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The plumb status command must operate in cache-only mode to avoid making LLM calls",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-e3da267e",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "The plumb coverage command must display progress using an in-place updating spinner, then print the final results table",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-d8f2007e",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Session file reading must be optimized by pre-filtering based on file modification times to skip files that cannot contain relevant conversations",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-1d15aa1b",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "Plumb itself must use pytest with 80% coverage minimum for v0.1.0",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-e3f10182",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "cli.py tests must verify all commands run without error given valid inputs, per-decision commands update decisions.jsonl correctly, coverage command provides progress feedback with progress bar and status text, and spec and test suggestion functions cover various directory scenarios",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-240b6b68",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "decision_log.py tests must verify read/write/filter/dedup on .jsonl and latest-line-wins logic for status updates",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-4c4adca1",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "git_hook.py tests must verify hook produces correct pending decisions given mock diffs and conversation logs, amend detection, and TTY vs non-TTY output formats",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-831d7d68",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "conversation.py tests must verify correct chunk boundaries, overlap, noise reduction, metadata, and oversized chunks split at tool call boundaries",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-f890a0ed",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "programs/ tests must verify each DSPy program produces correctly structured output given fixture inputs (schema validity, not LLM quality) and comprehensive test suite for chunking functionality covering token estimation, item chunking, and chunked mapper execution scenarios",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-448b67f2",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "coverage_reporter.py tests must verify correct calculations given mock pytest output",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
+    "last_seen_commit": null
+  },
+  {
+    "id": "req-63b9bc1c",
+    "source_file": "plumb_spec.md",
+    "source_section": "",
+    "text": "sync.py tests must verify spec and test files updated correctly given approved decisions, no partial writes, and newline formatting tests covering both apply_section_updates() and insert_new_sections() functions",
+    "ambiguous": false,
+    "created_at": "2026-03-03T17:51:34.983536+00:00",
     "last_seen_commit": null
   }
 ]
