@@ -1,5 +1,7 @@
 # Plumb
 
+*Plumb is proof of concept software demonstrating how we can manage the "Spec Driven Development Triange". It is very much alpha software, use cautiously.*
+
 ### A tool to keep things true.
 
 `plumb` keeps your spec, tests, and code in sync during AI-assisted development.

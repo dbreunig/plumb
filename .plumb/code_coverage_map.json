@@ -3,14 +3,14 @@
   "source_hashes": {
     "plumb/__init__.py": "16f2211e2ab3b9c5a45e928e80fca934302b2b508239ff957eaf7d698ff4fb39",
     "plumb/claude_session.py": "39fa928294a449e6912e432600560ca9dcaec47a82a691e9a6ca66ed9f909f69",
-    "plumb/cli.py": "ba1d9b29f203539efd7b244dcb038938bd283b26288ac8bcac4124ff022ec072",
+    "plumb/cli.py": "31d712010855bd7eba3e52cc4f2656c9adfa0ff3b8156bf9d861ed8db6e4c32f",
     "plumb/config.py": "07c24955e1355679da85a31f409e07365b66f235e813716136cda404c93f87f2",
     "plumb/conversation.py": "c09215d97193559579e083efab8d399c3c9332218070c7e1e0d78a907af80ad1",
-    "plumb/coverage_reporter.py": "704d0bea155e95ccded6c13451963e4af824ef0dc57391dd35bb36528c37c90c",
+    "plumb/coverage_reporter.py": "0464f4fc79b993f650e37e91672f08a73dfe9fb524ad1f4782d79ebff2e772f3",
     "plumb/decision_log.py": "bc840185886e6ba6176cc2d1d3548e62f1a3c8e8e5a5a5d4b0a86b1a2ceae38a",
     "plumb/git_hook.py": "811c72485574b4969c77d477908c3c843424da0d673e54dc0e0b1bce52097e7c",
     "plumb/ignore.py": "a9d05eee0ac5ac0d13b3d8ae49ecd2690088fa421b089c1929a8240b5d9e9c12",
-    "plumb/programs/__init__.py": "f97fe45ec55787f18425b7e6d41cc86db20b341f4522fcacd815e5f21465d7b9",
+    "plumb/programs/__init__.py": "a7743ab6de438c6d94261442661b8347d6eff90c433d5b755a33ef2a2bdf7b01",
     "plumb/programs/code_coverage_mapper.py": "4f3867d91c38b1ea39315f7b27c68cace410ea9753b4a4ed64bebfb8d43222be",
     "plumb/programs/code_modifier.py": "a6a7f75008c8acf074bde718bb413058ce3eb530ea4c56cd29f757db143aea55",
     "plumb/programs/decision_deduplicator.py": "7b7d7c38b4c5509482f749dca22ec7bb6d5b89fae2b497a31a25768efdb44704",
@@ -18,1034 +18,1566 @@
     "plumb/programs/diff_analyzer.py": "437d2119994f0e1149f2767a94432b75253c8350fc60263cbd87f92caa1aa4f5",
     "plumb/programs/question_synthesizer.py": "12df72304475abe9e1c70a78a9f4c5150684ef999c32f7b90b06126649bda7fe",
     "plumb/programs/requirement_parser.py": "1151a7c83bbc8808c1eb37e1cb9936230b89788874f86d1dfdcfb886baefef54",
-    "plumb/programs/spec_updater.py": "2c04e5edd529033b95e549c9f72d3d413418a22a2c67e5709977548489788b6e",
-    "plumb/sync.py": "c9d1932423b5c1891652135df52a484f460c9737170655283272aa7fb3b511ac"
+    "plumb/programs/spec_updater.py": "3fc5abbbf108e55a4aef670706e3c319d7fa3f5ca11c0ddc2bf8af7552c65ebb",
+    "plumb/sync.py": "4a371f036c6d028b78eb56ae28ec8db3909557f6590fdf4ac43618732a63c6e7"
   },
-  "requirements_hash": "233c317def87895fb8bec04356436b32ab4c52fc1b09edff6e4945b12d1aade3",
+  "requirements_hash": "95a6e5fda96dda8bbc178ce5cf3de9651eeb5f912fd85be955c5129948c830a9",
   "results": {
-    "req-bbc39cfa": {
+    "req-88c76f2d": {
       "implemented": true,
-      "evidence": "_extract_test_req_ids function in coverage_reporter.py supports both '# plumb:req-XXXXXXXX' comment markers and 'test_req_XXXXXXXX_' function name patterns",
+      "evidence": "CLI entry point defined in cli.py with @click.group() decorator creating 'plumb' command",
       "source_files": []
     },
-    "req-250f1864": {
+    "req-2e041992": {
       "implemented": true,
-      "evidence": "DecisionExtractor program filters for spec-relevant content, and Decision class has spec_relevant field for filtering",
+      "evidence": "coverage_reporter.py _extract_test_req_ids() function supports '# plumb:req-XXXXXXXX' format using PLUMB_MARKER_RE regex",
       "source_files": []
     },
-    "req-f7ee5484": {
+    "req-9c06e1fd": {
       "implemented": true,
-      "evidence": "deduplicate_decisions function with semantic similarity checking via _llm_dedup function in decision_log.py",
+      "evidence": "coverage_reporter.py _extract_test_req_ids() function supports 'test_req_XXXXXXXX_' format using FUNC_NAME_RE regex",
       "source_files": []
     },
-    "req-873a9ca7": {
+    "req-437e0812": {
       "implemented": true,
-      "evidence": "deduplicate_decisions function accepts use_llm parameter defaulting to False in decision_log.py",
+      "evidence": "coverage_reporter.py _extract_test_req_ids() supports both comment markers and function name formats",
       "source_files": []
     },
-    "req-46ac7829": {
+    "req-01aa7442": {
       "implemented": true,
-      "evidence": "All LLM interactions are implemented as DSPy programs in the programs/ directory (DecisionExtractor, RequirementParser, etc.) except CodeModifier which explicitly uses direct API calls",
+      "evidence": "programs/decision_extractor.py filters for spec-relevant content in DecisionExtractorSignature",
       "source_files": []
     },
-    "req-10353269": {
+    "req-d63074a9": {
       "implemented": true,
-      "evidence": "get_lm function in programs/__init__.py uses Anthropic Claude SDK with Claude Sonnet 4.6 as default model",
+      "evidence": "decision_log.py deduplicate_decisions() function implements semantic similarity checking",
       "source_files": []
     },
-    "req-145c9a4c": {
+    "req-e0cc4dbc": {
       "implemented": true,
-      "evidence": "CLI commands in cli.py provide git hook functionality (hook command) and operate without changing user code",
+      "evidence": "programs/decision_deduplicator.py uses Claude Haiku 4.5 model for LLM-based deduplication",
       "source_files": []
     },
-    "req-8c1070ae": {
+    "req-d2a5f8af": {
       "implemented": true,
-      "evidence": "run_hook function in git_hook.py ensures commits are blocked when pending decisions exist (exit non-zero)",
+      "evidence": "decision_log.py deduplicate_decisions() function accepts use_llm parameter defaulting to False",
       "source_files": []
     },
-    "req-253396e9": {
+    "req-8ce944c2": {
       "implemented": true,
-      "evidence": "deduplicate_decisions function implements multi-stage pipeline with exact matching and LLM semantic analysis in decision_log.py",
+      "evidence": "programs/__init__.py validate_api_access() loads .env files for environment configuration",
       "source_files": []
     },
-    "req-d8c6e642": {
+    "req-175dd28e": {
       "implemented": true,
-      "evidence": "DecisionExtractor program extracts explicit and implicit decisions but excludes trivial decisions like variable naming",
+      "evidence": "cli.py init() function creates .env file in project directory",
       "source_files": []
     },
-    "req-41d8fed1": {
+    "req-8c3cafa6": {
       "implemented": true,
-      "evidence": "DecisionExtractor filters out process observations and diagnostic findings through spec_relevant classification",
+      "evidence": "programs/__init__.py validate_api_access() supports ANTHROPIC_API_KEY from both environment and .env files",
       "source_files": []
     },
-    "req-b83b529f": {
+    "req-3110f2cf": {
       "implemented": true,
-      "evidence": "validate_api_access function loads .env files using python-dotenv in programs/__init__.py",
+      "evidence": "coverage_reporter.py _extract_test_req_ids() links tests to requirements through ID comments",
       "source_files": []
     },
-    "req-81062ff5": {
+    "req-b3af883e": {
       "implemented": true,
-      "evidence": "init command in cli.py creates .env file in project directory",
+      "evidence": "ignore.py parse_plumbignore() supports .plumbignore file patterns",
       "source_files": []
     },
-    "req-9691bcdb": {
+    "req-d85fdf59": {
       "implemented": true,
-      "evidence": "validate_api_access function supports ANTHROPIC_API_KEY from both environment variables and .env files",
+      "evidence": "cli.py approve() function supports --all option to approve all changes at once",
       "source_files": []
     },
-    "req-18c539bd": {
+    "req-8e836859": {
       "implemented": true,
-      "evidence": "_extract_test_req_ids function extracts requirement ID comments for traceability in coverage_reporter.py",
+      "evidence": "cli.py check() function serves as alias for manual decision scanning",
       "source_files": []
     },
-    "req-c6f61809": {
+    "req-30ccc823": {
       "implemented": true,
-      "evidence": "parse_plumbignore and is_ignored functions in ignore.py support .plumbignore file patterns",
+      "evidence": "claude_session.py read_claude_sessions() reads and merges multiple session files chronologically",
       "source_files": []
     },
-    "req-9a262976": {
+    "req-84c21d5b": {
       "implemented": true,
-      "evidence": "approve command in cli.py accepts --all flag to approve all pending decisions",
+      "evidence": "cli.py sync_cmd() provides progress indicators with Rich status updates",
       "source_files": []
     },
-    "req-88f464dd": {
+    "req-9a53d050": {
       "implemented": true,
-      "evidence": "check command in cli.py is implemented as alias for manual decision scanning",
+      "evidence": "cli.py review() requires explicit sync step after approving decisions",
       "source_files": []
     },
-    "req-0265bcba": {
+    "req-f45b5b79": {
       "implemented": true,
-      "evidence": "read_claude_sessions function in claude_session.py handles multiple session files chronologically",
+      "evidence": "decision_log.py uses branch-sharded structure with _branch_decisions_path()",
       "source_files": []
     },
-    "req-47763ec4": {
+    "req-9ec31930": {
       "implemented": true,
-      "evidence": "_coverage_bar function in cli.py provides progress indicators, and coverage command uses Rich Status spinner",
+      "evidence": "cli.py merge_decisions() command provides CLI for merging decision logs",
       "source_files": []
     },
-    "req-9afa3c01": {
+    "req-c532950f": {
       "implemented": true,
-      "evidence": "sync_cmd command in cli.py provides explicit sync step after approving decisions",
+      "evidence": "cli.py migrate() command migrates from monolithic to branch-sharded layout",
       "source_files": []
     },
-    "req-f3b7364d": {
+    "req-26005df3": {
       "implemented": true,
-      "evidence": "get_program_lm function in programs/__init__.py supports program-specific model configuration from config.json",
+      "evidence": "cli.py merge_decisions() allows merging decisions from feature branches",
       "source_files": []
     },
-    "req-3d676d92": {
+    "req-bae33cef": {
       "implemented": true,
-      "evidence": "ensure_plumb_dir function in config.py creates and manages .plumb/ folder at repository root",
+      "evidence": "decision_log.py find_decision_branch() locates which branch file contains decision ID",
       "source_files": []
     },
-    "req-cfea96d6": {
+    "req-f306efbc": {
       "implemented": true,
-      "evidence": "validate_api_access function validates API access before LLM operations and raises PlumbAuthError on failure",
+      "evidence": "programs/spec_updater.py WholeFileSpecUpdaterSignature takes full spec content and decisions",
       "source_files": []
     },
-    "req-ff497d24": {
+    "req-61ddd8a0": {
       "implemented": true,
-      "evidence": "run_hook function analyzes staged diff and uses read_conversation for Claude Code conversation logs",
+      "evidence": "programs/spec_updater.py WholeFileSpecUpdaterSignature outputs section_updates and new_sections",
       "source_files": []
     },
-    "req-e2e22a80": {
+    "req-f2d81c91": {
       "implemented": true,
-      "evidence": "find_session_dir and parse_session_file functions in claude_session.py auto-detect and read Claude Code session files from ~/.claude/projects/",
+      "evidence": "programs/spec_updater.py accepts rewriting whole sections for markdown specs",
       "source_files": []
     },
-    "req-31bd8582": {
+    "req-00f64ba3": {
       "implemented": true,
-      "evidence": "run_hook writes pending decisions to decisions.jsonl and updates last_extracted_at timestamp",
+      "evidence": "programs/spec_updater.py OutlineMergerSignature handles structural changes for new sections",
       "source_files": []
     },
-    "req-927292e5": {
+    "req-e4c1679c": {
       "implemented": true,
-      "evidence": "_format_json_output function in git_hook.py prints machine-readable JSON summary and exits non-zero",
+      "evidence": "decision_log.py includes _clean_duckdb_row() and _to_python_native() helper functions",
       "source_files": []
     },
-    "req-8b9e63c2": {
+    "req-65849e21": {
       "implemented": true,
-      "evidence": "CLI commands only provide approve/reject/edit interfaces, never automatically approve or edit decisions",
+      "evidence": "decision_log.py _clean_duckdb_row() and _to_python_native() convert DuckDB types to Python native",
       "source_files": []
     },
-    "req-b3cd772e": {
+    "req-1c4d546f": {
       "implemented": true,
-      "evidence": "run_hook function only allows commits when there are zero pending decisions (exit 0 only when no pending)",
+      "evidence": "Architecture appears bounded with clear separation of concerns across modules",
       "source_files": []
     },
-    "req-871c318e": {
+    "req-8ad25430": {
       "implemented": true,
-      "evidence": "validate_api_access function validates API before LLM operations in pre-commit hook",
+      "evidence": "All LLM functions in programs/ directory implemented as DSPy programs with structured signatures",
       "source_files": []
     },
-    "req-fb163643": {
+    "req-f9d51be6": {
       "implemented": true,
-      "evidence": "PlumbAuthError exception class in __init__.py for API authentication failures",
+      "evidence": "programs/__init__.py uses Anthropic Claude SDK via user's account",
       "source_files": []
     },
-    "req-169dcf7a": {
+    "req-0f3e453b": {
       "implemented": true,
-      "evidence": "validate_api_access function in programs/__init__.py implements separate API key validation",
+      "evidence": "programs/__init__.py get_lm() defaults to Claude Sonnet 4.6 model",
       "source_files": []
     },
-    "req-e332c537": {
+    "req-f8773a0f": {
       "implemented": true,
-      "evidence": "validate_api_access function uses python-dotenv for .env file management",
+      "evidence": "git_hook.py implements git hook functionality, cli.py provides CLI interface",
       "source_files": []
     },
-    "req-1fdeec9d": {
+    "req-d77d06ac": {
       "implemented": true,
-      "evidence": "parse_plumbignore function in ignore.py uses gitignore-style patterns with default patterns",
+      "evidence": "git_hook.py run_hook() ensures every committed state has been reviewed",
       "source_files": []
     },
-    "req-832d94c3": {
+    "req-a721721f": {
       "implemented": true,
-      "evidence": "run_post_commit function in git_hook.py clears last_extracted_at timestamp after commit",
+      "evidence": "git_hook.py ensures commits represent fully reconciled snapshots",
       "source_files": []
     },
-    "req-22fd6aae": {
+    "req-8f77912a": {
       "implemented": true,
-      "evidence": "_parse_session_entry function in claude_session.py handles Claude Code's type/message schema and converts tool usage to text format",
+      "evidence": "claude_session.py and conversation.py use Claude Code session data when available",
       "source_files": []
     },
-    "req-1ac80dc8": {
+    "req-849bea7f": {
       "implemented": true,
-      "evidence": "TestGenerator program produces runnable pytest test code without TODO comments or stubs",
+      "evidence": "git_hook.py falls back to diff-only analysis when conversation unavailable",
       "source_files": []
     },
-    "req-e7de224b": {
+    "req-ecab5cc5": {
       "implemented": true,
-      "evidence": "TestGenerator creates functional test code that can be executed immediately",
+      "evidence": "decision_log.py deduplicate_decisions() uses multi-stage pipeline with exact matching, Jaccard similarity, and LLM analysis",
       "source_files": []
     },
-    "req-04de995d": {
+    "req-b2c75e3b": {
       "implemented": true,
-      "evidence": "run_hook analyzes staged diff and read_claude_sessions reads native session files from auto-detected paths",
+      "evidence": "programs/decision_extractor.py captures only prescriptive choices affecting system design",
       "source_files": []
     },
-    "req-c20ff2c4": {
+    "req-c9a8cfa4": {
       "implemented": true,
-      "evidence": "DecisionExtractor extracts prescriptive choices while filtering out observations and diagnostics via spec_relevant field",
+      "evidence": "programs/decision_extractor.py filters out process observations and diagnostic findings",
       "source_files": []
     },
-    "req-aeb05ba2": {
+    "req-63b44f74": {
       "implemented": true,
-      "evidence": "deduplicate_decisions function prevents duplicate decisions in the same batch",
+      "evidence": "sync.py apply_section_updates() uses search-and-replace approach with old_text/new_text pairs",
       "source_files": []
     },
-    "req-ead61636": {
+    "req-ed576b1d": {
       "implemented": true,
-      "evidence": "read_conversation_log and _commit_sha_to_datetime functions use both last_commit and last_extracted_at timestamps",
+      "evidence": "sync.py _normalize_header() provides exact header matching with fallback to normalized matching",
       "source_files": []
     },
-    "req-89c85adb": {
+    "req-c4c942fd": {
       "implemented": true,
-      "evidence": "_collect_source_summaries function returns per-file mappings in coverage_reporter.py",
+      "evidence": "git_hook.py integrates with git hooks to trigger workflows",
       "source_files": []
     },
-    "req-725af702": {
+    "req-0657f78d": {
       "implemented": true,
-      "evidence": "init command uses find_repo_root function to check for git repository",
+      "evidence": "programs/__init__.py get_program_lm() supports program-specific model configuration",
       "source_files": []
     },
-    "req-54fa5389": {
+    "req-fbc55122": {
       "implemented": true,
-      "evidence": "init command uses ensure_plumb_dir function to create .plumb/ directory",
+      "evidence": "coverage_reporter.py modularizes pattern parsing with _extract_test_req_ids()",
       "source_files": []
     },
-    "req-c44c38e4": {
+    "req-f6b56157": {
       "implemented": true,
-      "evidence": "init command in cli.py prompts user interactively for spec and test file paths",
+      "evidence": "sync.py extract_outline() extracts markdown headers from content",
       "source_files": []
     },
-    "req-f95937f6": {
+    "req-a7186d68": {
       "implemented": true,
-      "evidence": "init command writes config.json with provided paths using save_config function",
+      "evidence": "programs/__init__.py includes token estimation, chunking, and concurrent mapper functionality",
       "source_files": []
     },
-    "req-2f4e5109": {
+    "req-b0253818": {
       "implemented": true,
-      "evidence": "init command creates .plumbignore file if it doesn't exist",
+      "evidence": "programs/__init__.py run_chunked_mapper() uses ThreadPoolExecutor for concurrent processing",
       "source_files": []
     },
-    "req-9a207b56": {
+    "req-8fe4d884": {
       "implemented": true,
-      "evidence": "init command installs git pre-commit hook by writing script to .git/hooks/pre-commit",
+      "evidence": "programs/__init__.py run_chunked_mapper() supports different merge strategies",
       "source_files": []
     },
-    "req-3d17e291": {
+    "req-0b90e74a": {
       "implemented": true,
-      "evidence": "init command copies SKILL.md to .claude/skills/plumb/SKILL.md locally",
+      "evidence": "config.py ensure_plumb_dir() stores all state in .plumb/ folder",
       "source_files": []
     },
-    "req-b323bad9": {
+    "req-46f52276": {
       "implemented": true,
-      "evidence": "_update_claude_md function appends Plumb status block to CLAUDE.md",
+      "evidence": "programs/__init__.py validate_api_access() validates API access before proceeding",
       "source_files": []
     },
-    "req-6a5ffec2": {
+    "req-83898562": {
       "implemented": true,
-      "evidence": "init command runs 'plumb parse-spec' for initial spec parsing",
+      "evidence": "git_hook.py raises PlumbAuthError on API failure, causing non-zero exit",
       "source_files": []
     },
-    "req-2274edb4": {
+    "req-b45b3862": {
       "implemented": true,
-      "evidence": "init command prints confirmation summary including skill installation confirmation",
+      "evidence": "git_hook.py analyzes staged diff and Claude Code conversation using unified reading system",
       "source_files": []
     },
-    "req-edf77907": {
+    "req-94cc46f2": {
       "implemented": true,
-      "evidence": "hook command checks for config.json existence and exits 0 silently if not found",
+      "evidence": "conversation.py read_conversation() auto-detects Claude Code sessions vs legacy logs",
       "source_files": []
     },
-    "req-36bf66bc": {
+    "req-a93f8739": {
       "implemented": true,
-      "evidence": "_get_staged_diff function gets current staged diff via 'git diff --cached'",
+      "evidence": "claude_session.py reads from Claude Code session files at ~/.claude/projects/<encoded-path>/<uuid>.jsonl",
       "source_files": []
     },
-    "req-a87e05e7": {
+    "req-22696c3d": {
       "implemented": true,
-      "evidence": "_detect_amend function compares HEAD commit's parent SHA to last_commit",
+      "evidence": "git_hook.py writes pending decisions to branch-specific files with path sanitization",
       "source_files": []
     },
-    "req-a7e0ba91": {
+    "req-240b423a": {
       "implemented": true,
-      "evidence": "_check_broken_refs function checks all SHAs in decisions.jsonl against git history",
+      "evidence": "git_hook.py sets last_extracted_at timestamp",
       "source_files": []
     },
-    "req-5e890e5a": {
+    "req-b5714325": {
       "implemented": true,
-      "evidence": "_analyze_diff function runs DiffAnalyzer DSPy program on staged diff",
+      "evidence": "git_hook.py prints machine-readable JSON summary and exits non-zero",
       "source_files": []
     },
-    "req-3eb0f629": {
+    "req-70efecfc": {
       "implemented": true,
-      "evidence": "run_hook attempts to locate and read Claude Code conversation log via read_claude_sessions",
+      "evidence": "decision_log.py operations support branch-specific handling through branch parameters",
       "source_files": []
     },
-    "req-000e86e0": {
+    "req-4b8c9aca": {
       "implemented": true,
-      "evidence": "DecisionExtractor filters out decisions marked as non-spec-relevant",
+      "evidence": "cli.py modify() command invoked for rejected decisions",
       "source_files": []
     },
-    "req-72bcbbab": {
+    "req-59f5ea14": {
       "implemented": true,
-      "evidence": "run_hook merges and deduplicates decisions across chunks using deduplicate_decisions",
+      "evidence": "git_hook.py only allows commit when zero pending decisions exist",
       "source_files": []
     },
-    "req-7f0af43a": {
+    "req-cc9d890b": {
       "implemented": true,
-      "evidence": "_synthesize_questions function runs QuestionSynthesizer for decisions with no question",
+      "evidence": "plumb/__init__.py defines PlumbAuthError exception",
+      "source_files": [
+        "plumb/__init__.py"
+      ]
+    },
+    "req-62303611": {
+      "implemented": true,
+      "evidence": "PlumbAuthError provides clear API key instructions",
+      "source_files": []
+    },
+    "req-222ddbbd": {
+      "implemented": true,
+      "evidence": "programs/__init__.py validate_api_access() function implemented separately",
+      "source_files": []
+    },
+    "req-2b7249bd": {
+      "implemented": true,
+      "evidence": "programs/__init__.py validate_api_access() called before LLM operations",
+      "source_files": []
+    },
+    "req-bf52fc71": {
+      "implemented": true,
+      "evidence": "ignore.py uses gitignore-style patterns for ignore functionality",
+      "source_files": []
+    },
+    "req-0528aa41": {
+      "implemented": true,
+      "evidence": "ignore.py parse_plumbignore() uses default patterns when no file exists",
+      "source_files": []
+    },
+    "req-ee5e4ab1": {
+      "implemented": true,
+      "evidence": "git_hook.py run_post_commit() clears last_extracted_at timestamp",
+      "source_files": []
+    },
+    "req-3878d570": {
+      "implemented": true,
+      "evidence": "claude_session.py _parse_session_entry() handles Claude Code type/message schema",
+      "source_files": []
+    },
+    "req-a5977ebb": {
+      "implemented": true,
+      "evidence": "conversation.py converts tool usage blocks to '[tool: Name] description' format",
+      "source_files": []
+    },
+    "req-d31c8656": {
+      "implemented": true,
+      "evidence": "decision_log.py deduplicate_decisions() runs Jaccard similarity filtering first",
+      "source_files": []
+    },
+    "req-2b9b0310": {
+      "implemented": true,
+      "evidence": "decision_log.py applies LLM deduplication as second pass when candidates remain",
+      "source_files": []
+    },
+    "req-fd548a9e": {
+      "implemented": true,
+      "evidence": "programs/decision_deduplicator.py uses DSPy context manager with Haiku LM",
+      "source_files": []
+    },
+    "req-bfd0ba5b": {
+      "implemented": true,
+      "evidence": "decision_log.py deduplicate_decisions() prioritizes approved/synced decisions",
+      "source_files": []
+    },
+    "req-da235efb": {
+      "implemented": true,
+      "evidence": "decision_log.py read_all_decisions() serves as primary API for accessing decisions",
+      "source_files": []
+    },
+    "req-0ebf5393": {
+      "implemented": true,
+      "evidence": "cli.py migrate() command migrates from monolithic to sharded layout",
+      "source_files": []
+    },
+    "req-9fa3c5c5": {
+      "implemented": true,
+      "evidence": "programs/spec_updater.py implements single LLM call per spec file",
+      "source_files": []
+    },
+    "req-e436c817": {
+      "implemented": true,
+      "evidence": "programs/spec_updater.py output schema contains section_updates and new_sections",
+      "source_files": []
+    },
+    "req-5afa15a7": {
+      "implemented": true,
+      "evidence": "programs/spec_updater.py OutlineMergerSignature separates structural reasoning",
+      "source_files": []
+    },
+    "req-869374c9": {
+      "implemented": true,
+      "evidence": "sync.py keeps edit operations simple with search-and-replace approach",
+      "source_files": []
+    },
+    "req-4e1b972d": {
+      "implemented": true,
+      "evidence": "Architecture accepts risk of unintended edits for performance gains",
+      "source_files": []
+    },
+    "req-86327b73": {
+      "implemented": true,
+      "evidence": "decision_log.py _decisions_path() maintained for migration detection",
+      "source_files": []
+    },
+    "req-d33fb2bc": {
+      "implemented": true,
+      "evidence": "git_hook.py analyzes staged diff and reads Claude Code session files directly",
+      "source_files": []
+    },
+    "req-bbcbc0c8": {
+      "implemented": true,
+      "evidence": "programs/decision_extractor.py extracts prescriptive choices, excludes observations",
+      "source_files": []
+    },
+    "req-c417e44f": {
+      "implemented": true,
+      "evidence": "decision_log.py deduplicate_decisions() prevents duplicates within same batch",
+      "source_files": []
+    },
+    "req-44a64359": {
+      "implemented": true,
+      "evidence": "git_hook.py uses both last_commit datetime and last_extracted_at as cutoffs",
+      "source_files": []
+    },
+    "req-8ba347f8": {
+      "implemented": true,
+      "evidence": "git_hook.py takes later of two timestamps to determine processing",
+      "source_files": []
+    },
+    "req-1972ebc2": {
+      "implemented": true,
+      "evidence": "git_hook.py writes pending decisions and passes to deduplication",
+      "source_files": []
+    },
+    "req-35457627": {
+      "implemented": true,
+      "evidence": "decision_log.py uses exact deduplication and LLM-based semantic deduplication",
+      "source_files": []
+    },
+    "req-a756777b": {
+      "implemented": true,
+      "evidence": "coverage_reporter.py _collect_source_summaries() creates per-file mappings",
+      "source_files": []
+    },
+    "req-faad83ce": {
+      "implemented": true,
+      "evidence": "cli.py init() checks current directory is git repository",
+      "source_files": []
+    },
+    "req-27edd42d": {
+      "implemented": true,
+      "evidence": "cli.py init() creates .plumb/ directory if not exists",
+      "source_files": []
+    },
+    "req-91a665b6": {
+      "implemented": true,
+      "evidence": "cli.py init() prompts user interactively for spec file path",
+      "source_files": []
+    },
+    "req-06131444": {
+      "implemented": true,
+      "evidence": "cli.py init() validates spec path exists and contains .md files",
+      "source_files": []
+    },
+    "req-c1f5274f": {
+      "implemented": true,
+      "evidence": "cli.py _find_spec_suggestions() uses recursive search to find markdown files",
+      "source_files": []
+    },
+    "req-45552710": {
+      "implemented": true,
+      "evidence": "cli.py init() prompts for test directory path and validates existence",
+      "source_files": []
+    },
+    "req-e1f47c3c": {
+      "implemented": true,
+      "evidence": "cli.py _find_test_suggestions() scans repository for test directories",
+      "source_files": []
+    },
+    "req-1a094799": {
+      "implemented": true,
+      "evidence": "cli.py init() writes .plumb/config.json with provided paths",
+      "source_files": []
+    },
+    "req-bf4411bf": {
+      "implemented": true,
+      "evidence": "cli.py init() creates .plumbignore file if not exists",
+      "source_files": []
+    },
+    "req-ca4321b1": {
+      "implemented": true,
+      "evidence": "cli.py init() installs git pre-commit hook script",
+      "source_files": []
+    },
+    "req-cc3bdd12": {
+      "implemented": true,
+      "evidence": "cli.py init() sets pre-commit hook script as executable",
+      "source_files": []
+    },
+    "req-33b8caf9": {
+      "implemented": true,
+      "evidence": "cli.py init() copies SKILL.md to .claude/skills/plumb/SKILL.md locally",
+      "source_files": []
+    },
+    "req-948d13b6": {
+      "implemented": true,
+      "evidence": "cli.py init() creates .claude/skills/plumb/ directories",
+      "source_files": []
+    },
+    "req-13646c4b": {
+      "implemented": true,
+      "evidence": "cli.py init() only performs project-local installation",
+      "source_files": []
+    },
+    "req-caf43aa6": {
+      "implemented": true,
+      "evidence": "cli.py _update_claude_md() appends Plumb status block to CLAUDE.md",
+      "source_files": []
+    },
+    "req-c67575fb": {
+      "implemented": true,
+      "evidence": "cli.py init() creates CLAUDE.md if not exists",
+      "source_files": []
+    },
+    "req-26d23d84": {
+      "implemented": true,
+      "evidence": "cli.py init() runs plumb parse-spec for initial spec parsing",
+      "source_files": []
+    },
+    "req-d8a3939d": {
+      "implemented": true,
+      "evidence": "cli.py init() prints confirmation summary including skill installation",
+      "source_files": []
+    },
+    "req-72b62bed": {
+      "implemented": true,
+      "evidence": "cli.py hook() reads config.json and exits 0 if not found",
+      "source_files": []
+    },
+    "req-bafc9fa8": {
+      "implemented": true,
+      "evidence": "git_hook.py _get_staged_diff() gets staged diff via git diff --cached",
+      "source_files": []
+    },
+    "req-c5fc9f66": {
+      "implemented": true,
+      "evidence": "git_hook.py _get_branch_name() gets current branch name",
+      "source_files": []
+    },
+    "req-7b18f61d": {
+      "implemented": true,
+      "evidence": "git_hook.py _detect_amend() compares HEAD parent SHA to last_commit",
+      "source_files": []
+    },
+    "req-13c66175": {
+      "implemented": true,
+      "evidence": "git_hook.py deletes decisions matching last_commit when amend detected",
+      "source_files": []
+    },
+    "req-9366118b": {
+      "implemented": true,
+      "evidence": "git_hook.py _check_broken_refs() checks SHAs against git history",
+      "source_files": []
+    },
+    "req-0deace02": {
+      "implemented": true,
+      "evidence": "git_hook.py flags unreachable SHAs with 'ref_status': 'broken'",
+      "source_files": []
+    },
+    "req-1f63047b": {
+      "implemented": true,
+      "evidence": "git_hook.py runs DiffAnalyzer program on staged diff",
+      "source_files": []
+    },
+    "req-acc96b17": {
+      "implemented": true,
+      "evidence": "git_hook.py attempts to locate and read Claude Code conversation log",
+      "source_files": []
+    },
+    "req-dba849cd": {
+      "implemented": true,
+      "evidence": "git_hook.py reads and chunks turns since last_commit timestamp",
+      "source_files": []
+    },
+    "req-05e8f2c6": {
+      "implemented": true,
+      "evidence": "conversation.py provides unified conversation reading interface",
+      "source_files": []
+    },
+    "req-5b3e1b17": {
+      "implemented": true,
+      "evidence": "claude_session.py merges conversation turns from session files and sorts chronologically",
+      "source_files": []
+    },
+    "req-d922da8a": {
+      "implemented": true,
+      "evidence": "claude_session.py _parse_session_entry() handles multi-line assistant responses",
+      "source_files": []
+    },
+    "req-58fba9e1": {
+      "implemented": true,
+      "evidence": "conversation.py converts tool_use blocks to '[tool: Name] description' format",
+      "source_files": []
+    },
+    "req-b5e95f2b": {
+      "implemented": true,
+      "evidence": "git_hook.py runs DecisionExtractor per chunk when conversation found",
+      "source_files": []
+    },
+    "req-a21ff129": {
+      "implemented": true,
+      "evidence": "git_hook.py skips conversation analysis and sets 'conversation_available': false",
+      "source_files": []
+    },
+    "req-7cd1e714": {
+      "implemented": true,
+      "evidence": "git_hook.py filters out non-spec-relevant decisions before creating records",
+      "source_files": []
+    },
+    "req-cc309d37": {
+      "implemented": true,
+      "evidence": "git_hook.py merges and deduplicates decisions using DuckDB for cross-shard queries",
+      "source_files": []
+    },
+    "req-b74b17a4": {
+      "implemented": true,
+      "evidence": "decision_log.py deduplication checks against all existing decisions",
+      "source_files": []
+    },
+    "req-7c8ae0ee": {
+      "implemented": true,
+      "evidence": "git_hook.py implements within-batch similarity deduplication using Jaccard similarity",
+      "source_files": []
+    },
+    "req-697533d4": {
+      "implemented": true,
+      "evidence": "git_hook.py runs QuestionSynthesizer with program-specific model configuration",
+      "source_files": []
+    },
+    "req-a236365d": {
+      "implemented": true,
+      "evidence": "git_hook.py writes new decisions with status: 'pending' to decisions.jsonl",
+      "source_files": []
+    },
+    "req-1583438b": {
+      "implemented": true,
+      "evidence": "decision_log.py implements decisions sharding with DuckDB integration",
+      "source_files": []
+    },
+    "req-5f742072": {
+      "implemented": true,
+      "evidence": "git_hook.py runs parse-spec to update requirements cache for modified specs",
+      "source_files": []
+    },
+    "req-7c46db62": {
+      "implemented": true,
+      "evidence": "git_hook.py batches spec updates across all decisions",
+      "source_files": []
+    },
+    "req-3c6a8dea": {
+      "implemented": true,
+      "evidence": "programs/spec_updater.py uses search-and-replace pairs pattern",
+      "source_files": []
+    },
+    "req-5cc13ef0": {
+      "implemented": true,
+      "evidence": "programs/spec_updater.py returns {old_text, new_text} operations",
+      "source_files": []
+    },
+    "req-492c3d57": {
+      "implemented": true,
+      "evidence": "programs/spec_updater.py implements two-tier approach for spec updates",
+      "source_files": []
+    },
+    "req-5a494006": {
+      "implemented": true,
+      "evidence": "programs/spec_updater.py uses outline-first approach for structural changes",
+      "source_files": []
+    },
+    "req-630a8665": {
+      "implemented": true,
+      "evidence": "programs/spec_updater.py OutlineMergerSignature for conditional second call",
+      "source_files": []
+    },
+    "req-8c30bbe5": {
+      "implemented": true,
+      "evidence": "git_hook.py checks TTY vs subprocess mode for pending decisions",
+      "source_files": []
+    },
+    "req-be3bc21d": {
+      "implemented": true,
+      "evidence": "git_hook.py prints human-readable summary in TTY mode",
+      "source_files": []
+    },
+    "req-2799568d": {
+      "implemented": true,
+      "evidence": "git_hook.py prints machine-readable JSON in non-TTY mode",
+      "source_files": []
+    },
+    "req-b7483e0e": {
+      "implemented": true,
+      "evidence": "git_hook.py exits non-zero when pending decisions exist",
+      "source_files": []
+    },
+    "req-e2b8175e": {
+      "implemented": true,
+      "evidence": "git_hook.py runs coverage and updates config when no pending decisions",
+      "source_files": []
+    },
+    "req-8ee91280": {
+      "implemented": true,
+      "evidence": "git_hook.py never exits non-zero due to internal Plumb errors",
+      "source_files": []
+    },
+    "req-30d47a01": {
+      "implemented": true,
+      "evidence": "git_hook.py prints warning to stderr and exits 0 on internal failures",
+      "source_files": []
+    },
+    "req-fa2b82bc": {
+      "implemented": true,
+      "evidence": "cli.py hook() supports --dry-run flag for analysis without writes",
+      "source_files": []
+    },
+    "req-1efee139": {
+      "implemented": true,
+      "evidence": "cli.py diff() reads staged changes via git diff --cached",
+      "source_files": []
+    },
+    "req-cc554120": {
+      "implemented": true,
+      "evidence": "cli.py diff() runs DiffAnalyzer on staged diff",
+      "source_files": []
+    },
+    "req-450b451e": {
+      "implemented": true,
+      "evidence": "cli.py diff() reads and chunks conversation log if available",
+      "source_files": []
+    },
+    "req-94fa46d9": {
+      "implemented": true,
+      "evidence": "cli.py diff() runs DecisionExtractor per chunk",
+      "source_files": []
+    },
+    "req-4b8461ac": {
+      "implemented": true,
+      "evidence": "cli.py diff() prints preview with code changes and decision summaries",
+      "source_files": []
+    },
+    "req-8953913c": {
+      "implemented": true,
+      "evidence": "cli.py diff() makes no writes to .plumb/ directory",
+      "source_files": []
+    },
+    "req-40e0dce9": {
+      "implemented": true,
+      "evidence": "cli.py review() reads decisions.jsonl filtering for status == 'pending'",
+      "source_files": []
+    },
+    "req-e70021ee": {
+      "implemented": true,
+      "evidence": "cli.py review() accepts optional --branch flag for filtering",
+      "source_files": []
+    },
+    "req-3d39d41b": {
+      "implemented": true,
+      "evidence": "claude_session.py uses most recent session file by modification time",
+      "source_files": []
+    },
+    "req-519b59f0": {
+      "implemented": true,
+      "evidence": "cli.py review() prints 'No pending decisions.' and exits 0 when none exist",
+      "source_files": []
+    },
+    "req-27e66a3a": {
+      "implemented": true,
+      "evidence": "cli.py review() displays framing question, decision, branch, file refs, and spec text",
+      "source_files": []
+    },
+    "req-d9731257": {
+      "implemented": true,
+      "evidence": "cli.py review() prompts with [a]pprove, [r]eject, [e]dit, [s]kip options",
+      "source_files": []
+    },
+    "req-a699217f": {
+      "implemented": true,
+      "evidence": "cli.py review() prompts for reason on reject and can run modify automatically",
       "source_files": []
     },
-    "req-5a17049c": {
+    "req-0777324d": {
       "implemented": true,
-      "evidence": "run_hook writes new decisions with status 'pending' to decisions.jsonl",
+      "evidence": "cli.py review() allows user to provide replacement decision text for edit",
       "source_files": []
     },
-    "req-f86b4160": {
+    "req-caf07232": {
       "implemented": true,
-      "evidence": "run_hook runs 'plumb parse-spec' to update requirements cache for modified spec files",
+      "evidence": "cli.py review() runs sync for all approved/edited decisions after resolution",
       "source_files": []
     },
-    "req-ac58c8fb": {
+    "req-12dac66a": {
       "implemented": true,
-      "evidence": "run_hook checks TTY vs subprocess mode for output formatting",
+      "evidence": "programs/decision_extractor.py defaults spec_relevant to True",
       "source_files": []
     },
-    "req-f1d2ef4f": {
+    "req-d4eaa6b5": {
       "implemented": true,
-      "evidence": "_format_tty_output function provides human-readable summary in TTY mode",
+      "evidence": "cli.py approve() approves single decision and updates status to 'approved'",
       "source_files": []
     },
-    "req-74e252b8": {
+    "req-51f06652": {
       "implemented": true,
-      "evidence": "_format_json_output function prints machine-readable JSON in non-TTY mode",
+      "evidence": "cli.py approve() runs sync for approved decision only",
       "source_files": []
     },
-    "req-22523876": {
+    "req-cb968d6c": {
       "implemented": true,
-      "evidence": "run_hook exits non-zero in both TTY and non-TTY cases when pending decisions exist",
+      "evidence": "cli.py uses Rich for visual bar chart and Status spinner for progress",
       "source_files": []
     },
-    "req-a6511eda": {
+    "req-6b124406": {
       "implemented": true,
-      "evidence": "run_hook runs 'plumb coverage', prints summary, updates config, and exits 0 when no pending decisions",
+      "evidence": "cli.py reject() rejects decision by ID, updates status to 'rejected', records reason",
       "source_files": []
     },
-    "req-ad299ae0": {
+    "req-87c1366e": {
       "implemented": true,
-      "evidence": "run_hook function has top-level try/except to never exit non-zero due to internal errors",
+      "evidence": "cli.py reject() does not modify code or spec",
       "source_files": []
     },
-    "req-f5adb0a8": {
+    "req-d39a2666": {
       "implemented": true,
-      "evidence": "diff command provides read-only preview of what Plumb will capture from staged changes",
+      "evidence": "cli.py edit() replaces decision text and updates status to 'edited'",
       "source_files": []
     },
-    "req-2fbfe578": {
+    "req-441f49f9": {
       "implemented": true,
-      "evidence": "review command provides interactive review of pending decisions for terminal use",
+      "evidence": "cli.py edit() runs sync for edited decision only",
       "source_files": []
     },
-    "req-571ce0a6": {
+    "req-871343e0": {
       "implemented": true,
-      "evidence": "review command reads decisions.jsonl and filters for status 'pending'",
+      "evidence": "cli.py modify() modifies staged code to satisfy rejected decision",
       "source_files": []
     },
-    "req-ad7384d1": {
+    "req-d75124fb": {
       "implemented": true,
-      "evidence": "review command accepts optional '--branch <name>' flag to filter by branch",
+      "evidence": "cli.py modify() reads decision from decisions.jsonl and verifies status == 'rejected'",
       "source_files": []
     },
-    "req-2b0d42e5": {
+    "req-938c8765": {
       "implemented": true,
-      "evidence": "review command uses most recent session file by modification time when multiple exist",
+      "evidence": "cli.py modify() reads staged diff",
       "source_files": []
     },
-    "req-17c08294": {
+    "req-901f2865": {
       "implemented": true,
-      "evidence": "review command displays decision details and prompts for user action",
+      "evidence": "cli.py modify() calls Claude API with diff, decision, rejection reason, spec",
       "source_files": []
     },
-    "req-a7fa7c1d": {
+    "req-162d9bf0": {
       "implemented": true,
-      "evidence": "review command runs 'plumb sync' after all decisions are resolved",
+      "evidence": "programs/code_modifier.py applies proposed modification to staged files",
       "source_files": []
     },
-    "req-6e22c78a": {
+    "req-d2152bfb": {
       "implemented": true,
-      "evidence": "approve command approves single decision by ID and updates status to 'approved'",
+      "evidence": "cli.py modify() runs pytest to verify tests pass after modification",
       "source_files": []
     },
-    "req-5e082750": {
+    "req-438b117d": {
       "implemented": true,
-      "evidence": "approve command runs 'plumb sync' for the approved decision only",
+      "evidence": "cli.py modify() stages files and updates status to 'rejected_modified' if tests pass",
       "source_files": []
     },
-    "req-f6ae6892": {
+    "req-9640a20f": {
       "implemented": true,
-      "evidence": "_coverage_bar function provides visual bar chart representation for coverage statistics",
+      "evidence": "cli.py modify() updates status to 'rejected_manual' if tests fail",
       "source_files": []
     },
-    "req-854215fa": {
+    "req-53520b79": {
       "implemented": true,
-      "evidence": "coverage command uses Rich's Status spinner for in-place progress updates",
+      "evidence": "cli.py modify() returns machine-readable JSON in non-TTY mode",
       "source_files": []
     },
-    "req-4b4d673b": {
+    "req-1a50a171": {
       "implemented": true,
-      "evidence": "reject command rejects single decision by ID and updates status to 'rejected' with reason",
+      "evidence": "cli.py modify() only stages modification, never commits",
       "source_files": []
     },
-    "req-7b53b5d1": {
+    "req-d24bd2d1": {
       "implemented": true,
-      "evidence": "edit command replaces decision text for given decision ID with user-provided text",
+      "evidence": "cli.py sync_cmd() includes early exit check for no unsynced decisions",
       "source_files": []
     },
-    "req-52252815": {
+    "req-0f3a158a": {
       "implemented": true,
-      "evidence": "edit command updates status to 'edited' and runs 'plumb sync' for that decision only",
+      "evidence": "sync.py sync_decisions() reads 'approved' or 'edited' unsynced decisions",
       "source_files": []
     },
-    "req-28f1caa9": {
+    "req-6f486f84": {
       "implemented": true,
-      "evidence": "modify command modifies staged code to satisfy a rejected decision",
+      "evidence": "sync.py processes decisions by spec file using WholeFileSpecUpdater",
       "source_files": []
     },
-    "req-852b5772": {
+    "req-f084b481": {
       "implemented": true,
-      "evidence": "modify command reads decision object and verifies status equals 'rejected'",
+      "evidence": "programs/spec_updater.py WholeFileSpecUpdater returns section_updates and new_sections",
       "source_files": []
     },
-    "req-000a3452": {
+    "req-9b66984b": {
       "implemented": true,
-      "evidence": "CodeModifier class calls Claude API with staged diff, decision, rejection reason, and current spec",
+      "evidence": "sync.py runs OutlineMerger when new_sections is non-empty",
       "source_files": []
     },
-    "req-2d744e4a": {
+    "req-82dc3bc4": {
       "implemented": true,
-      "evidence": "modify command applies proposed modification to staged files",
+      "evidence": "sync.py _atomic_write() writes spec file using temp file \u2192 rename",
       "source_files": []
     },
-    "req-03064f04": {
+    "req-0a87f4fc": {
       "implemented": true,
-      "evidence": "_run_modify function runs pytest to verify tests pass after modification",
+      "evidence": "sync.py fixes newline formatting between section headers and body",
       "source_files": []
     },
-    "req-eb9a9a64": {
+    "req-ea611ecc": {
       "implemented": true,
-      "evidence": "modify command prints resulting diff and stages modified files if tests pass",
+      "evidence": "sync.py runs TestGenerator for uncovered requirements",
       "source_files": []
     },
-    "req-3f001b54": {
+    "req-f2b2d620": {
       "implemented": true,
-      "evidence": "modify command prints failure output without staging if tests fail",
+      "evidence": "sync.py organizes tests by functionality with proper requirement links",
       "source_files": []
     },
-    "req-d3714891": {
+    "req-5594c2d9": {
       "implemented": true,
-      "evidence": "modify command only stages modifications, never commits them",
+      "evidence": "sync.py reads only source files referenced by file_refs for context",
       "source_files": []
     },
-    "req-956098e2": {
+    "req-a2f68bdb": {
       "implemented": true,
-      "evidence": "sync_cmd updates spec and tests to reflect all approved and edited decisions",
+      "evidence": "sync.py writes generated tests using temp file \u2192 rename",
       "source_files": []
     },
-    "req-da58a8be": {
+    "req-06342f24": {
       "implemented": true,
-      "evidence": "sync_decisions reads decisions with status 'approved' or 'edited' that haven't been synced",
+      "evidence": "sync.py runs parse-spec to re-cache requirements",
       "source_files": []
     },
-    "req-a1aaf10e": {
+    "req-e314fd4f": {
       "implemented": true,
-      "evidence": "sync_decisions runs SpecUpdater to rewrite relevant spec sections for each decision",
+      "evidence": "sync.py sets synced_at on each processed decision",
       "source_files": []
     },
-    "req-aeab65bd": {
+    "req-1fb47cf5": {
       "implemented": true,
-      "evidence": "BatchSpecUpdater processes multiple decisions affecting the same spec section together",
+      "evidence": "sync.py prints summary of spec sections updated and test files created",
       "source_files": []
     },
-    "req-bb907765": {
+    "req-0212e0ac": {
       "implemented": true,
-      "evidence": "sync_decisions runs TestGenerator to generate tests for uncovered requirements",
+      "evidence": "sync.py uses .plumbignore with default patterns for excluding files",
       "source_files": []
     },
-    "req-30d20011": {
+    "req-b3844050": {
       "implemented": true,
-      "evidence": "TestGenerator organizes tests by functionality with proper requirement links in 'test_<req_id>_<description>' format",
+      "evidence": "cli.py parse_spec() reads markdown files from spec_paths in config",
       "source_files": []
     },
-    "req-7b1b1370": {
+    "req-f37d7950": {
       "implemented": true,
-      "evidence": "TestGenerator reads only source files referenced by file_refs on synced decisions for context",
+      "evidence": "sync.py parse_spec_files() runs RequirementParser on file/paragraph blocks",
       "source_files": []
     },
-    "req-bc6ba145": {
+    "req-09dfc5aa": {
       "implemented": true,
-      "evidence": "sync_decisions writes generated tests to 'test_generated.py' using _atomic_write temp file \u2192 rename",
+      "evidence": "sync.py _generate_requirement_id() assigns stable ID based on content hash",
       "source_files": []
     },
-    "req-329028d5": {
+    "req-0256d633": {
       "implemented": true,
-      "evidence": "sync_decisions runs 'plumb parse-spec' to re-cache requirements",
+      "evidence": "sync.py writes results to .plumb/requirements.json",
       "source_files": []
     },
-    "req-a419bcee": {
+    "req-109ad433": {
       "implemented": true,
-      "evidence": "sync_decisions sets synced_at on each processed decision",
+      "evidence": "sync.py preserves existing metadata for matching hashes",
       "source_files": []
     },
-    "req-af760bf5": {
+    "req-9849b5eb": {
       "implemented": true,
-      "evidence": "sync_decisions prints summary of spec sections updated and test files created",
+      "evidence": "coverage_reporter.py uses PLUMB_MARKER_RE and FUNC_NAME_RE for test mapping",
       "source_files": []
     },
-    "req-97f9d2f7": {
+    "req-79be045a": {
       "implemented": true,
-      "evidence": "sync command uses .plumbignore file with default patterns via parse_plumbignore function",
+      "evidence": "coverage_reporter.py processes requirements and AST summaries through CodeCoverageMapper",
       "source_files": []
     },
-    "req-052bf55f": {
+    "req-d8daba7e": {
       "implemented": true,
-      "evidence": "parse_spec_files reads all markdown files in spec_paths from config.json",
+      "evidence": "coverage_reporter.py uses fan-out chunking with token budget",
       "source_files": []
     },
-    "req-c69fd90a": {
+    "req-5306be27": {
       "implemented": true,
-      "evidence": "parse_spec_files runs RequirementParser to produce explicit, testable requirement statements",
+      "evidence": "coverage_reporter.py implements granular per-file hashing with v2 cache format",
       "source_files": []
     },
-    "req-2c8ce279": {
+    "req-540ce2f9": {
       "implemented": true,
-      "evidence": "_generate_requirement_id assigns stable ID based on hash of content",
+      "evidence": "coverage_reporter.py applies chunking inside LLM call after dirty determination",
       "source_files": []
     },
-    "req-7e2bd20f": {
+    "req-08497ba3": {
       "implemented": true,
-      "evidence": "parse_spec_files writes results to '.plumb/requirements.json'",
+      "evidence": "coverage_reporter.py _extract_source_files_from_evidence() extracts file paths",
       "source_files": []
     },
-    "req-51b6ee0f": {
+    "req-1ed44dec": {
       "implemented": true,
-      "evidence": "Requirements with matching hashes are not re-processed, preserving existing metadata",
+      "evidence": "coverage_reporter.py uses greedy packing and ThreadPoolExecutor for chunks",
       "source_files": []
     },
-    "req-a734a4cc": {
+    "req-62422150": {
       "implemented": true,
-      "evidence": "_extract_test_req_ids uses regex patterns to extract requirement IDs from test files",
+      "evidence": "coverage_reporter.py merges results using custom logic that ORs flags",
       "source_files": []
     },
-    "req-4333321e": {
+    "req-4e251d08": {
       "implemented": true,
-      "evidence": "parse_spec processes requirements and AST summaries through CodeCoverageMapper in batch operations",
+      "evidence": "cli.py coverage() runs pytest --cov and parses output",
       "source_files": []
     },
-    "req-99b718d9": {
+    "req-38a18ebb": {
       "implemented": true,
-      "evidence": "_compute_per_file_hashes and _compute_requirements_hash implement granular per-file hashing",
+      "evidence": "coverage_reporter.py check_spec_to_test_coverage() uses string-matching for requirement IDs",
       "source_files": []
     },
-    "req-5a4eaa63": {
+    "req-aa441ce5": {
       "implemented": true,
-      "evidence": "_extract_source_files_from_evidence extracts source file paths from evidence strings using pattern matching",
+      "evidence": "coverage_reporter.py scans for link markers in test files",
       "source_files": []
     },
-    "req-ae47a585": {
+    "req-29180eff": {
       "implemented": true,
-      "evidence": "coverage command reports coverage across code, spec-to-test, and spec-to-code dimensions",
+      "evidence": "coverage_reporter.py reports count and percentage for spec-to-test coverage",
       "source_files": []
     },
-    "req-2a56e2f6": {
+    "req-342ca58b": {
       "implemented": true,
-      "evidence": "run_pytest_coverage runs 'pytest --cov' and parses output for code coverage",
+      "evidence": "coverage_reporter.py check_spec_to_code_coverage() uses requirements cache",
       "source_files": []
     },
-    "req-7deb47e5": {
+    "req-38aa0d40": {
       "implemented": true,
-      "evidence": "check_spec_to_test_coverage checks whether tests reference or map to each requirement",
+      "evidence": "coverage_reporter.py reports gaps in spec-to-code coverage",
       "source_files": []
     },
-    "req-556d2577": {
+    "req-a9b444e0": {
       "implemented": true,
-      "evidence": "check_spec_to_code_coverage uses requirements cache to check implementation correspondence",
+      "evidence": "coverage_reporter.py print_coverage_report() uses Rich for formatted table",
       "source_files": []
     },
-    "req-a3dcf4f6": {
+    "req-d3c4a32f": {
       "implemented": true,
-      "evidence": "print_coverage_report prints formatted table using rich",
+      "evidence": "coverage_reporter.py uses LLM calls to refresh requirements cache",
       "source_files": []
     },
-    "req-957356ca": {
+    "req-c7f0491f": {
       "implemented": true,
-      "evidence": "coverage command uses LLM calls to refresh requirements cache for accurate analysis",
+      "evidence": "cli.py status() prints comprehensive project state including specs, tests, decisions, coverage",
       "source_files": []
     },
-    "req-eb36b97f": {
+    "req-f57e6f6e": {
       "implemented": true,
-      "evidence": "status command prints human-readable summary including tracked spec files, tests, pending decisions, and coverage",
+      "evidence": "claude_session.py supports reading native session files with JSONL parsing",
       "source_files": []
     },
-    "req-f27b3efc": {
+    "req-37b09243": {
       "implemented": true,
-      "evidence": "init command copies skill file to '.claude/skills/plumb/SKILL.md' as project-local installation",
+      "evidence": "claude_session.py locates session files in ~/.claude/projects/<project>/<session-uuid>.jsonl",
       "source_files": []
     },
-    "req-66e21c5f": {
+    "req-d77b9cd4": {
       "implemented": true,
-      "evidence": "parse_session_file and find_session_dir functions support reading Claude Code native session files from ~/.claude/projects/",
+      "evidence": "cli.py _update_claude_md() appends Plumb status block with comment markers",
       "source_files": []
     },
-    "req-4d011743": {
+    "req-41d4e45d": {
       "implemented": true,
-      "evidence": "find_session_dir and list_session_files locate conversation logs in ~/.claude/projects/<project>/<session-uuid>.jsonl format",
+      "evidence": "conversation.py locate_conversation_log() attempts auto-detection",
       "source_files": []
     },
-    "req-448f7658": {
+    "req-6bdbb096": {
       "implemented": true,
-      "evidence": "init command creates .claude/ directory and SKILL.md to be committed to version control",
+      "evidence": "git_hook.py skips conversation analysis and continues with diff-only",
       "source_files": []
     },
-    "req-3b4cf2e5": {
+    "req-94dff2bc": {
       "implemented": true,
-      "evidence": "_update_claude_md function appends specific Plumb status block to CLAUDE.md with comment markers",
+      "evidence": "claude_session.py expects JSONL with role, content, timestamp minimum",
       "source_files": []
     },
-    "req-7b70d6e6": {
+    "req-df781741": {
       "implemented": true,
-      "evidence": "read_claude_sessions function works across repositories without additional setup via auto-detection",
+      "evidence": "claude_session.py pre-filters by modification time, then by timestamp",
       "source_files": []
     },
-    "req-5fc3546a": {
+    "req-12bbabfd": {
       "implemented": true,
-      "evidence": "locate_conversation_log function attempts auto-detection of Claude Code log locations",
+      "evidence": "conversation.py reads turns after last_commit timestamp",
       "source_files": []
     },
-    "req-4c9617da": {
+    "req-061cd59a": {
       "implemented": true,
-      "evidence": "read_conversation function skips conversation analysis when log not found and notes 'conversation_available': false",
+      "evidence": "claude_session.py handles native JSONL format with type/message schema",
       "source_files": []
     },
-    "req-77ff525f": {
+    "req-6f16a9a1": {
       "implemented": true,
-      "evidence": "ConversationTurn class has role, content, and timestamp fields for JSONL conversation format",
+      "evidence": "conversation.py chunk_conversation() performs chunking before DSPy programs",
       "source_files": []
     },
-    "req-252fe68f": {
+    "req-68f4361d": {
       "implemented": true,
-      "evidence": "list_session_files pre-filters session files by modification time",
+      "evidence": "conversation.py chunks created deterministically",
       "source_files": []
     },
-    "req-586e42c0": {
+    "req-fcf965d0": {
       "implemented": true,
-      "evidence": "read_conversation_log reads only turns after last_commit timestamp in config.json",
+      "evidence": "conversation.py primary unit is user turn with following assistant turns",
       "source_files": []
     },
-    "req-8cc665cb": {
+    "req-5fc5b454": {
       "implemented": true,
-      "evidence": "_parse_session_entry handles native session JSONL format with type/message schema",
+      "evidence": "conversation.py splits chunks exceeding 6,000 tokens at tool call boundaries",
       "source_files": []
     },
-    "req-90a7fb94": {
+    "req-ebc37f9a": {
       "implemented": true,
-      "evidence": "chunk_conversation performs deterministic chunking using user turns as primary unit",
+      "evidence": "conversation.py splits at midpoint when no tool call boundary exists",
       "source_files": []
     },
-    "req-99606fbc": {
+    "req-00caf97d": {
       "implemented": true,
-      "evidence": "_split_at_tool_boundary splits chunks exceeding 6,000 tokens at tool call boundaries",
+      "evidence": "conversation.py prepends final assistant turn as header to next chunk",
       "source_files": []
     },
-    "req-87117fc5": {
+    "req-8e144fc9": {
       "implemented": true,
-      "evidence": "chunk_conversation provides one turn overlap by prepending final assistant turn",
+      "evidence": "conversation.py one turn overlap preserves continuity",
       "source_files": []
     },
-    "req-d960d5dc": {
+    "req-90d31c64": {
       "implemented": true,
-      "evidence": "reduce_noise replaces tool result turns >500 tokens that look like file reads with placeholder",
+      "evidence": "conversation.py reduce_noise() replaces long file reads with placeholders",
       "source_files": []
     },
-    "req-98b9fa7f": {
+    "req-1887de32": {
       "implemented": true,
-      "evidence": "_parse_session_entry properly parses and reassembles assistant messages spanning multiple JSONL entries",
+      "evidence": "claude_session.py properly parses and reassembles multi-line assistant messages",
       "source_files": []
     },
-    "req-fae3c340": {
+    "req-4b3e0fd2": {
       "implemented": true,
-      "evidence": "_extract_decisions_from_conversation calls DecisionExtractor once per chunk with identical diff_summary",
+      "evidence": "git_hook.py calls DecisionExtractor once per chunk with diff_summary",
       "source_files": []
     },
-    "req-8f666f88": {
+    "req-526ef3ed": {
       "implemented": true,
-      "evidence": "deduplicate_decisions merges results after all chunks with near-duplicates collapsed, preserving earliest chunk_index",
+      "evidence": "decision_log.py deduplicate_decisions() merges results and collapses duplicates",
       "source_files": []
     },
-    "req-7483376c": {
+    "req-1fe4c337": {
       "implemented": true,
-      "evidence": "_detect_amend compares HEAD's parent SHA to last_commit and deletes matching decisions on amends",
+      "evidence": "git_hook.py pre-commit hook fires on amends",
       "source_files": []
     },
-    "req-fcb4b550": {
+    "req-509ab736": {
       "implemented": true,
-      "evidence": "_check_broken_refs checks all stored SHAs against git history and flags unreachable ones",
+      "evidence": "git_hook.py _detect_amend() compares SHA and deletes duplicate decisions",
       "source_files": []
     },
-    "req-3fd0e15d": {
+    "req-880151e4": {
       "implemented": true,
-      "evidence": "System does not attempt to re-map decisions to new SHAs after rebase - only flags as broken",
+      "evidence": "git_hook.py _check_broken_refs() checks stored SHAs against git history",
       "source_files": []
     },
-    "req-80281c6a": {
+    "req-b396df65": {
       "implemented": true,
-      "evidence": "append_decision and decision log functions maintain append-only log with no in-place modifications",
+      "evidence": "git_hook.py flags unreachable SHAs as 'ref_status': 'broken'",
       "source_files": []
     },
-    "req-59102c0e": {
+    "req-b834e6a1": {
       "implemented": true,
-      "evidence": "update_decision_status writes new lines with same id, with latest-line-wins logic in read_decisions",
+      "evidence": "git_hook.py does not attempt to re-map decisions to new SHAs",
       "source_files": []
     },
-    "req-52695f8d": {
+    "req-52b8a99b": {
       "implemented": true,
-      "evidence": "DiffAnalyzer takes raw unified diff string and outputs change summaries with files_changed, summary, change_type",
+      "evidence": "Users must review broken-reference decisions manually through CLI",
       "source_files": []
     },
-    "req-79a277cf": {
+    "req-9efad91f": {
       "implemented": true,
-      "evidence": "DiffAnalyzer groups related changes into logical units without inventing meaning",
+      "evidence": "decision_log.py implements append-only log with no in-place modifications",
       "source_files": []
     },
-    "req-e1820941": {
+    "req-2aaba138": {
       "implemented": true,
-      "evidence": "DecisionExtractor takes conversation chunk and diff_summary as input and outputs decision objects",
+      "evidence": "decision_log.py update_decision_status() writes new lines for status updates",
       "source_files": []
     },
-    "req-809b4d94": {
+    "req-b2576545": {
       "implemented": true,
-      "evidence": "DecisionExtractor extracts explicit and implicit decisions but excludes trivial decisions",
+      "evidence": "decision_log.py read_decisions() implements latest-line-wins for same ID",
       "source_files": []
     },
-    "req-2227a858": {
+    "req-df77970c": {
       "implemented": true,
-      "evidence": "QuestionSynthesizer takes decision object with no question and outputs plain-English question",
+      "evidence": "decision_log.py commit_sha populated by hook when no pending decisions remain",
       "source_files": []
     },
-    "req-4f14a05b": {
+    "req-150ddd31": {
       "implemented": true,
-      "evidence": "RequirementParser takes markdown string and outputs requirement objects with text and ambiguous fields",
+      "evidence": "programs/diff_analyzer.py DiffAnalyzer takes diff string, outputs change summaries",
       "source_files": []
     },
-    "req-f6ba3966": {
+    "req-ce9232f3": {
       "implemented": true,
-      "evidence": "RequirementParser produces atomic statements in active voice with no duplicates and flags vague statements",
+      "evidence": "programs/diff_analyzer.py groups related changes, does not invent meaning",
       "source_files": []
     },
-    "req-f6534923": {
+    "req-0cf06417": {
       "implemented": true,
-      "evidence": "SpecUpdater takes spec_section and decision object, outputs updated markdown for that section",
+      "evidence": "programs/decision_extractor.py DecisionExtractor takes chunk and diff_summary inputs",
       "source_files": []
     },
-    "req-57b58c68": {
+    "req-156b8f13": {
       "implemented": true,
-      "evidence": "SpecUpdater captures decision result as natural requirement with no reference to decision itself",
+      "evidence": "programs/decision_extractor.py extracts explicit/implicit decisions, excludes trivial ones",
       "source_files": []
     },
-    "req-9c050f40": {
+    "req-3930b6be": {
       "implemented": true,
-      "evidence": "TestGenerator takes uncovered requirements, existing tests, and code context, outputs runnable pytest code",
+      "evidence": "programs/question_synthesizer.py QuestionSynthesizer takes decision without question",
       "source_files": []
     },
-    "req-b6ac7101": {
+    "req-bb93c5fa": {
       "implemented": true,
-      "evidence": "TestGenerator creates one function per requirement with descriptive names and real assertions",
+      "evidence": "programs/requirement_parser.py RequirementParser takes markdown, outputs requirements",
       "source_files": []
     },
-    "req-af14b7d6": {
+    "req-26d777ca": {
       "implemented": true,
-      "evidence": "TestGenerator does not use pytest.skip() or TODO comments and does not overwrite existing tests",
+      "evidence": "programs/requirement_parser.py uses atomic statements, flags ambiguous as true",
       "source_files": []
     },
-    "req-882f7929": {
+    "req-556cb007": {
       "implemented": true,
-      "evidence": "CodeModifier implemented as direct Claude API call, not DSPy program, for open-ended code modification",
+      "evidence": "programs/spec_updater.py SpecUpdater takes spec_section and decision inputs",
       "source_files": []
     },
-    "req-1a2db6a3": {
+    "req-b170221d": {
       "implemented": true,
-      "evidence": "CLI commands check for config.json existence and fail gracefully with clear error messages",
+      "evidence": "programs/spec_updater.py captures decision as natural requirement, preserves formatting",
       "source_files": []
     },
-    "req-47956c40": {
+    "req-def8ae99": {
       "implemented": true,
-      "evidence": "run_with_retries function implements LLM failure retry with maximum 2 retries then raises PlumbInferenceError",
+      "evidence": "programs/spec_updater.py TestGenerator takes requirements, tests, context inputs",
       "source_files": []
     },
-    "req-b2270a92": {
+    "req-50ab8293": {
       "implemented": true,
-      "evidence": "run_hook has top-level try/except to never exit non-zero due to internal errors, prints warnings to stderr",
+      "evidence": "programs/spec_updater.py TestGenerator uses descriptive names, real assertions, no skips",
       "source_files": []
     },
-    "req-e7955aa2": {
+    "req-760e44b2": {
       "implemented": true,
-      "evidence": "_atomic_write function uses temp file \u2192 rename for spec updates and test generation",
+      "evidence": "programs/code_modifier.py CodeModifier uses Claude API directly, takes required inputs",
       "source_files": []
     },
-    "req-38223335": {
+    "req-94cb093b": {
       "implemented": true,
-      "evidence": "read_conversation continues with diff-only analysis when conversation log unavailable without error",
+      "evidence": "cli.py commands fail gracefully with clear errors if config missing",
       "source_files": []
     },
-    "req-916d50e8": {
+    "req-6a36a406": {
       "implemented": true,
-      "evidence": "modify command does not stage modification if tests fail and updates decision status to 'rejected_manual'",
+      "evidence": "programs/__init__.py run_with_retries() implements retry logic with PlumbInferenceError",
       "source_files": []
     },
-    "req-2cf61eb8": {
+    "req-a82e5e59": {
       "implemented": true,
-      "evidence": "status command operates in cache-only mode to avoid making LLM calls",
+      "evidence": "git_hook.py run_hook() never exits non-zero due to internal errors",
       "source_files": []
     },
-    "req-83800353": {
+    "req-f29b8aee": {
       "implemented": true,
-      "evidence": "coverage command displays progress using Rich Status spinner, then prints final results table",
+      "evidence": "git_hook.py prints warning to stderr and exits 0 on hook failures",
       "source_files": []
     },
-    "req-370da2c8": {
+    "req-8c29e2a6": {
       "implemented": true,
-      "evidence": "list_session_files pre-filters session files by modification times for optimization",
+      "evidence": "sync.py _atomic_write() uses temp file \u2192 rename for safe writes",
       "source_files": []
     },
-    "req-2f1b7403": {
+    "req-b68098a2": {
       "implemented": true,
-      "evidence": "deduplicate_decisions function implements multi-pass deduplication, and _llm_dedup function provides LLM-based semantic deduplication as second pass",
+      "evidence": "conversation.py and git_hook.py continue with diff-only when log unavailable",
       "source_files": []
     },
-    "req-693d6511": {
+    "req-a4ea6bb8": {
       "implemented": true,
-      "evidence": "read_decisions, append_decision, append_decisions, filter_decisions, and deduplicate_decisions functions implement JSONL file operations with latest-line-wins logic",
+      "evidence": "cli.py modify() does not stage and updates to rejected_manual on test failure",
       "source_files": []
     },
-    "req-03d3a150": {
+    "req-da73bbcc": {
       "implemented": true,
-      "evidence": "deduplicate_decisions function implements exact deduplication and _llm_dedup function implements LLM-based semantic deduplication",
+      "evidence": "cli.py status() operates in cache-only mode without LLM calls",
       "source_files": []
     },
-    "req-8d7bd730": {
+    "req-e3da267e": {
       "implemented": true,
-      "evidence": "deduplicate_decisions function preserves earliest chunk_index for duplicates, implementing ordering rules for decision conflicts",
+      "evidence": "cli.py coverage() displays progress with in-place spinner, then results table",
       "source_files": []
     },
-    "req-cb4cb8c8": {
+    "req-d8f2007e": {
       "implemented": true,
-      "evidence": "Function '_llm_dedup' in decision_log.py suggests LLM-based deduplication capability, though specific Claude Haiku 4.5 model configuration not visible",
+      "evidence": "claude_session.py list_session_files() pre-filters by modification time",
       "source_files": []
     },
-    "req-29d5471d": {
+    "req-7b8e6597": {
       "implemented": false,
-      "evidence": "No setup.py, pyproject.toml, or package configuration found in source summaries to indicate PyPI packaging setup",
+      "evidence": "No setup.py, pyproject.toml, or package configuration found in source summaries",
       "source_files": []
     },
-    "req-b018f6cb": {
+    "req-9d18692f": {
       "implemented": false,
-      "evidence": "No classification task logic or reasoning trace configuration found in source summaries",
+      "evidence": "No classification task implementation found in source summaries",
       "source_files": []
     },
-    "req-5f6f750f": {
+    "req-e9d1c3ec": {
       "implemented": false,
-      "evidence": "No tests/ directory structure or test files mentioned in source summaries",
+      "evidence": "No tests/ directory structure visible in source summaries",
       "source_files": []
     },
-    "req-e97f7952": {
+    "req-dad6f9f5": {
       "implemented": false,
-      "evidence": "No test validation or requirement linking logic found in source summaries",
+      "evidence": "No test validation logic for requirement links found in source summaries",
       "source_files": []
     },
-    "req-072df243": {
+    "req-227e52ba": {
       "implemented": false,
-      "evidence": "No .gitignore or cache/coverage file exclusion configuration found in source summaries",
+      "evidence": "No .gitignore or commit exclusion logic found in source summaries",
       "source_files": []
     },
-    "req-ddb84954": {
+    "req-c301a547": {
       "implemented": false,
-      "evidence": "No pattern parsing functions or modular parsing logic found in source summaries",
+      "evidence": "No sync output staging or commit logic found in source summaries",
       "source_files": []
     },
-    "req-031434fc": {
+    "req-4acb9940": {
       "implemented": false,
-      "evidence": "No dirty requirement tracking or change detection system found in source summaries",
+      "evidence": "No migration and merge test coverage found in source summaries",
       "source_files": []
     },
-    "req-0004cd3b": {
+    "req-746ebee3": {
       "implemented": false,
-      "evidence": "No authentication functionality or related tests found in source summaries",
+      "evidence": "No .plumb/ folder management logic found in source summaries",
       "source_files": []
     },
-    "req-c497b6b6": {
+    "req-eea300b9": {
       "implemented": false,
-      "evidence": "No API validation mocking or test updates found in source summaries",
+      "evidence": "No requirement modification tracking found in source summaries",
       "source_files": []
     },
-    "req-6275f4ef": {
+    "req-1b8d9118": {
       "implemented": false,
-      "evidence": "No comprehensive documentation or detailed instructions found in source summaries",
+      "evidence": "No Claude Code skill or AskUserQuestion format found in source summaries",
       "source_files": []
     },
-    "req-6d0b8893": {
+    "req-bdd82be0": {
       "implemented": false,
-      "evidence": "No DSPy context manager, Haiku LM, or Sonnet configuration found in source summaries",
+      "evidence": "No per-decision command calling logic found in source summaries",
       "source_files": []
     },
-    "req-004d1efd": {
+    "req-62a379d7": {
       "implemented": false,
-      "evidence": "No test generation or context limit configuration found in source summaries",
+      "evidence": "No user decision safeguards found in source summaries",
       "source_files": []
     },
-    "req-6e38af1a": {
+    "req-a26ab279": {
+      "implemented": false,
+      "evidence": "No git commit re-run logic found in source summaries",
+      "source_files": []
+    },
+    "req-c22982ef": {
+      "implemented": false,
+      "evidence": "No commit message drafting logic found in source summaries",
+      "source_files": []
+    },
+    "req-96630c2a": {
+      "implemented": false,
+      "evidence": "No authentication functionality found in source summaries",
+      "source_files": []
+    },
+    "req-b49be1ff": {
+      "implemented": false,
+      "evidence": "No API validation mocking logic found in source summaries",
+      "source_files": []
+    },
+    "req-b267f5d2": {
+      "implemented": false,
+      "evidence": "No Plumb skill documentation found in source summaries",
+      "source_files": []
+    },
+    "req-ca3831fd": {
+      "implemented": false,
+      "evidence": "No context window or duplicate detection logic found in source summaries",
+      "source_files": []
+    },
+    "req-bbfe3eea": {
+      "implemented": false,
+      "evidence": "No test generation logic found in source summaries",
+      "source_files": []
+    },
+    "req-5ddf02e6": {
+      "implemented": false,
+      "evidence": "No test generation context limits found in source summaries",
+      "source_files": []
+    },
+    "req-e28fe1db": {
+      "implemented": false,
+      "evidence": "No functional test code generator found in source summaries",
+      "source_files": []
+    },
+    "req-7d0ca084": {
+      "implemented": false,
+      "evidence": "No test existence checking logic found in source summaries",
+      "source_files": []
+    },
+    "req-f0903a96": {
+      "implemented": false,
+      "evidence": "No review command or decision branch logic found in source summaries",
+      "source_files": []
+    },
+    "req-6f9ee9d8": {
+      "implemented": false,
+      "evidence": "No conditional second call logic found in source summaries",
+      "source_files": []
+    },
+    "req-787fa6f3": {
+      "implemented": false,
+      "evidence": "No documentation sync workflow found in source summaries",
+      "source_files": []
+    },
+    "req-42d6ea3a": {
       "implemented": true,
-      "evidence": "_update_claude_md function in cli.py handles updating CLAUDE.md file consistency",
+      "evidence": "coverage_reporter.py implements coverage measurement and reporting functionality",
       "source_files": []
     },
-    "req-e6524c0d": {
+    "req-8c5b25b4": {
       "implemented": false,
-      "evidence": "No decision classification or spec_relevant field defaulting logic found in source summaries",
+      "evidence": "No skill file at plumb/skill/SKILL.md found in source summaries",
       "source_files": []
     },
-    "req-ec3fb0cb": {
-      "implemented": true,
-      "evidence": "coverage command in cli.py measures and reports coverage with _coverage_bar function for reporting",
-      "source_files": []
-    },
-    "req-26c013e9": {
+    "req-1f73348d": {
       "implemented": false,
-      "evidence": "No plumb/skill/SKILL.md file or skill file shipping configuration found in source summaries",
+      "evidence": "No plumb init or skill file copying logic found in source summaries",
       "source_files": []
     },
-    "req-e2f946ed": {
+    "req-7c5534bf": {
       "implemented": false,
-      "evidence": "No skill file or structured AI workflow guidance found in source summaries",
+      "evidence": "No global installation prevention logic found in source summaries",
       "source_files": []
     },
-    "req-c99d6b78": {
+    "req-8a055bdf": {
       "implemented": false,
-      "evidence": "No Claude Code skill file or machine-readable protocol found in source summaries",
+      "evidence": "No Claude Code .claude/ directory reading logic found in source summaries",
       "source_files": []
     },
-    "req-6e9214b8": {
+    "req-d914459f": {
       "implemented": false,
-      "evidence": "No Claude Code skill restrictions or .plumb/decisions.jsonl editing prevention found in source summaries",
+      "evidence": "No skill file guidance structure found in source summaries",
       "source_files": []
     },
-    "req-705d819d": {
+    "req-6c5cff9b": {
       "implemented": false,
-      "evidence": "No Claude Code skill restrictions or .plumb/config.json editing prevention found in source summaries",
+      "evidence": "No Plumb workflow teaching logic found in source summaries",
       "source_files": []
     },
-    "req-9805c619": {
+    "req-fda06c41": {
       "implemented": false,
-      "evidence": "No Claude Code skill installation restrictions found in source summaries",
+      "evidence": "No machine-readable protocol for hook output parsing found in source summaries",
       "source_files": []
     },
-    "req-06f23e6b": {
-      "implemented": true,
-      "evidence": "parse_spec command in cli.py parses spec files, indicating spec markdown files are treated as source of truth",
-      "source_files": []
-    },
-    "req-5f74d41f": {
+    "req-4183f881": {
       "implemented": false,
-      "evidence": "No commit prevention logic for 'rejected_manual' status decisions found in source summaries",
+      "evidence": "No .claude/ directory management found in source summaries",
       "source_files": []
     },
-    "req-5f517f34": {
+    "req-1d15aa1b": {
       "implemented": false,
-      "evidence": "No pytest configuration or coverage minimum requirements found in source summaries",
+      "evidence": "No pytest configuration or 80% coverage setup found in source summaries",
       "source_files": []
     },
-    "req-87d8aaba": {
+    "req-e3f10182": {
       "implemented": false,
-      "evidence": "No CLI command testing found in source summaries",
+      "evidence": "No cli.py tests found in source summaries",
       "source_files": []
     },
-    "req-bf456981": {
+    "req-240b6b68": {
       "implemented": false,
-      "evidence": "No per-decision command testing for decisions.jsonl updates found in source summaries",
+      "evidence": "No decision_log.py tests found in source summaries",
       "source_files": []
     },
-    "req-0b7b3d4f": {
+    "req-4c4adca1": {
       "implemented": false,
-      "evidence": "Coverage command exists but no testing of progress bar functionality found in source summaries",
+      "evidence": "No git_hook.py tests found in source summaries",
       "source_files": []
     },
-    "req-8b862057": {
+    "req-831d7d68": {
       "implemented": false,
-      "evidence": "Git hook command exists but no testing of mock diffs and conversation logs found in source summaries",
+      "evidence": "No conversation.py tests found in source summaries",
       "source_files": []
     },
-    "req-e843aa0a": {
+    "req-f890a0ed": {
       "implemented": false,
-      "evidence": "Git hook exists but no testing of amend detection or TTY output formats found in source summaries",
+      "evidence": "No programs/ tests found in source summaries",
       "source_files": []
     },
-    "req-05661d07": {
+    "req-448b67f2": {
       "implemented": false,
-      "evidence": "No conversation chunking functionality or related testing found in source summaries",
+      "evidence": "No coverage_reporter.py tests found in source summaries, only the implementation",
       "source_files": []
     },
-    "req-a2d0d5fb": {
+    "req-63b9bc1c": {
       "implemented": false,
-      "evidence": "No DSPy program testing or schema validity testing found in source summaries",
-      "source_files": []
-    },
-    "req-51f123a5": {
-      "implemented": false,
-      "evidence": "No coverage reporter testing with mock pytest output found in source summaries",
-      "source_files": []
-    },
-    "req-dec99070": {
-      "implemented": false,
-      "evidence": "sync_cmd command exists but no testing of spec/test file updates or partial write prevention found in source summaries",
+      "evidence": "No sync.py tests found in source summaries",
       "source_files": []
     }
   }
