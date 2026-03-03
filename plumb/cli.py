@@ -111,79 +111,102 @@ def init():
         console.print("[red]Error: Not a git repository.[/red]")
         raise SystemExit(1)
 
-    # Create .plumb/
-    ensure_plumb_dir(repo_root)
+    # --- Collect user input (before spinner) ---
 
-    # Prompt for spec paths
-    spec_input = click.prompt(
+    # Spec path
+    spec_suggestions = _find_spec_suggestions(repo_root)
+    spec_input = _prompt_with_suggestions(
         "Path to spec file or directory of spec markdown files",
-        default=".",
+        spec_suggestions,
+        default_no_suggestions=".",
     )
     spec_path = repo_root / spec_input
     if not spec_path.exists():
         console.print(f"[red]Error: Path '{spec_input}' does not exist.[/red]")
         raise SystemExit(1)
-    # Validate .md files exist
+    if spec_path.is_file() and not spec_input.endswith(".md"):
+        console.print(f"[red]Error: '{spec_input}' is not a markdown file. Plumb requires markdown spec files (.md).[/red]")
+        raise SystemExit(1)
     if spec_path.is_dir():
         md_files = list(spec_path.rglob("*.md"))
         if not md_files:
-            console.print(
-                f"[red]Error: No .md files found in '{spec_input}'.[/red]"
-            )
+            console.print(f"[red]Error: No .md files found in '{spec_input}'.[/red]")
             raise SystemExit(1)
 
-    # Prompt for test paths
-    test_input = click.prompt(
-        "Path to test file or test directory", default="tests/"
+    # Test path
+    test_suggestions = _find_test_suggestions(repo_root)
+    test_input = _prompt_with_suggestions(
+        "Path to test file or test directory",
+        test_suggestions,
+        default_no_suggestions="tests/",
     )
     test_path = repo_root / test_input
     if not test_path.exists():
         console.print(f"[yellow]Warning: Path '{test_input}' does not exist. Creating it.[/yellow]")
         test_path.mkdir(parents=True, exist_ok=True)
 
-    # Save config
-    cfg = PlumbConfig(
-        spec_paths=[spec_input],
-        test_paths=[test_input],
-        initialized_at=datetime.now(timezone.utc).isoformat(),
-    )
-    save_config(repo_root, cfg)
+    # Pytest detection
+    import importlib.util
+    if importlib.util.find_spec("pytest") is None:
+        console.print(
+            "\n[yellow]Note: pytest was not detected. Currently, plumb only supports pytest.\n"
+            "Install it with: pip install pytest[/yellow]\n"
+        )
 
-    # Install git hooks
-    hooks_dir = repo_root / ".git" / "hooks"
-    hooks_dir.mkdir(exist_ok=True)
-    hook_path = hooks_dir / "pre-commit"
-    hook_path.write_text("#!/bin/sh\nplumb hook\nexit $?\n")
-    hook_path.chmod(0o755)
-    post_commit_path = hooks_dir / "post-commit"
-    post_commit_path.write_text("#!/bin/sh\nplumb post-commit\n")
-    post_commit_path.chmod(0o755)
+    # --- Progress spinner for setup steps ---
+    with console.status("[bold cyan]Initializing plumb...", spinner="dots") as status:
+        # Create .plumb/
+        status.update("[bold cyan]Creating .plumb/ directory...")
+        ensure_plumb_dir(repo_root)
 
-    # Create default .plumbignore if it doesn't exist
-    plumbignore_path = repo_root / ".plumbignore"
-    if not plumbignore_path.exists():
-        plumbignore_path.write_text(DEFAULT_PLUMBIGNORE)
+        # Save config
+        status.update("[bold cyan]Saving configuration...")
+        cfg = PlumbConfig(
+            spec_paths=[spec_input],
+            test_paths=[test_input],
+            initialized_at=datetime.now(timezone.utc).isoformat(),
+        )
+        save_config(repo_root, cfg)
 
-    # Install skill file
-    skill_dir = repo_root / ".claude" / "skills" / "plumb"
-    skill_dir.mkdir(parents=True, exist_ok=True)
-    skill_src = Path(__file__).parent / "skill" / "SKILL.md"
-    skill_dst = skill_dir / "SKILL.md"
-    if skill_src.exists():
-        shutil.copy2(str(skill_src), str(skill_dst))
-    else:
-        console.print("[yellow]Warning: SKILL.md source not found in package.[/yellow]")
+        # Install git hooks
+        status.update("[bold cyan]Installing git hooks...")
+        hooks_dir = repo_root / ".git" / "hooks"
+        hooks_dir.mkdir(exist_ok=True)
+        hook_path = hooks_dir / "pre-commit"
+        hook_path.write_text("#!/bin/sh\nplumb hook\nexit $?\n")
+        hook_path.chmod(0o755)
+        post_commit_path = hooks_dir / "post-commit"
+        post_commit_path.write_text("#!/bin/sh\nplumb post-commit\n")
+        post_commit_path.chmod(0o755)
 
-    # CLAUDE.md integration
-    _update_claude_md(repo_root, cfg)
+        # Create default .plumbignore
+        status.update("[bold cyan]Creating .plumbignore...")
+        plumbignore_path = repo_root / ".plumbignore"
+        if not plumbignore_path.exists():
+            plumbignore_path.write_text(DEFAULT_PLUMBIGNORE)
 
-    # Run parse-spec
-    try:
-        from plumb.sync import parse_spec_files
-        parse_spec_files(repo_root)
-        console.print("Parsed spec into requirements.")
-    except Exception as e:
-        console.print(f"[yellow]Warning: Could not parse spec: {e}[/yellow]")
+        # Install skill file
+        status.update("[bold cyan]Installing Claude skill...")
+        skill_dir = repo_root / ".claude" / "skills" / "plumb"
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        skill_src = Path(__file__).parent / "skill" / "SKILL.md"
+        skill_dst = skill_dir / "SKILL.md"
+        if skill_src.exists():
+            shutil.copy2(str(skill_src), str(skill_dst))
+        else:
+            console.print("[yellow]Warning: SKILL.md source not found in package.[/yellow]")
+
+        # CLAUDE.md integration
+        status.update("[bold cyan]Updating CLAUDE.md...")
+        _update_claude_md(repo_root, cfg)
+
+        # Parse spec
+        status.update("[bold cyan]Parsing spec files...")
+        try:
+            from plumb.sync import parse_spec_files
+            parse_spec_files(repo_root)
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not parse spec: {e}[/yellow]")
 
     console.print(f"\n[green]Plumb initialized successfully![/green]")
     console.print(f"  Config: .plumb/config.json")

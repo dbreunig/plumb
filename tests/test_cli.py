@@ -282,6 +282,41 @@ class TestDiff:
             assert result.exit_code == 0
 
 
+class TestInitValidation:
+    def test_non_md_file_rejected(self, runner, tmp_repo):
+        """Single file that's not .md should hard-fail."""
+        (tmp_repo / "spec.txt").write_text("not markdown\n")
+        (tmp_repo / "tests").mkdir(exist_ok=True)
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.cli._find_spec_suggestions", return_value=[]), \
+             patch("plumb.cli._find_test_suggestions", return_value=[]):
+            result = runner.invoke(cli, ["init"], input="spec.txt\ntests/\n")
+            assert result.exit_code != 0
+            assert "not a markdown file" in result.output.lower()
+
+    def test_shows_spec_suggestions(self, runner, tmp_repo):
+        """Init should display found .md files."""
+        (tmp_repo / "my_spec.md").write_text("# Spec\n")
+        (tmp_repo / "tests").mkdir(exist_ok=True)
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]):
+            result = runner.invoke(cli, ["init"], input="1\ntests/\n")
+            assert result.exit_code == 0
+            assert "my_spec.md" in result.output
+
+    def test_shows_test_suggestions(self, runner, tmp_repo):
+        """Init should display found test directories."""
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        tests_dir = tmp_repo / "tests"
+        tests_dir.mkdir()
+        (tests_dir / "test_foo.py").write_text("def test_foo(): pass\n")
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]):
+            result = runner.invoke(cli, ["init"], input="spec.md\n1\n")
+            assert result.exit_code == 0
+            assert "tests/" in result.output
+
+
 class TestFindSpecSuggestions:
     def test_finds_md_files(self, tmp_repo):
         (tmp_repo / "spec.md").write_text("# Spec\n")
