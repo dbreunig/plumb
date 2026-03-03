@@ -1,6 +1,6 @@
 
 # Plumb: Specification
-**Version:** 0.2.0  **Purpose:** This document is the authoritative spec for the Plumb Python library. It is intended to be fed to Claude Code to guide implementation. Implement exactly what is described here — no more, no less.
+**Version:** 0.2.1  **Purpose:** This document is the authoritative spec for the Plumb Python library. It is intended to be fed to Claude Code to guide implementation. Implement exactly what is described here — no more, no less.
 ## Overview
 Plumb is a Python library and CLI tool that keeps three artifacts in sync throughout a software project's lifecycle:
 1. **The Spec** — one or more markdown files describing intended behavior as human-readable requirements
@@ -41,6 +41,7 @@ uv add plumb-dev
 
 The package name on PyPI is `plumb-dev`. The CLI command is `plumb`.
 
+The package includes a comprehensive project description sourced from the README.md file to provide clear information on PyPI about the library's purpose and functionality.
 ## Test-Requirement Linking
 Tests must support two formats for linking to requirements:- Comment-based markers using `# plumb:req-XXXXXXXX` format
 - Function name-based linking using `test_req_XXXXXXXX_` format

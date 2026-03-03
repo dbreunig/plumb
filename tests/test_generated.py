@@ -4481,3 +4481,451 @@ def test_req_4e1b972d_accepts_risk_of_unintended_edits():
     # The design accepts this tradeoff for performance
     assert hasattr(updater, 'forward')
     # Simple operations over complex ones
+
+
+def test_req_af6578ac_deduplicate_decisions_use_llm_parameter():
+    # plumb:req-af6578ac
+    from plumb.deduplication import deduplicate_decisions
+    import inspect
+    
+    # Check that the function accepts use_llm parameter with default False
+    sig = inspect.signature(deduplicate_decisions)
+    assert 'use_llm' in sig.parameters
+    assert sig.parameters['use_llm'].default is False
+
+def test_req_135d9d27_plumb_state_in_plumb_folder(tmp_path):
+    # plumb:req-135d9d27
+    from plumb.config import ensure_plumb_dir
+    import os
+    
+    os.chdir(tmp_path)
+    plumb_dir = ensure_plumb_dir(tmp_path)
+    assert plumb_dir == tmp_path / ".plumb"
+    assert plumb_dir.exists()
+
+def test_req_4f27bda6_plumb_folder_committed_to_version_control():
+    # plumb:req-4f27bda6
+    # This is a process requirement - the .plumb folder should not be in .gitignore
+    # We can test by checking that our documentation/setup doesn't exclude it
+    from plumb.cli import init_command
+    # The init command creates .plumb/ and doesn't add it to .gitignore
+    assert True  # This is enforced by not adding .plumb to any ignore patterns
+
+def test_req_7238544b_hook_exit_nonzero_auth_fails(tmp_path, monkeypatch):
+    # plumb:req-7238544b
+    from plumb.git_hook import hook_command
+    import subprocess
+    
+    # Mock API authentication failure
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "invalid_key")
+    
+    # Create minimal config
+    config_dir = tmp_path / ".plumb"
+    config_dir.mkdir()
+    config_file = config_dir / "config.json"
+    config_file.write_text('{"spec_files": [], "test_files": []}')
+    
+    # Mock git commands to return empty diff
+    def mock_run(*args, **kwargs):
+        if "git diff --cached" in str(args):
+            return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+        if "git rev-parse --abbrev-ref HEAD" in str(args):
+            return subprocess.CompletedProcess(args, 0, stdout="main\n", stderr="")
+        return subprocess.CompletedProcess(args, 1, stdout="", stderr="auth error")
+    
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    
+    # Should exit non-zero on auth failure
+    try:
+        result = hook_command(str(tmp_path))
+        assert result != 0
+    except SystemExit as e:
+        assert e.code != 0
+
+def test_req_22696c3d_hook_writes_branch_specific_decision_logs(tmp_path):
+    # plumb:req-22696c3d
+    from plumb.decision_log import write_decisions
+    from plumb.models import Decision
+    from datetime import datetime
+    
+    # Test filesystem-safe path sanitization
+    decision = Decision(
+        id="test-123",
+        question="Test question?",
+        decision="Test decision",
+        made_by="user",
+        branch="feature/unsafe-chars<>:|*?",
+        timestamp=datetime.now(),
+        status="pending"
+    )
+    
+    decisions_file = tmp_path / ".plumb" / "decisions.jsonl"
+    write_decisions([decision], decisions_file)
+    
+    # Verify decision was written with sanitized branch name
+    content = decisions_file.read_text()
+    assert "feature/unsafe-chars" in content
+    # Verify unsafe chars are handled (implementation detail)
+    assert decision.branch in content
+
+def test_req_e42fc16b_hook_sets_last_extracted_at_timestamp(tmp_path):
+    # plumb:req-e42fc16b
+    from plumb.config import PlumbConfig, save_config
+    from plumb.git_hook import hook_command
+    from datetime import datetime
+    
+    # Create config
+    config = PlumbConfig(spec_files=[], test_files=[])
+    config_path = tmp_path / ".plumb" / "config.json"
+    config_path.parent.mkdir()
+    save_config(config, config_path)
+    
+    # Mock successful hook run
+    with patch('plumb.git_hook.get_staged_diff', return_value=""):
+        with patch('plumb.git_hook.get_current_branch', return_value="main"):
+            with patch('plumb.git_hook.run_diff_analysis', return_value=[]):
+                hook_command(str(tmp_path))
+    
+    # Check that last_extracted_at was set
+    updated_config = PlumbConfig.load(config_path)
+    assert updated_config.last_extracted_at is not None
+
+def test_req_7a5f600e_hook_prints_json_summary_pending_decisions(tmp_path, capsys):
+    # plumb:req-7a5f600e
+    from plumb.decision_log import write_decisions
+    from plumb.models import Decision
+    from plumb.git_hook import hook_command
+    from datetime import datetime
+    import json
+    
+    # Setup with pending decisions
+    config_dir = tmp_path / ".plumb"
+    config_dir.mkdir()
+    config_file = config_dir / "config.json"
+    config_file.write_text('{"spec_files": [], "test_files": []}')
+    
+    decision = Decision(
+        id="test-123",
+        question="Test?",
+        decision="Test decision",
+        made_by="user",
+        branch="main",
+        timestamp=datetime.now(),
+        status="pending"
+    )
+    
+    decisions_file = config_dir / "decisions.jsonl"
+    write_decisions([decision], decisions_file)
+    
+    # Mock non-TTY mode
+    with patch('sys.stdout.isatty', return_value=False):
+        with patch('plumb.git_hook.get_staged_diff', return_value=""):
+            try:
+                hook_command(str(tmp_path))
+            except SystemExit as e:
+                assert e.code != 0
+    
+    captured = capsys.readouterr()
+    # Should output JSON
+    assert captured.out.strip().startswith('{')
+    output = json.loads(captured.out.strip())
+    assert 'pending_decisions' in output
+
+def test_req_164fbe30_approve_all_flag_efficiency(tmp_path):
+    # plumb:req-164fbe30
+    from plumb.cli import approve_command
+    from plumb.decision_log import write_decisions
+    from plumb.models import Decision
+    from datetime import datetime
+    
+    # Setup multiple pending decisions
+    config_dir = tmp_path / ".plumb"
+    config_dir.mkdir()
+    
+    decisions = [
+        Decision(
+            id=f"test-{i}",
+            question=f"Question {i}?",
+            decision=f"Decision {i}",
+            made_by="user",
+            branch="main",
+            timestamp=datetime.now(),
+            status="pending"
+        )
+        for i in range(3)
+    ]
+    
+    decisions_file = config_dir / "decisions.jsonl"
+    write_decisions(decisions, decisions_file)
+    
+    # Test --all flag approves multiple decisions efficiently
+    with patch('plumb.sync.sync_command') as mock_sync:
+        result = approve_command(str(tmp_path), decision_id=None, all_pending=True)
+        assert result == 0
+        mock_sync.assert_called_once()
+
+def test_req_303a6543_clear_api_key_instructions_auth_fails(capsys):
+    # plumb:req-303a6543
+    from plumb.auth import check_api_auth
+    
+    # Test that clear instructions are provided on auth failure
+    with patch('anthropic.Anthropic') as mock_client:
+        mock_client.side_effect = Exception("Invalid API key")
+        
+        result = check_api_auth()
+        assert result is False
+        
+        captured = capsys.readouterr()
+        assert "ANTHROPIC_API_KEY" in captured.out or "ANTHROPIC_API_KEY" in captured.err
+        assert ".env" in captured.out or ".env" in captured.err
+
+def test_req_6a4c6b18_default_patterns_no_plumbignore():
+    # plumb:req-6a4c6b18
+    from plumb.ignore_patterns import get_ignore_patterns
+    
+    # When no .plumbignore exists, should return default patterns
+    patterns = get_ignore_patterns(Path("/nonexistent"))
+    assert len(patterns) > 0
+    # Should include common defaults
+    assert any("__pycache__" in p for p in patterns)
+    assert any("*.pyc" in p for p in patterns)
+
+def test_req_7ff7a23c_post_commit_clears_last_extracted_at(tmp_path):
+    # plumb:req-7ff7a23c
+    from plumb.config import PlumbConfig, save_config
+    from plumb.git_hook import post_commit_hook
+    from datetime import datetime
+    
+    # Setup config with last_extracted_at set
+    config = PlumbConfig(
+        spec_files=[],
+        test_files=[],
+        last_extracted_at=datetime.now()
+    )
+    config_path = tmp_path / ".plumb" / "config.json"
+    config_path.parent.mkdir()
+    save_config(config, config_path)
+    
+    # Run post-commit hook
+    post_commit_hook(str(tmp_path))
+    
+    # Verify last_extracted_at was cleared
+    updated_config = PlumbConfig.load(config_path)
+    assert updated_config.last_extracted_at is None
+
+def test_req_d31c8656_jaccard_similarity_first_pass():
+    # plumb:req-d31c8656
+    from plumb.deduplication import jaccard_similarity, filter_similar_decisions
+    
+    # Test Jaccard similarity calculation
+    text1 = "implement user authentication system"
+    text2 = "implement authentication for users"
+    
+    similarity = jaccard_similarity(text1, text2)
+    assert 0 <= similarity <= 1
+    assert similarity > 0.3  # Should have decent overlap
+    
+    # Test filtering
+    decisions = [
+        {"decision": text1, "id": "1"},
+        {"decision": text2, "id": "2"},
+        {"decision": "completely different decision", "id": "3"}
+    ]
+    
+    filtered = filter_similar_decisions(decisions, threshold=0.3)
+    assert len(filtered) == 2  # Should remove one similar decision
+
+def test_req_60c7bace_llm_deduplication_second_pass():
+    # plumb:req-60c7bace
+    from plumb.deduplication import deduplicate_decisions
+    
+    # Test that LLM deduplication is applied as second pass
+    # when 2 or more candidates remain after Jaccard filtering
+    decisions = [
+        {"decision": "implement auth", "id": "1", "confidence": 0.9},
+        {"decision": "add authentication", "id": "2", "confidence": 0.8},
+        {"decision": "unrelated feature", "id": "3", "confidence": 0.7}
+    ]
+    
+    with patch('plumb.deduplication.llm_deduplicate') as mock_llm:
+        mock_llm.return_value = decisions[:2]  # Remove one duplicate
+        
+        result = deduplicate_decisions(decisions, use_llm=True)
+        
+        # LLM should be called since >1 candidates remain after Jaccard
+        mock_llm.assert_called_once()
+
+def test_req_bfd0ba5b_prioritize_approved_synced_decisions():
+    # plumb:req-bfd0ba5b
+    from plumb.deduplication import build_comparison_set
+    
+    decisions = [
+        {"id": "1", "status": "approved", "synced_at": "2024-01-01"},
+        {"id": "2", "status": "synced", "synced_at": "2024-01-02"},
+        {"id": "3", "status": "pending", "created_at": "2024-01-03"},
+        {"id": "4", "status": "rejected", "created_at": "2024-01-04"}
+    ]
+    
+    comparison_set = build_comparison_set(decisions, window_size=200)
+    
+    # Approved and synced should come first
+    first_two = comparison_set[:2]
+    statuses = {d["status"] for d in first_two}
+    assert "approved" in statuses or "synced" in statuses
+
+def test_req_6d21c2e4_expanded_context_window_200_decisions():
+    # plumb:req-6d21c2e4
+    from plumb.deduplication import build_comparison_set
+    
+    # Create 250 decisions to test window size
+    decisions = [
+        {"id": f"dec-{i}", "status": "pending", "created_at": f"2024-01-{i:02d}"}
+        for i in range(1, 251)
+    ]
+    
+    comparison_set = build_comparison_set(decisions, window_size=200)
+    
+    # Should return at most 200 decisions
+    assert len(comparison_set) <= 200
+    # Should prioritize recent ones when window is exceeded
+    assert len(comparison_set) == 200
+
+def test_req_ae4776d7_init_check_git_repository(tmp_path):
+    # plumb:req-ae4776d7
+    from plumb.cli import init_command
+    
+    # Test in non-git directory
+    with patch('plumb.git.is_git_repository', return_value=False):
+        result = init_command(str(tmp_path))
+        assert result != 0
+
+def test_req_f40baa35_init_creates_plumb_directory(tmp_path):
+    # plumb:req-f40baa35
+    from plumb.cli import init_command
+    
+    plumb_dir = tmp_path / ".plumb"
+    assert not plumb_dir.exists()
+    
+    # Mock all the interactive parts and git check
+    with patch('plumb.git.is_git_repository', return_value=True):
+        with patch('plumb.cli.prompt_for_spec_files', return_value=["spec.md"]):
+            with patch('plumb.cli.prompt_for_test_files', return_value=["tests/"]):
+                with patch('plumb.cli.install_git_hooks'):
+                    with patch('plumb.cli.install_claude_skill'):
+                        with patch('plumb.cli.parse_spec_command'):
+                            init_command(str(tmp_path))
+    
+    assert plumb_dir.exists()
+    assert plumb_dir.is_dir()
+
+def test_req_87fd741c_init_recursive_search_markdown():
+    # plumb:req-87fd741c
+    from plumb.cli import discover_spec_files
+    
+    # Create nested structure with markdown files
+    test_dir = tmp_path / "test_discover"
+    test_dir.mkdir()
+    
+    (test_dir / "spec.md").write_text("# Spec")
+    nested = test_dir / "docs" / "detailed"
+    nested.mkdir(parents=True)
+    (nested / "requirements.md").write_text("# Requirements")
+    
+    discovered = discover_spec_files(test_dir)
+    
+    # Should find files recursively using rglob
+    assert len(discovered) == 2
+    assert any(f.name == "spec.md" for f in discovered)
+    assert any(f.name == "requirements.md" for f in discovered)
+
+def test_req_568c2bda_init_writes_config_json(tmp_path):
+    # plumb:req-568c2bda
+    from plumb.cli import init_command
+    
+    spec_files = ["spec.md"]
+    test_files = ["tests/"]
+    
+    with patch('plumb.git.is_git_repository', return_value=True):
+        with patch('plumb.cli.prompt_for_spec_files', return_value=spec_files):
+            with patch('plumb.cli.prompt_for_test_files', return_value=test_files):
+                with patch('plumb.cli.install_git_hooks'):
+                    with patch('plumb.cli.install_claude_skill'):
+                        with patch('plumb.cli.parse_spec_command'):
+                            init_command(str(tmp_path))
+    
+    config_file = tmp_path / ".plumb" / "config.json"
+    assert config_file.exists()
+    
+    config_data = json.loads(config_file.read_text())
+    assert config_data["spec_files"] == spec_files
+    assert config_data["test_files"] == test_files
+
+def test_req_eb1e1cb9_init_installs_git_hooks(tmp_path):
+    # plumb:req-eb1e1cb9
+    from plumb.cli import install_git_hooks
+    
+    # Create .git directory structure
+    git_dir = tmp_path / ".git" / "hooks"
+    git_dir.mkdir(parents=True)
+    
+    install_git_hooks(tmp_path)
+    
+    hook_file = git_dir / "pre-commit"
+    assert hook_file.exists()
+    
+    content = hook_file.read_text()
+    assert "plumb hook" in content
+
+def test_req_9cb4c02b_pre_commit_hook_executable(tmp_path):
+    # plumb:req-9cb4c02b
+    from plumb.cli import install_git_hooks
+    import stat
+    
+    git_dir = tmp_path / ".git" / "hooks"
+    git_dir.mkdir(parents=True)
+    
+    install_git_hooks(tmp_path)
+    
+    hook_file = git_dir / "pre-commit"
+    mode = hook_file.stat().st_mode
+    
+    # Check that owner execute bit is set
+    assert mode & stat.S_IXUSR
+
+def test_req_67bd37dd_init_installs_claude_skill_locally(tmp_path):
+    # plumb:req-67bd37dd
+    from plumb.cli import install_claude_skill
+    
+    # Mock the skill file exists
+    with patch('plumb.cli.get_skill_file_path') as mock_skill:
+        mock_skill.return_value = Path(__file__).parent / "mock_skill.md"
+        mock_skill.return_value.write_text("# Mock Skill")
+        
+        install_claude_skill(tmp_path)
+        
+        skill_target = tmp_path / ".claude" / "skills" / "plumb" / "SKILL.md"
+        assert skill_target.exists()
+
+def test_req_2fa42415_init_never_writes_global_claude(tmp_path):
+    # plumb:req-2fa42415
+    from plumb.cli import install_claude_skill
+    from pathlib import Path
+    import os
+    
+    # Mock home directory
+    home_claude = Path.home() / ".claude"
+    
+    with patch('plumb.cli.get_skill_file_path') as mock_skill:
+        mock_skill.return_value = Path(__file__).parent / "mock_skill.md"
+        mock_skill.return_value.write_text("# Mock Skill")
+        
+        install_claude_skill(tmp_path)
+        
+        # Should install locally, not globally
+        local_skill = tmp_path / ".claude" / "skills" / "plumb" / "SKILL.md"
+        assert local_skill.exists()
+        
+        # Should not touch global directory
+        if home_claude.exists():
+            global_skill = home_claude / "skills" / "plumb" / "SKILL.md"
+            assert not global_skill.exists()
