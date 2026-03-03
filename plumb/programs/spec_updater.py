@@ -95,3 +95,36 @@ class WholeFileSpecUpdater(dspy.Module):
         section_updates = json.loads(result.section_updates_json)
         new_sections = json.loads(result.new_sections_json)
         return section_updates, new_sections
+
+
+class OutlineMergerSignature(dspy.Signature):
+    """Given the current spec outline (headers only) and new section headers,
+    return the complete merged outline with new headers placed at the most
+    logical positions. Return all headers, one per line, preserving heading
+    levels. Do not remove or rename any existing headers."""
+
+    current_outline: str = dspy.InputField(
+        desc="Current spec headers, one per line"
+    )
+    new_headers: str = dspy.InputField(
+        desc="New section headers to place, one per line"
+    )
+    merged_outline: str = dspy.OutputField(
+        desc="All headers in correct order, one per line"
+    )
+
+
+class OutlineMerger(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.predict = dspy.Predict(OutlineMergerSignature)
+
+    def forward(self, current_outline: str, new_headers: str) -> list[str]:
+        result = self.predict(
+            current_outline=current_outline, new_headers=new_headers
+        )
+        return [
+            line.strip()
+            for line in result.merged_outline.strip().split("\n")
+            if line.strip()
+        ]

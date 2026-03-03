@@ -1,7 +1,7 @@
 import json
 from unittest.mock import patch, MagicMock
 
-from plumb.programs.spec_updater import WholeFileSpecUpdater
+from plumb.programs.spec_updater import WholeFileSpecUpdater, OutlineMerger
 
 
 class TestWholeFileSpecUpdater:
@@ -47,3 +47,21 @@ class TestWholeFileSpecUpdater:
         assert section_updates == []
         assert len(new_sections) == 1
         assert new_sections[0]["header"] == "## Cache"
+
+
+class TestOutlineMerger:
+    def test_parses_outline(self):
+        mock_prediction = MagicMock()
+        mock_prediction.merged_outline = "# Title\n## Auth\n## Cache\n## API"
+
+        with patch("plumb.programs.spec_updater.dspy.Predict") as MockPredict:
+            mock_predict_instance = MagicMock(return_value=mock_prediction)
+            MockPredict.return_value = mock_predict_instance
+
+            merger = OutlineMerger()
+            result = merger(
+                current_outline="# Title\n## Auth\n## API",
+                new_headers="## Cache",
+            )
+
+        assert result == ["# Title", "## Auth", "## Cache", "## API"]
