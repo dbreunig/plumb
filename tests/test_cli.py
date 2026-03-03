@@ -282,6 +282,30 @@ class TestDiff:
             assert result.exit_code == 0
 
 
+class TestInitPytestDetection:
+    def test_warns_when_pytest_missing(self, runner, tmp_repo):
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        (tmp_repo / "tests").mkdir(exist_ok=True)
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.importlib.util") as mock_importlib:
+            mock_importlib.find_spec.return_value = None
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            assert result.exit_code == 0
+            assert "pytest was not detected" in result.output
+            assert "pip install pytest" in result.output
+
+    def test_no_warning_when_pytest_installed(self, runner, tmp_repo):
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        (tmp_repo / "tests").mkdir(exist_ok=True)
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]):
+            # Don't mock find_spec — pytest IS installed in test env
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            assert result.exit_code == 0
+            assert "pytest was not detected" not in result.output
+
+
 class TestInitValidation:
     def test_non_md_file_rejected(self, runner, tmp_repo):
         """Single file that's not .md should hard-fail."""
