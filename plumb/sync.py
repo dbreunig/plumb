@@ -89,6 +89,8 @@ def apply_section_updates(content: str, updates: list[dict]) -> str:
             result_parts.append(header + new_body)
         else:
             if header:
+                if body and not body.startswith("\n"):
+                    body = "\n" + body
                 result_parts.append(header + body)
             else:
                 result_parts.append(body)
@@ -134,6 +136,8 @@ def insert_new_sections(
             result_parts.append(s["header"] + section_content)
         elif norm in existing_by_norm:
             header, body = existing_by_norm[norm]
+            if body and not body.startswith("\n"):
+                body = "\n" + body
             result_parts.append(header + body)
 
     return "\n".join(result_parts)

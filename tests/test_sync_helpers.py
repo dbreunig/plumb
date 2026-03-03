@@ -47,6 +47,24 @@ class TestApplySectionUpdates:
         assert "Old B." not in result
 
 
+    def test_unchanged_sections_preserve_newline_after_header(self):
+        """Sections not being updated must still have a newline between header and body."""
+        content = "# Title\n\nIntro.\n\n## Auth\n\nLogin.\n\n## API\n\nEndpoints.\n"
+        updates = [{"header": "## Auth", "content": "New auth.\n"}]
+        result = apply_section_updates(content, updates)
+        # The unchanged ## API section must NOT be glued: "## APIEndpoints."
+        assert "## API\n" in result
+        assert "## APIEndpoints" not in result
+
+    def test_unchanged_section_no_blank_line_in_source(self):
+        """Even if source has no blank line after header, output must have one."""
+        content = "# Title\n\nIntro.\n\n## Auth\nLogin.\n\n## API\nEndpoints.\n"
+        updates = [{"header": "## Auth", "content": "New auth.\n"}]
+        result = apply_section_updates(content, updates)
+        assert "## API\n" in result
+        assert "## APIEndpoints" not in result
+
+
 class TestInsertNewSections:
     def test_inserts_after_anchor(self):
         content = "# Title\n\nIntro.\n\n## Auth\n\nLogin.\n\n## API\n\nEndpoints.\n"
@@ -66,6 +84,17 @@ class TestInsertNewSections:
         result = insert_new_sections(content, new_sections, merged_outline)
         assert "## API" in result
         assert result.index("## Auth") < result.index("## API")
+
+    def test_existing_sections_preserve_newline_after_header(self):
+        """Existing sections in insert_new_sections must have newline between header and body."""
+        content = "# Title\n\nIntro.\n\n## Auth\nLogin.\n\n## API\nEndpoints.\n"
+        new_sections = [{"header": "## Cache", "content": "Redis cache.\n"}]
+        merged_outline = ["# Title", "## Auth", "## Cache", "## API"]
+        result = insert_new_sections(content, new_sections, merged_outline)
+        assert "## Auth\n" in result
+        assert "## AuthLogin" not in result
+        assert "## API\n" in result
+        assert "## APIEndpoints" not in result
 
     def test_no_new_sections(self):
         content = "# Title\n\nStuff.\n"
