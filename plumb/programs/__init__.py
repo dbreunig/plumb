@@ -30,8 +30,9 @@ def configure_dspy() -> None:
 
 
 def validate_api_access() -> None:
-    """Check that ANTHROPIC_API_KEY is set. Loads .env first, then falls back
-    to exported environment variables. Raises PlumbAuthError if not found."""
+    """Check that ANTHROPIC_API_KEY is set and works. Loads .env first, then
+    falls back to exported environment variables. Performs a smoke test to
+    verify the key is valid. Raises PlumbAuthError if not found or invalid."""
     from dotenv import load_dotenv
 
     load_dotenv(override=False)
@@ -41,6 +42,22 @@ def validate_api_access() -> None:
             "Plumb requires a valid Anthropic API key to analyze commits.\n"
             "Set it in a .env file or export it: export ANTHROPIC_API_KEY=your-key-here"
         )
+
+    # Smoke test: verify the key actually works
+    lm = get_lm()
+    try:
+        response = lm("Reply with only the word: hello")
+        if not response:
+            raise PlumbAuthError("API returned empty response - key may be invalid")
+    except Exception as e:
+        err_str = str(e).lower()
+        if "auth" in err_str or "api key" in err_str or "401" in err_str:
+            raise PlumbAuthError(
+                f"ANTHROPIC_API_KEY is invalid or rejected: {e}"
+            ) from e
+        raise PlumbAuthError(
+            f"Failed to verify API access: {e}"
+        ) from e
 
 
 def get_program_lm(program_name: str, repo_root: str | Path | None = None) -> dspy.LM | None:

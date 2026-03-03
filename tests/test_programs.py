@@ -56,16 +56,37 @@ class TestValidateApiAccess:
             with pytest.raises(PlumbAuthError, match="ANTHROPIC_API_KEY is not set"):
                 validate_api_access()
 
-    def test_passes_when_key_set(self):
+    def test_passes_when_key_set_and_api_works(self):
+        mock_lm = MagicMock(return_value="hello")
         with patch("dotenv.load_dotenv"), \
-             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}):
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}), \
+             patch("plumb.programs.get_lm", return_value=mock_lm):
             validate_api_access()  # should not raise
+            mock_lm.assert_called_once()
+
+    def test_raises_when_api_returns_empty(self):
+        mock_lm = MagicMock(return_value="")
+        with patch("dotenv.load_dotenv"), \
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}), \
+             patch("plumb.programs.get_lm", return_value=mock_lm):
+            with pytest.raises(PlumbAuthError, match="empty response"):
+                validate_api_access()
+
+    def test_raises_when_api_auth_fails(self):
+        mock_lm = MagicMock(side_effect=Exception("AuthenticationError: invalid api key"))
+        with patch("dotenv.load_dotenv"), \
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}), \
+             patch("plumb.programs.get_lm", return_value=mock_lm):
+            with pytest.raises(PlumbAuthError, match="invalid or rejected"):
+                validate_api_access()
 
     def test_loads_dotenv_file(self):
         # plumb:req-98d8bd75
         """Verify load_dotenv is called so .env files are picked up."""
+        mock_lm = MagicMock(return_value="hello")
         with patch("dotenv.load_dotenv") as mock_load, \
-             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}):
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}), \
+             patch("plumb.programs.get_lm", return_value=mock_lm):
             validate_api_access()
             mock_load.assert_called_once_with(override=False)
 

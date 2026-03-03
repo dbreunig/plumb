@@ -346,13 +346,10 @@ def check_spec_to_code_coverage(
     def _combine(chunk):
         return "\n\n".join(text for _, text in chunk)
 
-    try:
-        results = run_chunked_mapper(
-            mapper, req_json, items, budget=60000,
-            combine_fn=_combine, merge_fn=merge_coverage_results,
-        )
-    except Exception:
-        return (0, len(requirements))
+    results = run_chunked_mapper(
+        mapper, req_json, items, budget=60000,
+        combine_fn=_combine, merge_fn=merge_coverage_results,
+    )
 
     # Build fresh results dict from LLM output
     fresh_results: dict[str, dict] = {}
