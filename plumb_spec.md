@@ -58,6 +58,7 @@ LLM-based deduplication must utilize Claude Haiku 4.5 as the designated model.
 
 The `deduplicate_decisions()` function must accept a `use_llm` parameter that defaults to False to ensure backward compatibility while enabling optional LLM-based deduplication.
 
+The deduplication function must include fallback handling for truncated or failed LLM responses by returning all candidates when the LLM returns None or produces truncated output.
 ### Dependencies
 - `dspy` — LLM workflow programs and framework for implementing LLM-based components- `anthropic` — Claude SDK for inference
 - `pytest` — test runner

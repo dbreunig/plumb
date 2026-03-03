@@ -467,6 +467,11 @@ def _llm_dedup(
 
     print(f"[dedup:llm] LLM returned unique_indices: {unique_indices}", flush=True)
 
+    # Handle truncated/failed LLM response - keep all candidates as fallback
+    if unique_indices is None:
+        print("[dedup:llm] WARNING: LLM returned None (possibly truncated), keeping all candidates", flush=True)
+        return candidates
+
     # Convert 1-based indices to 0-based, filter to valid range
     valid = []
     for idx in unique_indices:
