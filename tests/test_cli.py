@@ -8,7 +8,7 @@ import pytest
 from click.testing import CliRunner
 from git import Repo
 
-from plumb.cli import cli, _update_claude_md, _find_spec_suggestions, _find_test_suggestions
+from plumb.cli import cli, _update_claude_md, _find_spec_suggestions, _find_test_suggestions, _prompt_with_suggestions
 from plumb.config import PlumbConfig, save_config, ensure_plumb_dir, load_config
 from plumb.decision_log import Decision, append_decision, read_decisions, read_all_decisions
 
@@ -329,3 +329,36 @@ class TestFindTestSuggestions:
     def test_no_test_dirs(self, tmp_repo):
         suggestions = _find_test_suggestions(tmp_repo)
         assert suggestions == []
+
+
+class TestPromptWithSuggestions:
+    def test_pick_by_number(self):
+        suggestions = ["spec.md", "docs/  (3 .md files)"]
+        with patch("click.prompt", return_value="1"):
+            result = _prompt_with_suggestions("Pick a spec", suggestions, default_no_suggestions=".")
+            assert result == "spec.md"
+
+    def test_pick_second_option(self):
+        suggestions = ["spec.md", "docs/  (3 .md files)"]
+        with patch("click.prompt", return_value="2"):
+            result = _prompt_with_suggestions("Pick a spec", suggestions, default_no_suggestions=".")
+            # For dirs, strip the count suffix
+            assert result == "docs/"
+
+    def test_custom_path(self):
+        suggestions = ["spec.md"]
+        with patch("click.prompt", return_value="my_spec.md"):
+            result = _prompt_with_suggestions("Pick a spec", suggestions, default_no_suggestions=".")
+            assert result == "my_spec.md"
+
+    def test_no_suggestions_uses_default(self):
+        with patch("click.prompt", return_value="."):
+            result = _prompt_with_suggestions("Pick a spec", [], default_no_suggestions=".")
+            assert result == "."
+
+    def test_default_is_first_suggestion(self):
+        suggestions = ["spec.md"]
+        with patch("click.prompt", return_value="1") as mock_prompt:
+            _prompt_with_suggestions("Pick a spec", suggestions, default_no_suggestions=".")
+            mock_prompt.assert_called_once()
+            assert mock_prompt.call_args[1].get("default") == "1"

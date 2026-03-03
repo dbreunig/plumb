@@ -74,6 +74,29 @@ def _find_test_suggestions(repo_root: Path) -> list[str]:
     return suggestions
 
 
+def _prompt_with_suggestions(prompt_text: str, suggestions: list[str], default_no_suggestions: str) -> str:
+    """Show numbered suggestions, then prompt. Returns the resolved path string."""
+    if suggestions:
+        console.print(f"\n[bold]Found candidates:[/bold]")
+        for i, s in enumerate(suggestions, 1):
+            console.print(f"  [cyan][{i}][/cyan] {s}")
+        console.print()
+        answer = click.prompt(prompt_text, default="1")
+    else:
+        answer = click.prompt(prompt_text, default=default_no_suggestions)
+
+    # If answer is a number, resolve it to the suggestion
+    if answer.isdigit():
+        idx = int(answer) - 1
+        if 0 <= idx < len(suggestions):
+            raw = suggestions[idx]
+            # Strip count suffix like "  (3 .md files)" for dirs
+            if "  (" in raw:
+                raw = raw.split("  (")[0]
+            return raw
+    return answer
+
+
 @click.group()
 def cli():
     """Plumb: Keep spec, tests, and code in sync."""
