@@ -9,7 +9,7 @@
   "initialized_at": "2026-03-01T00:32:10.439519+00:00",
   "last_commit": "7c80f6da078e289bcada5ffb5e170af55e93140a",
   "last_commit_branch": "feat/decision-sharding",
-  "last_extracted_at": null,
+  "last_extracted_at": "2026-03-03T00:11:21.569646+00:00",
   "program_models": {
     "decision_deduplicator": {
       "model": "groq/openai/gpt-oss-120b",

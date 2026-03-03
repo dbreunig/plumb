@@ -77,6 +77,11 @@ def find_spec_section(spec_content: str, decision_text: str) -> tuple[str, int, 
     return best_section
 
 
+def extract_outline(content: str) -> list[str]:
+    """Extract markdown headers from content, preserving order."""
+    return [line for line in content.split("\n") if re.match(r"^#{1,6}\s", line)]
+
+
 def parse_spec_files(repo_root: str | Path) -> list[dict]:
     """Read markdown spec files, run RequirementParser, assign stable IDs,
     write requirements.json."""

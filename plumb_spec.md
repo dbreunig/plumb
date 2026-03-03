@@ -21,6 +21,10 @@ Tests are linked to requirements through requirement ID comments (e.g., `# plumb
 The system supports file ignore patterns through a '.plumbignore' file and provides a '--all' command option for the 'plumb approve' command to approve all changes at once. Generated cache and coverage files are excluded from commits, and the system includes a 'check' command as an alias for manual decision scanning.
 
 Plumb can handle conversations that span multiple Claude Code session files by reading and merging them chronologically to support exit-and-relaunch scenarios. The sync command provides progress indicators with status updates to give users feedback during operation. The workflow requires an explicit sync step after approving decisions, with staging of sync output before re-committing changes.
+
+The system uses a branch-sharded structure for decision logs and provides CLI commands for merging decision logs from different branches. Users can migrate existing decision logs from the old monolithic format to the new branch-sharded layout through dedicated CLI commands. The `plumb merge-decisions <branch>` command allows users to merge decisions from feature branches back to main. A find_decision_branch() function helps locate which branch file contains a specific decision ID.
+
+The core LLM integration is designed with a WholeFileSpecUpdater that takes full spec content and decisions as input, and outputs section_updates for existing sections and new_sections for brand new sections. This approach accepts rewriting whole sections instead of making surgical edits for markdown specs. The system includes helper functions for DuckDB result type conversion, using _clean_duckdb_row() and _to_python_native() functions to convert DuckDB result types to Python native types for Pydantic compatibility. Comprehensive test coverage is implemented for migration and merge functionality, including edge cases and error conditions.
 ### Design Principles
 
 - **Simple over clever.** Plumb solves a bounded problem. It should be holdable in a single programmer's head.
@@ -31,6 +35,8 @@ Plumb can handle conversations that span multiple Claude Code session files by r
 - **Conversation analysis is opportunistic.** Plumb uses Claude Code session data when available. When it is not (e.g., committing from a bare terminal), Plumb falls back to diff-only analysis. Decisions still get captured; they are just derived from code changes rather than reasoning.
 - **Multi-stage deduplication.** The system prevents duplicate decisions through a multi-stage pipeline using exact matching, Jaccard similarity, and LLM semantic analysis to catch different types of duplicates.
 - **Decision filtering.** Only prescriptive choices that affect system design, behavior, architecture, or data models are captured as decisions. Process observations, tooling choices, and diagnostic findings are filtered out.
+- **Search-and-replace updates.** Spec updates use a search-and-replace approach with edits containing old_text/new_text pairs rather than full section replacement for more precise modifications.
+- **Resilient header matching.** Section updates use exact header matching first, then fall back to normalized matching (stripped whitespace, case-insensitive) to handle minor variations in header formatting.
 
 ---
 ## Installation
@@ -106,7 +112,7 @@ plumb/
 │   └── SKILL.md                # Claude Code skill file, installed locally on plumb init
 ```
 
-DSPy programs support program-specific model configuration through a model configuration array in config.json. Pattern parsing logic is modularized into separate functions for reusability across programs.
+DSPy programs support program-specific model configuration through a model configuration array in config.json. Pattern parsing logic is modularized into separate functions for reusability across programs, including an extract_outline function that extracts markdown headers from content.
 ### `.plumb/` Directory
 
 Plumb stores all state in a `.plumb/` folder at the root of the user's repository. This folder should be committed to version control.
@@ -140,7 +146,7 @@ This is the primary workflow. The user works inside a Claude Code session. When 
    > **Question:** Should we cache API responses in memory or on disk?
    > **Decision made:** In-memory cache using a dict.
    > Approve, reject, or edit?"
-6. The user responds in the chat. The skill calls the appropriate per-decision command (`plumb approve <id>`, `plumb reject <id>`, or `plumb edit <id> "<text>"`). The system includes explicit safeguards to never approve, reject, or edit decisions on the user's behalf. Users can approve multiple pending decisions efficiently using the `--all` flag with the approve command.
+6. The user responds in the chat. The skill calls the appropriate per-decision command (`plumb approve <id>`, `plumb reject <id>`, or `plumb edit <id> "<text>"`). The system includes explicit safeguards to never approve, reject, or edit decisions on the user's behalf. Users can approve multiple pending decisions efficiently using the `--all` flag with the approve command. Decision operations support branch-specific handling through branch parameter support.
 7. For **rejected** decisions, the skill invokes `plumb modify <id>` (see below), which modifies the staged code, runs tests, and reports the result conversationally.
 8. Once all decisions are resolved, the skill re-runs `git commit`. The hook fires again, finds no pending decisions, exits zero, and the commit lands. The system drafts commit messages after decision review and includes the list of approved decisions.
 
@@ -154,7 +160,11 @@ The conversation parser handles Claude Code's type/message schema format and con
 
 The system implements intelligent deduplication by first running Jaccard similarity filtering, then applying LLM deduplication as a second pass when 2 or more candidates remain, using DSPy's context manager with Haiku LM for deduplication while preserving Sonnet for other operations.
 
-The system generates complete and runnable tests rather than stub files with TODO comments. Test generation uses increased context limits to accommodate complete test code. The test generator produces fully functional test code that can be executed immediately.
+The system generates complete and runnable tests rather than stub files with TODO comments. Test generation uses increased context limits to accommodate complete test code. The test generator produces fully functional test code that can be executed immediately and only runs if tests don't already exist.
+
+The system provides read_all_decisions() as the primary API function for accessing decisions across all branches. The review command pre-computes decision branches to optimize performance and ensure correct shard targeting for updates. Users can migrate from the monolithic decision file to the sharded layout using the plumb migrate command to convert existing decisions.jsonl to decisions/main.jsonl.
+
+The system implements spec updates using a single LLM call per spec file with an output schema containing section_updates and new_sections, making a second call only when new_sections is non-empty. Structural reasoning for section placement is kept separate from content generation to maintain clarity. The system keeps edit operations simple without complex operation sets and accepts the risk of unintended edits in exchange for performance gains while mitigating through clear prompting.
 
 The legacy decisions path function is maintained for migration detection purposes while the primary system operates on branch-specific decision logs.
 ### Path 2: Committing from the terminal (Interactive Review)
@@ -223,10 +233,10 @@ Called automatically by the git pre-commit hook. Not intended to be called direc
    - If found: reads and chunks turns since `last_commit` timestamp. Uses unified conversation reading interface to support multiple sessions. Merges conversation turns from all relevant session files modified after the last commit and sorts chronologically. Handles multi-line assistant responses that span multiple JSONL lines. Converts tool_use blocks to '[tool: Name] description' format in conversation turns. Runs **Decision Extraction** per chunk.
    - If not found: skips conversation analysis. Notes `"conversation_available": false` in each decision object.
 8. Filters out decisions marked as non-spec-relevant during extraction before creating Decision records.
-9. Merges and deduplicates decisions across chunks. Deduplication checks against all existing decisions (both pending and resolved) instead of only resolved ones. Implements within-batch similarity deduplication to compare new decisions against each other using Jaccard similarity check.
+9. Merges and deduplicates decisions across chunks using DuckDB for cross-shard queries to read and deduplicate decisions across all branch JSONL files. Deduplication checks against all existing decisions (both pending and resolved) instead of only resolved ones. Implements within-batch similarity deduplication to compare new decisions against each other using Jaccard similarity check.
 10. For each decision with no associated question, runs **Question Synthesizer** with program-specific model configuration.
 11. Writes all new decisions with `status: "pending"` to `decisions.jsonl`. Implements decisions sharding using a TDD approach with core refactor, DuckDB integration, caller updates, new commands, and comprehensive testing coverage.
-12. Runs `plumb parse-spec` to update requirements cache for any modified spec files.
+12. Runs `plumb parse-spec` to update requirements cache for any modified spec files. Batches spec updates across all decisions instead of running spec update for each individual decision. Uses search-and-replace pairs pattern for spec updates, where LLM returns list of {old_text, new_text} operations instead of rewriting entire sections. Implements a two-tier approach for spec updates: Tier 1 for existing section updates (section-header-keyed replacement) and Tier 2 for structural changes (new sections, reordering). For structural changes, uses outline-first approach where LLM returns updated header outline first, then fills in content for new sections. Creates OutlineMerger signature for conditional second call that takes current outline and new headers, returns merged outline with proper positioning.
 13. **If pending decisions exist:**
     - Checks whether it is running in a TTY (interactive terminal) or as a subprocess (e.g., called by Claude Code).
     - **TTY:** Prints a human-readable summary of pending decisions with instructions to run `plumb review`.
@@ -535,7 +545,7 @@ following:
 
 6. Rejected decisions are marked with 'ignored' status rather than being deleted from the system.
 
-7. Once all decisions are resolved, the user must run `plumb sync` to update the spec with approved decisions before re-running `git commit`. The hook will fire again. If there are no pending decisions it will exit 0 and the commit will land. If new decisions are found (rare), repeat the review process.
+7. Once all decisions are resolved, the user must run `plumb sync` to update the spec with approved decisions before re-running `git commit`. The hook will fire again. If there are no pending decisions it will exit 0 and the commit will land. If new decisions are found (rare), repeat the review process. The sync operation must identify and use the correct decision branch when marking decisions as synced.
 
 8. All CLI operations require explicit user commands. The system shall not perform automatic synchronization or background operations without direct user instruction.
 ### After committing
@@ -563,6 +573,7 @@ Present these gaps clearly so the user can prioritize.
 - Do not attempt to commit if there are decisions with `status: rejected_manual`.
   The user must resolve these manually first.
 - When handling decision conflicts, use opposite ordering rules: for duplicate decisions, keep the earlier one (lower index); for countermanded decisions, keep the later one (higher index).
+- Use section-header-keyed full replacement instead of search-and-replace for markdown spec editing.
 ## Command reference
 
 | Command | When to use |
