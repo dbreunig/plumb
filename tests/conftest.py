@@ -44,6 +44,27 @@ def initialized_repo(tmp_repo):
 
 
 @pytest.fixture
+def initialized_repo_dir_specs(tmp_repo):
+    """A tmp_repo with spec_paths pointing to a directory (not individual files)."""
+    ensure_plumb_dir(tmp_repo)
+    cfg = PlumbConfig(
+        spec_paths=["specs/"],
+        test_paths=["tests/"],
+        initialized_at=datetime.now(timezone.utc).isoformat(),
+    )
+    save_config(tmp_repo, cfg)
+    # Create specs directory with multiple spec files
+    specs_dir = tmp_repo / "specs"
+    specs_dir.mkdir(exist_ok=True)
+    (specs_dir / "spec.md").write_text("# Spec\n\n## Features\n\nThe system must do X.\n")
+    (specs_dir / "api.md").write_text("# API\n\n## Endpoints\n\nGET /items returns all items.\n")
+    # Create tests dir
+    (tmp_repo / "tests").mkdir(exist_ok=True)
+    (tmp_repo / ".plumb" / "decisions").mkdir(exist_ok=True)
+    return tmp_repo
+
+
+@pytest.fixture
 def sample_decisions():
     """Return a list of sample Decision objects."""
     return [

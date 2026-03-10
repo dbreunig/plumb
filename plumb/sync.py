@@ -267,10 +267,19 @@ def sync_decisions(
         )
     decisions_text = "\n".join(decision_lines)
 
+    # Resolve spec paths: directories expand to all .md files within
+    # (matches the resolution logic in parse_spec_files above)
+    resolved_spec_files: list[Path] = []
     for spec_path_str in config.spec_paths:
-        if on_progress:
-            on_progress(f"Updating spec: {spec_path_str}...")
         spec_path = repo_root / spec_path_str
+        if spec_path.is_dir():
+            resolved_spec_files.extend(sorted(spec_path.rglob("*.md")))
+        elif spec_path.is_file():
+            resolved_spec_files.append(spec_path)
+
+    for spec_path in resolved_spec_files:
+        if on_progress:
+            on_progress(f"Updating spec: {spec_path.relative_to(repo_root)}...")
         if not spec_path.is_file():
             continue
 
