@@ -1,6 +1,6 @@
 # Plumb
 
-*Plumb is proof of concept software demonstrating how we can manage the "Spec Driven Development Triange". It is very much alpha software, use cautiously.*
+*Plumb is proof of concept software demonstrating how we can manage the "Spec Driven Development Triange". It is very much alpha software, use cautiously. [Read the write up of the talk](https://www.dbreunig.com/2026/03/04/the-spec-driven-development-triangle.html) where I contextualize and introduce the Spec Driven Development Triangle, or [watch the video](https://www.youtube.com/watch?v=8TXAlOFkmk0).*
 
 ### A tool to keep things true.
 
