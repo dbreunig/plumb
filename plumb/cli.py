@@ -484,13 +484,16 @@ def _run_modify(repo_root: Path, decision_id: str) -> None:
         console.print("  [yellow]No staged changes to modify.[/yellow]")
         return
 
-    # Read spec
+    # Read spec (resolve directories to individual .md files)
     config = load_config(repo_root)
     spec_content = ""
     if config:
         for sp in config.spec_paths:
             spec_file = repo_root / sp
-            if spec_file.is_file():
+            if spec_file.is_dir():
+                for md_file in sorted(spec_file.rglob("*.md")):
+                    spec_content += md_file.read_text()
+            elif spec_file.is_file():
                 spec_content += spec_file.read_text()
 
     decision_branch = find_decision_branch(repo_root, decision_id)
