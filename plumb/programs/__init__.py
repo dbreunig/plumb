@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json as _json
 import os
+import shutil
+import subprocess
 from pathlib import Path
 
 import dspy
@@ -10,53 +13,170 @@ from plumb import PlumbAuthError, PlumbInferenceError
 
 _configured = False
 
+# Default model for direct API access
+_DEFAULT_API_MODEL = "anthropic/claude-sonnet-4-20250514"
+# Default model alias for Claude Code CLI fallback
+_DEFAULT_CLI_MODEL = "sonnet"
+
+
+class ClaudeCodeLM(dspy.LM):
+    """DSPy LM backend that routes through the Claude Code CLI.
+
+    This enables Plumb to work for users on Claude Max/Pro plans who
+    authenticate via OAuth through Claude Code, without needing a separate
+    ``ANTHROPIC_API_KEY``.
+
+    Calls ``claude -p --model <model> --output-format json
+    --no-session-persistence`` as a subprocess for each inference request.
+    """
+
+    def __init__(self, model: str = _DEFAULT_CLI_MODEL, max_tokens: int = 28000, **kwargs):
+        self.cli_model = model
+        self._max_tokens = max_tokens
+        super().__init__(model=f"claude-code/{model}", model_type="chat", **kwargs)
+
+    def forward(self, prompt=None, messages=None, **kwargs):
+        # Build prompt text from either a raw string or a messages list
+        if prompt is not None:
+            prompt_text = prompt if isinstance(prompt, str) else str(prompt)
+        elif messages:
+            parts = []
+            for msg in messages:
+                if isinstance(msg, dict):
+                    content = msg.get("content", "")
+                    if isinstance(content, list):
+                        content = "\n".join(
+                            c.get("text", str(c)) if isinstance(c, dict) else str(c)
+                            for c in content
+                        )
+                    parts.append(content)
+                else:
+                    parts.append(str(msg))
+            prompt_text = "\n\n".join(parts)
+        else:
+            prompt_text = ""
+
+        try:
+            result = subprocess.run(
+                [
+                    "claude", "-p",
+                    "--model", self.cli_model,
+                    "--output-format", "json",
+                    "--no-session-persistence",
+                ],
+                input=prompt_text,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        except subprocess.TimeoutExpired as e:
+            raise PlumbInferenceError(f"Claude Code CLI timed out: {e}") from e
+        except FileNotFoundError:
+            raise PlumbAuthError(
+                "Claude Code CLI ('claude') not found on PATH. "
+                "Install it from https://claude.ai/code or set ANTHROPIC_API_KEY instead."
+            )
+
+        if result.returncode != 0:
+            raise PlumbInferenceError(
+                f"Claude Code CLI exited {result.returncode}: {result.stderr[:500]}"
+            )
+
+        # Parse JSON output — array of event objects; text is in the final
+        # "result" event.
+        try:
+            events = _json.loads(result.stdout)
+            if isinstance(events, list):
+                for event in reversed(events):
+                    if isinstance(event, dict) and event.get("type") == "result":
+                        return [event.get("result", "")]
+            return [result.stdout]
+        except _json.JSONDecodeError:
+            return [result.stdout]
+
+    def __call__(self, prompt=None, messages=None, **kwargs):
+        return self.forward(prompt=prompt, messages=messages, **kwargs)
+
+
+def _claude_code_available() -> bool:
+    """Return True if the ``claude`` CLI is installed and runnable."""
+    return shutil.which("claude") is not None
+
 
 def get_lm() -> dspy.LM:
-    return dspy.LM("anthropic/claude-sonnet-4-20250514", max_tokens=28000)
+    """Return the best available LM backend.
+
+    Resolution order:
+    1. ``ANTHROPIC_API_KEY`` is set → direct Anthropic API via LiteLLM (fast).
+    2. ``claude`` CLI is on PATH → Claude Code CLI fallback (works with
+       Max/Pro plan OAuth, no API key needed).
+    3. Neither available → raise ``PlumbAuthError``.
+    """
+    from dotenv import load_dotenv
+    load_dotenv(override=False)
+
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return dspy.LM(_DEFAULT_API_MODEL, max_tokens=28000)
+
+    if _claude_code_available():
+        return ClaudeCodeLM(model=_DEFAULT_CLI_MODEL, max_tokens=28000)
+
+    raise PlumbAuthError(
+        "No LLM backend available. Plumb needs one of:\n"
+        "  1. ANTHROPIC_API_KEY set in environment or .env file, OR\n"
+        "  2. Claude Code CLI installed (https://claude.ai/code) with an active session.\n"
+        "Set ANTHROPIC_API_KEY or install Claude Code to continue."
+    )
 
 
 def configure_dspy() -> None:
     """Lazy DSPy configuration. No-op if already configured.
-    Never call at import time — ANTHROPIC_API_KEY absence would break
-    non-LLM commands like plumb status."""
+    Never call at import time — missing credentials would break
+    non-LLM commands like ``plumb status``."""
     global _configured
     if _configured:
         return
-    from dotenv import load_dotenv
-    load_dotenv(override=False)
     lm = get_lm()
     dspy.configure(lm=lm, adapter=XMLAdapter())
     _configured = True
 
 
 def validate_api_access() -> None:
-    """Check that ANTHROPIC_API_KEY is set and works. Loads .env first, then
-    falls back to exported environment variables. Performs a smoke test to
-    verify the key is valid. Raises PlumbAuthError if not found or invalid."""
-    from dotenv import load_dotenv
+    """Verify that a working LLM backend is available.
 
+    Checks for ``ANTHROPIC_API_KEY`` first, then falls back to the Claude
+    Code CLI. Performs a smoke test to confirm the backend actually works.
+    Raises ``PlumbAuthError`` if neither is available or functional.
+    """
+    from dotenv import load_dotenv
     load_dotenv(override=False)
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+
+    has_api_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    has_cli = _claude_code_available()
+
+    if not has_api_key and not has_cli:
         raise PlumbAuthError(
-            "ANTHROPIC_API_KEY is not set. "
-            "Plumb requires a valid Anthropic API key to analyze commits.\n"
-            "Set it in a .env file or export it: export ANTHROPIC_API_KEY=your-key-here"
+            "No LLM backend available. Plumb needs one of:\n"
+            "  1. ANTHROPIC_API_KEY set in environment or .env file, OR\n"
+            "  2. Claude Code CLI installed (https://claude.ai/code) with an active session."
         )
 
-    # Smoke test: verify the key actually works
+    # Smoke test whichever backend we'll use
     lm = get_lm()
     try:
         response = lm("Reply with only the word: hello")
-        if not response:
-            raise PlumbAuthError("API returned empty response - key may be invalid")
+        if not response or not str(response[0]).strip():
+            raise PlumbAuthError("LLM backend returned empty response")
+    except PlumbAuthError:
+        raise
     except Exception as e:
         err_str = str(e).lower()
         if "auth" in err_str or "api key" in err_str or "401" in err_str:
             raise PlumbAuthError(
-                f"ANTHROPIC_API_KEY is invalid or rejected: {e}"
+                f"API key is invalid or rejected: {e}"
             ) from e
         raise PlumbAuthError(
-            f"Failed to verify API access: {e}"
+            f"Failed to verify LLM access: {e}"
         ) from e
 
 
