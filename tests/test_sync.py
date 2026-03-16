@@ -189,6 +189,54 @@ class TestParseSpecFiles:
         assert result[0]["last_seen_commit"] is None
 
 
+class TestSyncDecisionsDirectorySpecPaths:
+    """Tests for directory-based spec_paths (e.g., spec_paths: ['specs/'])."""
+
+    def test_syncs_when_spec_path_is_directory(self, initialized_repo_dir_specs):
+        """sync_decisions should resolve directory spec_paths to .md files."""
+        d = Decision(
+            id="dec-dir1",
+            status="approved",
+            question="How to authenticate?",
+            decision="Use API keys.",
+            created_at=datetime.now(timezone.utc).isoformat(),
+        )
+        append_decision(initialized_repo_dir_specs, d, branch="main")
+
+        updater_call_count = [0]
+
+        def mock_run(fn, *args, **kwargs):
+            from plumb.programs.spec_updater import WholeFileSpecUpdater
+            if isinstance(fn, WholeFileSpecUpdater):
+                updater_call_count[0] += 1
+                return [{"header": "## Features", "content": "Uses API keys.\n"}], []
+            return []
+
+        with patch("plumb.programs.configure_dspy"), \
+             patch("plumb.programs.run_with_retries", side_effect=mock_run):
+            result = sync_decisions(initialized_repo_dir_specs)
+
+        # Should have called updater for each .md file in the directory
+        assert updater_call_count[0] == 2  # spec.md + api.md
+        assert result["spec_updated"] >= 1
+
+    def test_parses_spec_files_from_directory(self, initialized_repo_dir_specs):
+        """parse_spec_files should find .md files inside directory spec_paths."""
+        mock_reqs = [
+            MagicMock(text="The system must do X.", ambiguous=False),
+        ]
+
+        with patch("plumb.programs.configure_dspy"), \
+             patch("plumb.programs.run_with_retries", return_value=mock_reqs):
+            result = parse_spec_files(initialized_repo_dir_specs)
+
+        # Should parse both spec.md and api.md (2 files × 1 req each = 2, but
+        # same text → same ID → deduped to 1)
+        assert len(result) >= 1
+        req_path = initialized_repo_dir_specs / ".plumb" / "requirements.json"
+        assert req_path.exists()
+
+
 class TestSyncDecisionsWholeFile:
     """Tests for the whole-file spec update path."""
 
