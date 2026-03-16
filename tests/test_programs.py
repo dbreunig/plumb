@@ -7,7 +7,10 @@ from unittest.mock import MagicMock, patch
 import dspy
 import pytest
 
-from plumb.programs import run_with_retries, configure_dspy, validate_api_access, get_program_lm
+from plumb.programs import (
+    run_with_retries, configure_dspy, validate_api_access, get_program_lm,
+    ClaudeCodeLM, _claude_code_available, get_lm,
+)
 from plumb.config import PlumbConfig, save_config, ensure_plumb_dir
 from plumb import PlumbAuthError, PlumbInferenceError
 from plumb.programs.diff_analyzer import (
@@ -39,22 +42,36 @@ from plumb.programs.code_modifier import CodeModifier
 
 
 class TestValidateApiAccess:
-    def test_raises_when_key_missing(self):
+    def test_raises_when_no_backend_available(self):
         # plumb:req-60f97012
         # plumb:req-ab686eaa
         # plumb:req-222ddbbd
         with patch("dotenv.load_dotenv"), \
-             patch.dict("os.environ", {}, clear=True):
+             patch.dict("os.environ", {}, clear=True), \
+             patch("plumb.programs._claude_code_available", return_value=False):
             import os
             os.environ.pop("ANTHROPIC_API_KEY", None)
-            with pytest.raises(PlumbAuthError, match="ANTHROPIC_API_KEY is not set"):
+            with pytest.raises(PlumbAuthError, match="No LLM backend available"):
                 validate_api_access()
 
-    def test_raises_when_key_empty(self):
+    def test_raises_when_key_empty_and_no_cli(self):
         with patch("dotenv.load_dotenv"), \
-             patch.dict("os.environ", {"ANTHROPIC_API_KEY": ""}):
-            with pytest.raises(PlumbAuthError, match="ANTHROPIC_API_KEY is not set"):
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": ""}), \
+             patch("plumb.programs._claude_code_available", return_value=False):
+            with pytest.raises(PlumbAuthError, match="No LLM backend available"):
                 validate_api_access()
+
+    def test_falls_back_to_cli_when_no_key(self):
+        """When no API key but claude CLI is available, fallback works."""
+        mock_lm = MagicMock(return_value=["hello"])
+        with patch("dotenv.load_dotenv"), \
+             patch.dict("os.environ", {}, clear=True), \
+             patch("plumb.programs._claude_code_available", return_value=True), \
+             patch("plumb.programs.get_lm", return_value=mock_lm):
+            import os
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            validate_api_access()  # should not raise — CLI fallback works
+            mock_lm.assert_called_once()
 
     def test_passes_when_key_set_and_api_works(self):
         mock_lm = MagicMock(return_value="hello")
@@ -89,6 +106,122 @@ class TestValidateApiAccess:
              patch("plumb.programs.get_lm", return_value=mock_lm):
             validate_api_access()
             mock_load.assert_called_once_with(override=False)
+
+
+class TestClaudeCodeLM:
+    """Tests for the ClaudeCodeLM backend that routes through claude CLI."""
+
+    def test_instantiation(self):
+        lm = ClaudeCodeLM(model="haiku")
+        assert lm.cli_model == "haiku"
+        assert lm.model == "claude-code/haiku"
+
+    def test_forward_parses_json_result_event(self):
+        """ClaudeCodeLM extracts text from the final 'result' event."""
+        fake_output = json.dumps([
+            {"type": "system", "subtype": "init"},
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": "hello"}]}},
+            {"type": "result", "subtype": "success", "result": "hello world"},
+        ])
+        mock_result = MagicMock(returncode=0, stdout=fake_output, stderr="")
+        with patch("subprocess.run", return_value=mock_result):
+            lm = ClaudeCodeLM(model="haiku")
+            response = lm.forward(prompt="test prompt")
+            assert response == ["hello world"]
+
+    def test_forward_handles_plain_text_fallback(self):
+        """Falls back to raw stdout if JSON parsing fails."""
+        mock_result = MagicMock(returncode=0, stdout="just plain text", stderr="")
+        with patch("subprocess.run", return_value=mock_result):
+            lm = ClaudeCodeLM(model="haiku")
+            response = lm.forward(prompt="test")
+            assert response == ["just plain text"]
+
+    def test_forward_raises_on_timeout(self):
+        import subprocess
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="claude", timeout=120)):
+            lm = ClaudeCodeLM()
+            with pytest.raises(PlumbInferenceError, match="timed out"):
+                lm.forward(prompt="test")
+
+    def test_forward_raises_on_missing_cli(self):
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            lm = ClaudeCodeLM()
+            with pytest.raises(PlumbAuthError, match="not found"):
+                lm.forward(prompt="test")
+
+    def test_forward_raises_on_nonzero_exit(self):
+        mock_result = MagicMock(returncode=1, stdout="", stderr="something failed")
+        with patch("subprocess.run", return_value=mock_result):
+            lm = ClaudeCodeLM()
+            with pytest.raises(PlumbInferenceError, match="exited 1"):
+                lm.forward(prompt="test")
+
+    def test_forward_builds_prompt_from_messages(self):
+        """Messages list is concatenated into prompt text."""
+        fake_output = json.dumps([{"type": "result", "result": "ok"}])
+        mock_result = MagicMock(returncode=0, stdout=fake_output, stderr="")
+        with patch("subprocess.run", return_value=mock_result) as mock_run:
+            lm = ClaudeCodeLM()
+            lm.forward(messages=[
+                {"role": "system", "content": "You are helpful."},
+                {"role": "user", "content": "Say hi."},
+            ])
+            call_kwargs = mock_run.call_args
+            assert "You are helpful." in call_kwargs.kwargs["input"]
+            assert "Say hi." in call_kwargs.kwargs["input"]
+
+    def test_callable_delegates_to_forward(self):
+        fake_output = json.dumps([{"type": "result", "result": "called"}])
+        mock_result = MagicMock(returncode=0, stdout=fake_output, stderr="")
+        with patch("subprocess.run", return_value=mock_result):
+            lm = ClaudeCodeLM()
+            result = lm("hello")
+            assert result == ["called"]
+
+
+class TestClaudeCodeAvailable:
+    def test_returns_true_when_claude_on_path(self):
+        with patch("shutil.which", return_value="/usr/local/bin/claude"):
+            assert _claude_code_available() is True
+
+    def test_returns_false_when_not_installed(self):
+        with patch("shutil.which", return_value=None):
+            assert _claude_code_available() is False
+
+
+class TestGetLm:
+    def test_returns_api_lm_when_key_set(self):
+        with patch("dotenv.load_dotenv"), \
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}):
+            lm = get_lm()
+            assert "anthropic" in lm.model
+
+    def test_returns_cli_lm_when_no_key_but_cli_available(self):
+        with patch("dotenv.load_dotenv"), \
+             patch.dict("os.environ", {}, clear=True), \
+             patch("plumb.programs._claude_code_available", return_value=True):
+            import os
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            lm = get_lm()
+            assert isinstance(lm, ClaudeCodeLM)
+
+    def test_raises_when_nothing_available(self):
+        with patch("dotenv.load_dotenv"), \
+             patch.dict("os.environ", {}, clear=True), \
+             patch("plumb.programs._claude_code_available", return_value=False):
+            import os
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            with pytest.raises(PlumbAuthError, match="No LLM backend available"):
+                get_lm()
+
+    def test_api_key_takes_precedence_over_cli(self):
+        """When both are available, API key wins (faster)."""
+        with patch("dotenv.load_dotenv"), \
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}), \
+             patch("plumb.programs._claude_code_available", return_value=True):
+            lm = get_lm()
+            assert not isinstance(lm, ClaudeCodeLM)
 
 
 class TestRunWithRetries:
