@@ -7,9 +7,10 @@ from unittest.mock import MagicMock, patch
 import dspy
 import pytest
 
-from plumb.programs import run_with_retries, configure_dspy, validate_api_access, get_program_lm
+from plumb.programs import run_with_retries, configure_dspy, validate_api_access, get_lm, get_program_lm
 from plumb.config import PlumbConfig, save_config, ensure_plumb_dir
 from plumb import PlumbAuthError, PlumbInferenceError
+from plumb.programs.claude_code_lm import ClaudeCodeLM
 from plumb.programs.diff_analyzer import (
     ChangeSummary,
     DiffAnalyzerSignature,
@@ -39,22 +40,35 @@ from plumb.programs.code_modifier import CodeModifier
 
 
 class TestValidateApiAccess:
-    def test_raises_when_key_missing(self):
+    def test_raises_when_key_missing_and_no_cli(self):
         # plumb:req-60f97012
         # plumb:req-ab686eaa
         # plumb:req-222ddbbd
         with patch("dotenv.load_dotenv"), \
-             patch.dict("os.environ", {}, clear=True):
+             patch.dict("os.environ", {}, clear=True), \
+             patch("plumb.programs.claude_code_lm.find_claude_cli", return_value=None):
             import os
             os.environ.pop("ANTHROPIC_API_KEY", None)
-            with pytest.raises(PlumbAuthError, match="ANTHROPIC_API_KEY is not set"):
+            with pytest.raises(PlumbAuthError, match="No LLM backend available"):
                 validate_api_access()
 
-    def test_raises_when_key_empty(self):
+    def test_raises_when_key_empty_and_no_cli(self):
         with patch("dotenv.load_dotenv"), \
-             patch.dict("os.environ", {"ANTHROPIC_API_KEY": ""}):
-            with pytest.raises(PlumbAuthError, match="ANTHROPIC_API_KEY is not set"):
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": ""}), \
+             patch("plumb.programs.claude_code_lm.find_claude_cli", return_value=None):
+            with pytest.raises(PlumbAuthError, match="No LLM backend available"):
                 validate_api_access()
+
+    def test_passes_with_cli_when_no_key(self):
+        """CLI fallback works when ANTHROPIC_API_KEY is not set."""
+        mock_lm = MagicMock(return_value=["hello"])
+        with patch("dotenv.load_dotenv"), \
+             patch.dict("os.environ", {}, clear=True), \
+             patch("plumb.programs.claude_code_lm.find_claude_cli", return_value="/usr/bin/claude"), \
+             patch("plumb.programs.claude_code_lm.ClaudeCodeLM", return_value=mock_lm):
+            import os
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            validate_api_access()  # should not raise
 
     def test_passes_when_key_set_and_api_works(self):
         mock_lm = MagicMock(return_value="hello")
@@ -324,6 +338,41 @@ class TestCodeModifier:
         assert "reason text" in prompt
         assert "spec text" in prompt
 
+    def test_uses_cli_when_no_api_key(self):
+        """CodeModifier falls back to claude CLI when no API key."""
+        json_response = '```json\n{"src/a.py": "modified via cli"}\n```'
+        with patch.dict("os.environ", {}, clear=True), \
+             patch("plumb.programs.code_modifier.find_claude_cli", return_value="/usr/bin/claude"), \
+             patch("plumb.programs.code_modifier._call_claude", return_value=json_response) as mock_call:
+            import os
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            modifier = CodeModifier()
+            result = modifier.modify(
+                staged_diff="diff",
+                decision="Use async",
+                rejection_reason="Too complex",
+                spec_content="# Spec",
+            )
+            assert result == {"src/a.py": "modified via cli"}
+            mock_call.assert_called_once()
+            prompt = mock_call.call_args[0][0]
+            assert "diff" in prompt
+            assert "Use async" in prompt
+
+    def test_uses_api_when_key_set(self):
+        """CodeModifier uses Anthropic API when ANTHROPIC_API_KEY is set."""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = [MagicMock(text='{"a.py": "content"}')]
+        mock_client.messages.create.return_value = mock_response
+
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}), \
+             patch("plumb.programs.code_modifier.anthropic") as mock_anthropic:
+            mock_anthropic.Anthropic.return_value = mock_client
+            modifier = CodeModifier()
+            result = modifier.modify("diff", "dec", "reason", "spec")
+            mock_client.messages.create.assert_called_once()
+
 
 class TestGetProgramLm:
     def test_returns_none_when_no_config(self, tmp_path):
@@ -339,8 +388,8 @@ class TestGetProgramLm:
         result = get_program_lm("decision_deduplicator", repo_root=tmp_repo)
         assert result is None
 
-    def test_returns_lm_when_override_exists(self, tmp_repo):
-        """Config has an override → returns a dspy.LM."""
+    def test_returns_lm_when_override_exists_with_api_key(self, tmp_repo):
+        """Config has an override + API key → returns a dspy.LM."""
         ensure_plumb_dir(tmp_repo)
         cfg = PlumbConfig(
             spec_paths=["spec.md"],
@@ -349,13 +398,66 @@ class TestGetProgramLm:
             },
         )
         save_config(tmp_repo, cfg)
-        lm = get_program_lm("decision_deduplicator", repo_root=tmp_repo)
-        assert isinstance(lm, dspy.LM)
-        assert lm.model == "openai/gpt-4o-mini"
-        assert lm.kwargs["max_tokens"] == 4096
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}):
+            lm = get_program_lm("decision_deduplicator", repo_root=tmp_repo)
+            assert isinstance(lm, dspy.LM)
+            assert lm.model == "openai/gpt-4o-mini"
+            assert lm.kwargs["max_tokens"] == 4096
+
+    def test_returns_claude_code_lm_when_override_exists_no_key(self, tmp_repo):
+        """Config has an override + no API key + CLI available → returns ClaudeCodeLM."""
+        ensure_plumb_dir(tmp_repo)
+        cfg = PlumbConfig(
+            spec_paths=["spec.md"],
+            program_models={
+                "decision_deduplicator": {"model": "anthropic/claude-sonnet-4-20250514", "max_tokens": 4096},
+            },
+        )
+        save_config(tmp_repo, cfg)
+        with patch.dict("os.environ", {}, clear=True), \
+             patch("plumb.programs.claude_code_lm.find_claude_cli", return_value="/usr/bin/claude"):
+            import os
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            lm = get_program_lm("decision_deduplicator", repo_root=tmp_repo)
+            assert isinstance(lm, ClaudeCodeLM)
+            assert lm.cli_model == "claude-sonnet-4-20250514"
 
     def test_returns_none_when_no_repo_root(self):
         """No repo root found → returns None."""
         with patch("plumb.config.find_repo_root", return_value=None):
             result = get_program_lm("decision_deduplicator")
             assert result is None
+
+
+class TestGetLm:
+    def test_returns_dspy_lm_with_api_key(self):
+        """ANTHROPIC_API_KEY set → returns dspy.LM."""
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}):
+            lm = get_lm()
+            assert isinstance(lm, dspy.LM)
+
+    def test_returns_claude_code_lm_without_api_key(self):
+        """No API key + CLI available → returns ClaudeCodeLM."""
+        with patch.dict("os.environ", {}, clear=True), \
+             patch("plumb.programs.claude_code_lm.find_claude_cli", return_value="/usr/bin/claude"):
+            import os
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            lm = get_lm()
+            assert isinstance(lm, ClaudeCodeLM)
+
+    def test_raises_when_neither_available(self):
+        """No API key + no CLI → raises PlumbAuthError."""
+        with patch.dict("os.environ", {}, clear=True), \
+             patch("plumb.programs.claude_code_lm.find_claude_cli", return_value=None):
+            import os
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            with pytest.raises(PlumbAuthError, match="No LLM backend available"):
+                get_lm()
+
+    def test_api_key_takes_precedence_over_cli(self):
+        """When both API key and CLI exist, API key wins."""
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}), \
+             patch("plumb.programs.claude_code_lm.find_claude_cli", return_value="/usr/bin/claude"):
+            lm = get_lm()
+            assert isinstance(lm, dspy.LM)
+            assert not isinstance(lm, ClaudeCodeLM)

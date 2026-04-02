@@ -115,10 +115,12 @@ def _init_clone_setup(repo_root: Path, cfg: PlumbConfig) -> None:
         hooks_dir = repo_root / ".git" / "hooks"
         hooks_dir.mkdir(exist_ok=True)
         hook_path = hooks_dir / "pre-commit"
-        hook_path.write_text("#!/bin/sh\nplumb hook\nexit $?\n")
+        hook_path.write_text('#!/bin/sh\n[ "$PLUMB_SKIP" = "1" ] && exit 0\nplumb hook\nexit $?\n')
         hook_path.chmod(0o755)
         post_commit_path = hooks_dir / "post-commit"
-        post_commit_path.write_text("#!/bin/sh\nplumb post-commit\n")
+        post_commit_path.write_text(
+            '#!/bin/sh\n[ "$PLUMB_SKIP" = "1" ] && exit 0\nplumb post-commit\nnohup plumb hook --post-commit >> .plumb/hook.log 2>&1 &\n'
+        )
         post_commit_path.chmod(0o755)
 
         # Verify API access
@@ -249,10 +251,12 @@ def init():
         hooks_dir = repo_root / ".git" / "hooks"
         hooks_dir.mkdir(exist_ok=True)
         hook_path = hooks_dir / "pre-commit"
-        hook_path.write_text("#!/bin/sh\nplumb hook\nexit $?\n")
+        hook_path.write_text('#!/bin/sh\n[ "$PLUMB_SKIP" = "1" ] && exit 0\nplumb hook\nexit $?\n')
         hook_path.chmod(0o755)
         post_commit_path = hooks_dir / "post-commit"
-        post_commit_path.write_text("#!/bin/sh\nplumb post-commit\n")
+        post_commit_path.write_text(
+            '#!/bin/sh\n[ "$PLUMB_SKIP" = "1" ] && exit 0\nplumb post-commit\nnohup plumb hook --post-commit >> .plumb/hook.log 2>&1 &\n'
+        )
         post_commit_path.chmod(0o755)
 
         # Create default .plumbignore
@@ -352,12 +356,13 @@ This project uses Plumb to keep the spec, tests, and code in sync.
 
 @cli.command()
 @click.option("--dry-run", is_flag=True, help="Preview only, don't write decisions")
-def hook(dry_run):
-    """Run the pre-commit hook analysis."""
+@click.option("--post-commit", is_flag=True, help="Analyze committed diff (HEAD~1..HEAD) instead of staged changes")
+def hook(dry_run, post_commit):
+    """Run the pre-commit hook (gate) or post-commit analysis."""
     from plumb.git_hook import run_hook
 
     repo_root = find_repo_root()
-    exit_code = run_hook(repo_root, dry_run=dry_run)
+    exit_code = run_hook(repo_root, dry_run=dry_run, post_commit=post_commit)
     raise SystemExit(exit_code)
 
 
@@ -806,11 +811,14 @@ def map_tests(dry_run):
     console.print(f"Found {len(test_summaries)} test functions and {len(requirements)} requirements.")
     console.print("Running LLM mapping...")
 
-    from plumb.programs import configure_dspy, run_chunked_mapper
+    from plumb.programs import configure_dspy, run_chunked_mapper, get_program_lm, get_program_config
     from plumb.programs.test_mapper import TestMapper
 
     configure_dspy()
     mapper = TestMapper()
+    override_lm = get_program_lm("test_mapper")
+    prog_cfg = get_program_config("test_mapper") or {}
+    budget = prog_cfg.get("budget", 60000)
 
     req_json = json.dumps([{"id": r["id"], "text": r["text"]} for r in requirements])
     items = [(s["name"], json.dumps(s)) for s in test_summaries]
@@ -819,9 +827,16 @@ def map_tests(dry_run):
         return json.dumps([json.loads(t) for _, t in chunk])
 
     try:
-        mappings = run_chunked_mapper(
-            mapper, req_json, items, budget=60000, combine_fn=_combine,
-        )
+        if override_lm:
+            import dspy
+            with dspy.context(lm=override_lm):
+                mappings = run_chunked_mapper(
+                    mapper, req_json, items, budget=budget, combine_fn=_combine,
+                )
+        else:
+            mappings = run_chunked_mapper(
+                mapper, req_json, items, budget=budget, combine_fn=_combine,
+            )
     except Exception as e:
         console.print(f"[red]Mapping failed: {e}[/red]")
         raise SystemExit(1)

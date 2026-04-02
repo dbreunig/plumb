@@ -35,11 +35,16 @@ def _get_plumb_managed_paths(config) -> list[str]:
     return [".plumb/"] + list(config.spec_paths)
 
 
-def _get_staged_diff_filtered(repo: Repo, config) -> str:
-    """Get staged diff excluding plumb-managed and ignored files."""
+def _get_staged_diff_filtered(repo: Repo, config, post_commit: bool = False) -> str:
+    """Get diff excluding plumb-managed and ignored files.
+
+    When post_commit is True, reads the just-committed diff (HEAD~1..HEAD)
+    instead of the staging area (--cached).
+    """
+    diff_ref = ["HEAD~1", "HEAD"] if post_commit else ["--cached"]
     managed = _get_plumb_managed_paths(config)
     ignore_patterns = parse_plumbignore(repo.working_dir)
-    staged_files = repo.git.diff("--cached", "--name-only").splitlines()
+    staged_files = repo.git.diff(*diff_ref, "--name-only").splitlines()
     if not staged_files:
         return ""
     unmanaged = [
@@ -49,7 +54,7 @@ def _get_staged_diff_filtered(repo: Repo, config) -> str:
     ]
     if not unmanaged:
         return ""
-    return repo.git.diff("--cached", "--", *unmanaged)
+    return repo.git.diff(*diff_ref, "--", *unmanaged)
 
 
 def _get_branch_name(repo: Repo) -> str:
@@ -91,12 +96,18 @@ def _check_broken_refs(repo: Repo, decisions: list[Decision]) -> list[Decision]:
 
 def _analyze_diff(diff: str) -> str:
     """Run DiffAnalyzer on the staged diff. Returns summary string."""
-    from plumb.programs import configure_dspy, run_with_retries
+    import dspy
+    from plumb.programs import configure_dspy, run_with_retries, get_program_lm
     from plumb.programs.diff_analyzer import DiffAnalyzer
 
     configure_dspy()
     analyzer = DiffAnalyzer()
-    summaries = run_with_retries(analyzer, diff)
+    override_lm = get_program_lm("diff_analyzer")
+    if override_lm:
+        with dspy.context(lm=override_lm):
+            summaries = run_with_retries(analyzer, diff)
+    else:
+        summaries = run_with_retries(analyzer, diff)
     lines = []
     for s in summaries:
         lines.append(f"[{s.change_type}] {', '.join(s.files_changed)}: {s.summary}")
@@ -107,7 +118,9 @@ def _extract_decisions_from_conversation(
     repo_root: Path, config, diff_summary: str
 ) -> list[Decision]:
     """Read conversation log, chunk it, run DecisionExtractor per chunk."""
-    from plumb.programs import configure_dspy, run_with_retries
+    import dspy
+    from contextlib import nullcontext
+    from plumb.programs import configure_dspy, run_with_retries, get_program_lm
     from plumb.programs.decision_extractor import DecisionExtractor
 
     turns = read_conversation(
@@ -124,52 +137,65 @@ def _extract_decisions_from_conversation(
 
     configure_dspy()
     extractor = DecisionExtractor()
+    override_lm = get_program_lm("decision_extractor")
     now = datetime.now(timezone.utc).isoformat()
     branch = _get_branch_name(Repo(repo_root))
 
     all_decisions: list[Decision] = []
-    for chunk in chunks:
-        try:
-            extracted = run_with_retries(
-                extractor, chunk.text, diff_summary
-            )
-        except Exception:
-            continue
-        for ed in extracted:
-            if not ed.spec_relevant:
-                continue
-            all_decisions.append(
-                Decision(
-                    id=generate_decision_id(),
-                    status="pending",
-                    question=ed.question,
-                    decision=ed.decision,
-                    made_by=ed.made_by,
-                    branch=branch,
-                    confidence=ed.confidence,
-                    chunk_index=chunk.chunk_index,
-                    conversation_available=True,
-                    created_at=now,
+    ctx = dspy.context(lm=override_lm) if override_lm else nullcontext()
+    with ctx:
+        for chunk in chunks:
+            try:
+                extracted = run_with_retries(
+                    extractor, chunk.text, diff_summary
                 )
-            )
+            except Exception:
+                continue
+            for ed in extracted:
+                if not ed.spec_relevant:
+                    continue
+                all_decisions.append(
+                    Decision(
+                        id=generate_decision_id(),
+                        status="pending",
+                        question=ed.question,
+                        decision=ed.decision,
+                        made_by=ed.made_by,
+                        branch=branch,
+                        confidence=ed.confidence,
+                        chunk_index=chunk.chunk_index,
+                        conversation_available=True,
+                        created_at=now,
+                    )
+                )
     return all_decisions
 
 
 def _extract_decisions_from_diff(diff_summary: str, branch: str) -> list[Decision]:
     """Fallback: extract decisions from diff summary alone."""
-    from plumb.programs import configure_dspy, run_with_retries
+    import dspy
+    from plumb.programs import configure_dspy, run_with_retries, get_program_lm
     from plumb.programs.decision_extractor import DecisionExtractor
 
     configure_dspy()
     extractor = DecisionExtractor()
+    override_lm = get_program_lm("decision_extractor")
     now = datetime.now(timezone.utc).isoformat()
 
     try:
-        extracted = run_with_retries(
-            extractor,
-            f"No conversation available. Diff summary:\n{diff_summary}",
-            diff_summary,
-        )
+        if override_lm:
+            with dspy.context(lm=override_lm):
+                extracted = run_with_retries(
+                    extractor,
+                    f"No conversation available. Diff summary:\n{diff_summary}",
+                    diff_summary,
+                )
+        else:
+            extracted = run_with_retries(
+                extractor,
+                f"No conversation available. Diff summary:\n{diff_summary}",
+                diff_summary,
+            )
     except Exception:
         return []
 
@@ -253,15 +279,21 @@ def _format_json_output(pending: list[Decision]) -> str:
     )
 
 
-def run_hook(repo_root: str | Path | None = None, dry_run: bool = False) -> int:
+def run_hook(repo_root: str | Path | None = None, dry_run: bool = False, post_commit: bool = False) -> int:
     """Central hook orchestrator. Returns exit code (0 = allow commit, 1 = block).
+
+    When post_commit is False (pre-commit gate): checks for pending decisions
+    on disk and blocks if any exist. No LLM work.
+
+    When post_commit is True (post-commit background): reads the committed diff
+    (HEAD~1..HEAD) and runs the full LLM analysis pipeline.
 
     Top-level try/except: on ANY internal error, print warning to stderr, return 0.
     Never block commits due to internal Plumb errors.
     Auth errors block commits — a missing/invalid API key must be fixed.
     """
     try:
-        return _run_hook_inner(repo_root, dry_run)
+        return _run_hook_inner(repo_root, dry_run, post_commit)
     except PlumbAuthError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
@@ -271,7 +303,7 @@ def run_hook(repo_root: str | Path | None = None, dry_run: bool = False) -> int:
         return 0
 
 
-def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
+def _run_hook_inner(repo_root: str | Path | None, dry_run: bool, post_commit: bool = False) -> int:
     import time
 
     timings: list[tuple[str, float]] = []
@@ -307,9 +339,24 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
 
         repo = Repo(repo_root)
 
-    # 2. Get staged diff and branch (excluding plumb-managed files)
-    with _timed("Staged diff"):
-        diff = _get_staged_diff_filtered(repo, config)
+    # 1b. Gate: check pending decisions from prior background runs.
+    #     Only in pre-commit mode (not post_commit). Block if any pending.
+    if not post_commit:
+        with _timed("Gate check"):
+            all_decisions = read_all_decisions(repo_root)
+            pending = [d for d in all_decisions if d.status == "pending"]
+            if pending:
+                is_tty = sys.stdout.isatty()
+                if is_tty:
+                    print(_format_tty_output(pending))
+                else:
+                    print(_format_json_output(pending))
+                return 1
+        return 0
+
+    # 2. Get diff and branch (excluding plumb-managed files)
+    with _timed("Diff"):
+        diff = _get_staged_diff_filtered(repo, config, post_commit=post_commit)
         if not diff:
             return 0
 

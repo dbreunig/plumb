@@ -9,7 +9,7 @@ from git import Repo
 
 from plumb import PlumbAuthError
 from plumb.config import PlumbConfig, save_config, ensure_plumb_dir
-from plumb.decision_log import Decision, append_decision, read_decisions
+from plumb.decision_log import Decision, append_decision, append_decisions, read_decisions
 from plumb.programs.decision_extractor import ExtractedDecision
 from plumb.git_hook import (
     run_hook,
@@ -256,13 +256,14 @@ class TestRunHook:
             result = run_hook(initialized_repo)
             assert result == 1
 
-    def test_missing_api_key_blocks_commit(self, initialized_repo):
+    def test_missing_api_key_blocks_post_commit(self, initialized_repo):
         # plumb:req-3f212a0d
-        """Missing ANTHROPIC_API_KEY should block commit when there's a staged diff."""
+        """Missing ANTHROPIC_API_KEY should block post-commit analysis."""
         repo = Repo(initialized_repo)
         f = initialized_repo / "new.py"
         f.write_text("x = 1\n")
         repo.index.add(["new.py"])
+        repo.index.commit("add new.py")
 
         with patch("dotenv.load_dotenv"), \
              patch.dict("os.environ", {}, clear=True), \
@@ -270,7 +271,7 @@ class TestRunHook:
             # Remove ANTHROPIC_API_KEY if present
             import os
             os.environ.pop("ANTHROPIC_API_KEY", None)
-            result = run_hook(initialized_repo)
+            result = run_hook(initialized_repo, post_commit=True)
             assert result == 1
 
     def test_dry_run_returns_0(self, initialized_repo):
@@ -293,11 +294,10 @@ class TestRunHook:
         # plumb:req-bdfb0f18
         """Pending decisions should cause exit 1."""
         repo = Repo(initialized_repo)
-        f = initialized_repo / "new.py"
-        f.write_text("x = 1\n")
-        repo.index.add(["new.py"])
+        branch = repo.active_branch.name
 
-        mock_decisions = [
+        # Write pending decisions directly to disk
+        append_decisions(initialized_repo, [
             Decision(
                 id="dec-test1",
                 status="pending",
@@ -306,14 +306,11 @@ class TestRunHook:
                 made_by="llm",
                 confidence=0.8,
             )
-        ]
+        ], branch=branch)
 
-        with patch("plumb.programs.validate_api_access"), \
-             patch("plumb.git_hook._analyze_diff", return_value="summary"), \
-             patch("plumb.git_hook._extract_decisions_from_conversation", return_value=mock_decisions), \
-             patch("plumb.git_hook._synthesize_questions", return_value=mock_decisions):
-            result = run_hook(initialized_repo)
-            assert result == 1
+        # Pre-commit gate should block
+        result = run_hook(initialized_repo)
+        assert result == 1
 
     def test_no_pending_decisions_allow_commit(self, initialized_repo):
         # plumb:req-124ad3e8

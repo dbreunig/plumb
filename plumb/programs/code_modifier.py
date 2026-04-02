@@ -1,20 +1,34 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 
 import anthropic
 from dotenv import load_dotenv
 
+from plumb.programs.claude_code_lm import _call_claude, find_claude_cli
+
 
 class CodeModifier:
     """Modify staged code to satisfy a rejected decision.
     Uses Anthropic API directly (not DSPy) because code modification
-    is inherently open-ended."""
+    is inherently open-ended. Falls back to claude CLI when no API key."""
 
     def __init__(self, client: anthropic.Anthropic | None = None):
         load_dotenv(override=False)
-        self.client = client or anthropic.Anthropic()
+        if client is not None:
+            self.client = client
+            self._use_cli = False
+        elif os.environ.get("ANTHROPIC_API_KEY"):
+            self.client = anthropic.Anthropic()
+            self._use_cli = False
+        elif find_claude_cli():
+            self.client = None
+            self._use_cli = True
+        else:
+            self.client = anthropic.Anthropic()
+            self._use_cli = False
 
     def modify(
         self,
@@ -49,6 +63,10 @@ Return format:
   "path/to/file.py": "complete file contents here..."
 }}
 ```"""
+
+        if self._use_cli:
+            text = _call_claude(prompt)
+            return self._parse_response(text)
 
         response = self.client.messages.create(
             model="claude-sonnet-4-20250514",

@@ -11,6 +11,7 @@ from rich.console import Console
 from rich.table import Table
 
 from plumb.config import load_config
+from plumb.ignore import is_ignored, parse_plumbignore
 
 PLUMB_MARKER_RE = re.compile(r'#\s*plumb:(req-[a-f0-9]+)')
 FUNC_NAME_RE = re.compile(r'def test_req_([a-f0-9]+)_')
@@ -29,6 +30,7 @@ def run_pytest_coverage(repo_root: str | Path) -> dict | None:
         result = subprocess.run(
             [
                 sys.executable, "-m", "pytest",
+                "-m", "not slow",
                 "--cov=.",
                 f"--cov-report=json:{cov_json}",
                 "--cov-report=",
@@ -118,10 +120,13 @@ def _collect_source_summaries(repo_root: Path) -> dict[str, str]:
     """
     import ast
 
+    ignore_patterns = parse_plumbignore(repo_root)
     per_file: dict[str, str] = {}
     for item in sorted(repo_root.rglob("*.py")):
         rel = str(item.relative_to(repo_root))
         if ".plumb" in rel or "test_" in item.name or rel.startswith("tests/"):
+            continue
+        if is_ignored(rel, ignore_patterns):
             continue
         try:
             content = item.read_text()
@@ -324,11 +329,14 @@ def check_spec_to_code_coverage(
         return (0, len(requirements))
 
     # --- LLM mapping ---
-    from plumb.programs import configure_dspy, run_chunked_mapper
+    from plumb.programs import configure_dspy, run_chunked_mapper, get_program_lm, get_program_config
     from plumb.programs.code_coverage_mapper import CodeCoverageMapper
 
     configure_dspy()
     mapper = CodeCoverageMapper()
+    override_lm = get_program_lm("code_coverage_mapper", repo_root)
+    prog_cfg = get_program_config("code_coverage_mapper", repo_root) or {}
+    budget = prog_cfg.get("budget", 60000)
 
     if full_remap:
         dirty_reqs = requirements
@@ -346,10 +354,18 @@ def check_spec_to_code_coverage(
     def _combine(chunk):
         return "\n\n".join(text for _, text in chunk)
 
-    results = run_chunked_mapper(
-        mapper, req_json, items, budget=60000,
-        combine_fn=_combine, merge_fn=merge_coverage_results,
-    )
+    if override_lm:
+        import dspy
+        with dspy.context(lm=override_lm):
+            results = run_chunked_mapper(
+                mapper, req_json, items, budget=budget,
+                combine_fn=_combine, merge_fn=merge_coverage_results,
+            )
+    else:
+        results = run_chunked_mapper(
+            mapper, req_json, items, budget=budget,
+            combine_fn=_combine, merge_fn=merge_coverage_results,
+        )
 
     # Build fresh results dict from LLM output
     fresh_results: dict[str, dict] = {}

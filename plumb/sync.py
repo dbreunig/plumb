@@ -146,7 +146,7 @@ def insert_new_sections(
 def parse_spec_files(repo_root: str | Path) -> list[dict]:
     """Read markdown spec files, run RequirementParser, assign stable IDs,
     write requirements.json."""
-    from plumb.programs import configure_dspy, run_with_retries
+    from plumb.programs import configure_dspy, run_with_retries, get_program_lm
     from plumb.programs.requirement_parser import RequirementParser
 
     repo_root = Path(repo_root)
@@ -169,6 +169,7 @@ def parse_spec_files(repo_root: str | Path) -> list[dict]:
 
     configure_dspy()
     parser = RequirementParser()
+    override_lm = get_program_lm("requirement_parser", repo_root)
 
     for spec_path_str in config.spec_paths:
         spec_path = repo_root / spec_path_str
@@ -182,7 +183,12 @@ def parse_spec_files(repo_root: str | Path) -> list[dict]:
         for md_file in md_files:
             content = md_file.read_text()
             try:
-                parsed = run_with_retries(parser, content)
+                if override_lm:
+                    import dspy
+                    with dspy.context(lm=override_lm):
+                        parsed = run_with_retries(parser, content)
+                else:
+                    parsed = run_with_retries(parser, content)
             except Exception:
                 continue
 

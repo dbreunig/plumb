@@ -50,12 +50,17 @@ def is_ignored(filepath: str, patterns: list[str]) -> bool:
     - Exact match: ``README.md``
     - Glob matched against the basename: ``*.txt``
     - Directory prefix (pattern ends with ``/``): ``docs/`` matches ``docs/foo``
+    - Glob directory prefix: ``.venv*/`` matches ``.venv3.10/foo``
     """
     basename = Path(filepath).name
+    top_dir = filepath.split("/")[0]
     for pat in patterns:
         if pat.endswith("/"):
-            # Directory prefix — match if filepath starts with the prefix
-            if filepath == pat.rstrip("/") or filepath.startswith(pat):
+            prefix = pat.rstrip("/")
+            # Directory prefix — exact startswith or fnmatch on top directory
+            if filepath == prefix or filepath.startswith(pat):
+                return True
+            if fnmatch(top_dir, prefix):
                 return True
         else:
             # Exact full-path match or fnmatch against basename

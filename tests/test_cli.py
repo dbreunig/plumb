@@ -50,6 +50,22 @@ class TestInit:
         hook = tmp_repo / ".git" / "hooks" / "pre-commit"
         assert os.access(str(hook), os.X_OK)
 
+    def test_pre_commit_hook_checks_plumb_skip(self, runner, tmp_repo):
+        """The pre-commit hook must exit 0 when PLUMB_SKIP=1 so users
+        can bypass Plumb in worktrees or automated scripts."""
+        spec = tmp_repo / "spec.md"
+        spec.write_text("# Spec\n")
+        (tmp_repo / "tests").mkdir(exist_ok=True)
+
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]):
+            runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+
+        hook = tmp_repo / ".git" / "hooks" / "pre-commit"
+        content = hook.read_text()
+        assert 'PLUMB_SKIP' in content
+        assert 'exit 0' in content.split('PLUMB_SKIP')[1].split('\n')[0]
+
 
 class TestInitPlumbignore:
     def test_init_creates_plumbignore(self, runner, tmp_repo):
@@ -126,7 +142,7 @@ class TestHook:
              patch("plumb.git_hook.run_hook", return_value=0) as mock_hook:
             result = runner.invoke(cli, ["hook", "--dry-run"])
             assert result.exit_code == 0
-            mock_hook.assert_called_once_with(initialized_repo, dry_run=True)
+            mock_hook.assert_called_once_with(initialized_repo, dry_run=True, post_commit=False)
 
 
 class TestApprove:

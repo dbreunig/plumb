@@ -5,24 +5,42 @@ from pathlib import Path
 
 import dspy
 from dspy.adapters import XMLAdapter
+from dspy.clients.base_lm import BaseLM
 
 from plumb import PlumbAuthError, PlumbInferenceError
 
 _configured = False
 
+_NO_BACKEND_MSG = (
+    "No LLM backend available.\n"
+    "Option 1: Set ANTHROPIC_API_KEY in .env or environment (direct API, fastest)\n"
+    "Option 2: Install Claude Code CLI — https://claude.ai/code (uses your subscription)"
+)
 
-def get_lm() -> dspy.LM:
-    return dspy.LM("anthropic/claude-sonnet-4-20250514", max_tokens=28000)
+
+def get_lm() -> BaseLM:
+    """Return the best available LM: direct API if ANTHROPIC_API_KEY is set,
+    otherwise Claude Code CLI if available."""
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return dspy.LM("anthropic/claude-sonnet-4-20250514", max_tokens=28000)
+
+    from plumb.programs.claude_code_lm import ClaudeCodeLM, find_claude_cli
+
+    if find_claude_cli():
+        return ClaudeCodeLM(model="sonnet", max_tokens=28000)
+
+    raise PlumbAuthError(_NO_BACKEND_MSG)
 
 
 def configure_dspy() -> None:
     """Lazy DSPy configuration. No-op if already configured.
-    Never call at import time — ANTHROPIC_API_KEY absence would break
+    Never call at import time — missing auth would break
     non-LLM commands like plumb status."""
     global _configured
     if _configured:
         return
     from dotenv import load_dotenv
+
     load_dotenv(override=False)
     lm = get_lm()
     dspy.configure(lm=lm, adapter=XMLAdapter())
@@ -30,38 +48,35 @@ def configure_dspy() -> None:
 
 
 def validate_api_access() -> None:
-    """Check that ANTHROPIC_API_KEY is set and works. Loads .env first, then
-    falls back to exported environment variables. Performs a smoke test to
-    verify the key is valid. Raises PlumbAuthError if not found or invalid."""
+    """Check that an LLM backend is available and working.
+
+    Tries ANTHROPIC_API_KEY first (direct API), then falls back to the
+    Claude Code CLI. Performs a smoke test to verify the backend works.
+    Raises PlumbAuthError if neither is available or working.
+    """
     from dotenv import load_dotenv
 
     load_dotenv(override=False)
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise PlumbAuthError(
-            "ANTHROPIC_API_KEY is not set. "
-            "Plumb requires a valid Anthropic API key to analyze commits.\n"
-            "Set it in a .env file or export it: export ANTHROPIC_API_KEY=your-key-here"
-        )
 
-    # Smoke test: verify the key actually works
-    lm = get_lm()
+    lm = get_lm()  # raises PlumbAuthError if no backend available
+
     try:
         response = lm("Reply with only the word: hello")
         if not response:
-            raise PlumbAuthError("API returned empty response - key may be invalid")
+            raise PlumbAuthError("LLM returned empty response - backend may be misconfigured")
+    except PlumbAuthError:
+        raise
     except Exception as e:
         err_str = str(e).lower()
         if "auth" in err_str or "api key" in err_str or "401" in err_str:
             raise PlumbAuthError(
                 f"ANTHROPIC_API_KEY is invalid or rejected: {e}"
             ) from e
-        raise PlumbAuthError(
-            f"Failed to verify API access: {e}"
-        ) from e
+        raise PlumbAuthError(f"Failed to verify LLM access: {e}") from e
 
 
-def get_program_lm(program_name: str, repo_root: str | Path | None = None) -> dspy.LM | None:
-    """Return a per-program LM override from config, or None for the default."""
+def get_program_config(program_name: str, repo_root: str | Path | None = None) -> dict | None:
+    """Return the raw program_models entry for a program, or None."""
     from plumb.config import find_repo_root, load_config
 
     if repo_root is None:
@@ -71,14 +86,29 @@ def get_program_lm(program_name: str, repo_root: str | Path | None = None) -> ds
     cfg = load_config(repo_root)
     if cfg is None:
         return None
-    entry = cfg.program_models.get(program_name)
+    return cfg.program_models.get(program_name)
+
+
+def get_program_lm(program_name: str, repo_root: str | Path | None = None) -> BaseLM | None:
+    """Return a per-program LM override from config, or None for the default."""
+    entry = get_program_config(program_name, repo_root)
     if entry is None:
         return None
     model = entry.get("model")
     if not model:
         return None
     max_tokens = entry.get("max_tokens", 8192)
-    return dspy.LM(model, max_tokens=max_tokens)
+
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return dspy.LM(model, max_tokens=max_tokens)
+
+    from plumb.programs.claude_code_lm import ClaudeCodeLM, find_claude_cli
+
+    if find_claude_cli():
+        cli_model = model.removeprefix("anthropic/")
+        return ClaudeCodeLM(model=cli_model, max_tokens=max_tokens)
+
+    return None
 
 
 def run_with_retries(fn, *args, max_retries: int = 2, **kwargs):
@@ -94,6 +124,7 @@ def run_with_retries(fn, *args, max_retries: int = 2, **kwargs):
                 raise PlumbAuthError(
                     f"API key is invalid or rejected: {e}"
                 ) from e
+            print(f"[retry {attempt+1}/{max_retries+1}] {type(e).__name__}: {e}")
             last_error = e
     raise PlumbInferenceError(
         f"LLM inference failed after {max_retries + 1} attempts: {last_error}"
