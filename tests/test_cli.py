@@ -789,3 +789,39 @@ def test_sync_cli_precheck_counts_recorded(initialized_repo, monkeypatch):
     assert r.exit_code == 0, r.output
     assert "No unsynced decisions to sync." not in r.output
     stub.assert_called_once()
+
+
+def test_search_cli(initialized_repo, monkeypatch):
+    from tests.test_search import _seed
+    _seed(initialized_repo)
+    monkeypatch.chdir(initialized_repo)
+    runner = CliRunner()
+
+    r = runner.invoke(cli, ["search", "cache", "--json"])
+    assert r.exit_code == 0, r.output
+    data = json.loads(r.output)
+    assert sorted(d["id"] for d in data) == ["d1", "d3"]
+    by_id = {d["id"]: d for d in data}
+    assert by_id["d1"]["score"] > 0 and by_id["d1"]["file_refs"] == [{"file": "src/cache.py", "lines": [1, 9]}]
+
+    r = runner.invoke(cli, ["search", "--sort", "date", "--limit", "1"])
+    assert r.exit_code == 0, r.output
+    assert "d3" in r.output and "d2" not in r.output
+
+    r = runner.invoke(cli, ["search", "--file", "src/auth.py"])
+    assert r.exit_code == 0, r.output
+    assert "d2" in r.output and "files: src/auth.py:42-58" in r.output and "d1" not in r.output
+
+    # Human output: recorded rows show approved_by; score only under relevance sort.
+    r = runner.invoke(cli, ["search", "cache"])
+    assert r.exit_code == 0, r.output
+    assert "recorded" in r.output and "auto" in r.output and "score" in r.output
+    assert "session 019a0000 turns 4-5" in r.output
+    r = runner.invoke(cli, ["search", "--status", "recorded"])
+    assert "score" not in r.output
+
+    r = runner.invoke(cli, ["search", "--since", "no-such-ref"])
+    assert r.exit_code == 1 and "no-such-ref" in r.output
+
+    r = runner.invoke(cli, ["search", "zzzz-nothing"])
+    assert r.exit_code == 0 and "No decisions." in r.output

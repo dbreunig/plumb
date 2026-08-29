@@ -1056,6 +1056,73 @@ def log_cmd(since_ref, verify):
 
 
 @cli.command()
+@click.argument("query", nargs=-1)
+@click.option("--sort", type=click.Choice(["relevance", "date", "confidence"]), default=None,
+              help="Default: relevance with a query, date otherwise")
+@click.option("--status", multiple=True, help="Repeatable. Default hides ignored and rejected*")
+@click.option("--agent", multiple=True, help="Repeatable")
+@click.option("--branch")
+@click.option("--file", help="Match file_refs[*].file")
+@click.option("--made-by", type=click.Choice(["user", "agent"]))
+@click.option("--since", help="ISO date or git ref")
+@click.option("--limit", type=int, default=50, show_default=True)
+@click.option("--json", "as_json", is_flag=True)
+def search(query, sort, status, agent, branch, file, made_by, since, limit, as_json):
+    """Search the decision log across every branch (flat, newest first by default)."""
+    from rich.markup import escape
+    from plumb.search import search_decisions
+
+    repo_root = find_repo_root()
+    if repo_root is None:
+        console.print("[red]Error: Not a git repository.[/red]")
+        raise SystemExit(1)
+    text = " ".join(query).strip()
+    try:
+        hits = search_decisions(
+            repo_root, text, sort=sort, status=list(status) or None, agent=list(agent) or None,
+            branch=branch, file=file, made_by=made_by, since=since, limit=limit,
+        )
+    except ValueError as e:
+        console.print(f"[red]Error: {escape(str(e))}[/red]")
+        raise SystemExit(1)
+    if as_json:
+        click.echo(json.dumps([h.decision.model_dump() | {"score": h.score} for h in hits], indent=2))
+        return
+    if not hits:
+        console.print("No decisions.")
+        return
+    show_score = (sort or ("relevance" if text else "date")) == "relevance" and bool(text)
+    for h in hits:
+        d = h.decision
+        conf = f"{d.confidence:.2f}" if d.confidence is not None else "-"
+        date = (d.created_at or "")[:10] or "-"
+        sha = (d.commit_sha or "")[:7] or "-"
+        tail = []
+        if d.session_id:
+            tail.append(f"session {escape(d.session_id[:8])}")
+        if d.turn_range:
+            tail.append(f"turns {d.turn_range[0]}-{d.turn_range[1]}")
+        if d.status == "recorded" and d.approved_by:
+            tail.append(f"by {escape(d.approved_by)}")
+        if show_score:
+            tail.append(f"score {h.score:.2f}")
+        console.print(
+            f"{escape(d.id)}  {escape(d.status):<9} {escape(d.agent or '-'):<7} "
+            f"{escape(d.made_by or '-'):<6} {conf:<4}  {date}  {sha}  {' '.join(tail)}".rstrip()
+        )
+        body = textwrap.fill(
+            d.decision or "", width=max(40, console.width - 6),
+            initial_indent="    ", subsequent_indent="    ",
+        )
+        console.print(escape(body))
+        if d.file_refs:
+            refs = ", ".join(
+                f"{r.file}:{r.lines[0]}-{r.lines[-1]}" if r.lines else r.file for r in d.file_refs
+            )
+            console.print(f"    [dim]files: {escape(refs)}[/dim]")
+
+
+@cli.command()
 def status():
     """Print a summary of the project's Plumb state."""
     repo_root = find_repo_root()
