@@ -34,45 +34,6 @@ class TestDetectAmendExtended:
 
 
 class TestHookWithConversation:
-    def test_with_conversation_log(self, initialized_repo):
-        """Test that conversation log is read when available."""
-        repo = Repo(initialized_repo)
-        f = initialized_repo / "code.py"
-        f.write_text("hello = True\n")
-        repo.index.add(["code.py"])
-
-        # Create a fake conversation log
-        log_path = initialized_repo / "conv.jsonl"
-        log_data = [
-            json.dumps({"role": "user", "content": "add hello", "timestamp": "2025-01-02T00:00:00Z"}),
-            json.dumps({"role": "assistant", "content": "done", "timestamp": "2025-01-02T00:01:00Z"}),
-        ]
-        log_path.write_text("\n".join(log_data))
-
-        config = load_config(initialized_repo)
-        config.claude_log_path = str(log_path)
-        config.last_commit = None
-        save_config(initialized_repo, config)
-
-        mock_decisions = [
-            Decision(
-                id="dec-conv1",
-                status="pending",
-                question="Add hello?",
-                decision="Yes.",
-                made_by="user",
-                confidence=0.95,
-                created_at=datetime.now(timezone.utc).isoformat(),
-            )
-        ]
-
-        with patch("plumb.programs.validate_api_access"), \
-             patch("plumb.git_hook._analyze_diff", return_value="feature: hello"), \
-             patch("plumb.git_hook._extract_decisions_from_conversation", return_value=mock_decisions), \
-             patch("plumb.git_hook._synthesize_questions", return_value=mock_decisions):
-            result = run_hook(initialized_repo)
-            assert result == 1  # Should block due to pending
-
     def test_json_output_structure(self):
         """Verify JSON output has correct structure."""
         decisions = [

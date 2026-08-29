@@ -1,220 +1,173 @@
+"""Turn rendering and per-session chunking for the decision extractor."""
 from __future__ import annotations
 
-import json
-import os
 import re
 from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from plumb.traces import SessionRef, ToolCall, Turn
 
-class ConversationTurn(BaseModel):
-    role: str
-    content: str = ""
-    timestamp: Optional[str] = None
+# Backwards-compatible name; a ConversationTurn *is* a Turn.
+ConversationTurn = Turn
 
 
 class Chunk(BaseModel):
     chunk_index: int
+    agent: str
+    session_id: str
+    turn_start: int
+    turn_end: int
     start_timestamp: Optional[str] = None
     end_timestamp: Optional[str] = None
     truncated: bool = False
-    turns: list[ConversationTurn] = Field(default_factory=list)
+    turns: list[Turn] = Field(default_factory=list)
+
+    @property
+    def header(self) -> str:
+        return f"[agent={self.agent} session={self.session_id} turns {self.turn_start}-{self.turn_end}]"
 
     @property
     def text(self) -> str:
-        return "\n".join(f"[{t.role}]: {t.content}" for t in self.turns)
+        return "\n".join([self.header] + [render_turn(t) for t in self.turns])
 
 
 def estimate_tokens(text: str) -> int:
     return len(text) // 4
 
 
-def locate_conversation_log(config_path: str | None = None) -> Path | None:
-    """Check config path, then auto-detect common Claude Code log locations."""
-    if config_path:
-        p = Path(config_path)
-        if p.exists():
-            return p
-
-    # Auto-detect common Claude Code conversation log locations
-    home = Path.home()
-    candidates = [
-        home / ".claude" / "conversations.jsonl",
-        home / ".claude" / "conversation_log.jsonl",
-        home / ".claude" / "logs" / "conversation.jsonl",
-    ]
-    for c in candidates:
-        if c.exists():
-            return c
-    return None
+def render_tool_call(tc: ToolCall) -> str:
+    if tc.category in ("Edit", "Write", "Read") and tc.file_path:
+        head = f"[{tc.category} {tc.file_path}]"
+    elif tc.input_summary:
+        head = f"[{tc.category}: {tc.input_summary}]"
+    else:
+        head = f"[{tc.category}: {tc.name}]"
+    if tc.result_summary:
+        head += f" -> {tc.result_summary}"
+    return "  " + head
 
 
-def read_conversation_log(
-    path: Path, since: str | None = None
-) -> list[ConversationTurn]:
-    """Read JSONL conversation log, filtering by timestamp if since is provided."""
-    turns: list[ConversationTurn] = []
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            data = json.loads(line)
-            turn = ConversationTurn(
-                role=data.get("role", "unknown"),
-                content=data.get("content", ""),
-                timestamp=data.get("timestamp"),
-            )
-            if since and turn.timestamp and turn.timestamp <= since:
-                continue
-            turns.append(turn)
-        except (json.JSONDecodeError, Exception):
-            continue
-    return turns
+def render_turn(t: Turn) -> str:
+    lines = [f"[{t.role}]: {t.content}"]
+    lines += [render_tool_call(tc) for tc in t.tool_calls]
+    return "\n".join(lines)
 
 
 def _looks_like_file_read(content: str) -> bool:
-    """Heuristic: content begins with a file path or code fence."""
     stripped = content.strip()
     if not stripped:
         return False
     if stripped.startswith("```"):
         return True
-    # Looks like a file path (starts with / or ./ or contains common extensions)
-    if re.match(r"^[/.]", stripped) or re.match(r"^\w+[/\\]", stripped):
-        return True
-    return False
+    return bool(re.match(r"^[/.]", stripped) or re.match(r"^\w+[/\\]", stripped))
 
 
-def reduce_noise(turns: list[ConversationTurn]) -> list[ConversationTurn]:
-    """Replace tool result turns >500 tokens that look like file reads
-    with a short placeholder."""
+def reduce_noise(turns: list[Turn]) -> list[Turn]:
+    """Replace >500-token turns that look like file reads with a placeholder."""
     result = []
     for turn in turns:
-        tokens = estimate_tokens(turn.content)
-        if tokens > 500 and _looks_like_file_read(turn.content):
-            # Extract filename heuristic
-            first_line = turn.content.strip().split("\n")[0]
-            filename = first_line.strip("`").strip()
-            if len(filename) > 100:
-                filename = filename[:100]
-            result.append(
-                ConversationTurn(
-                    role=turn.role,
-                    content=f"[file read: {filename}]",
-                    timestamp=turn.timestamp,
-                )
-            )
+        if estimate_tokens(turn.content) > 500 and _looks_like_file_read(turn.content):
+            first_line = turn.content.strip().split("\n")[0].strip("`").strip()[:100]
+            result.append(turn.model_copy(update={"content": f"[file read: {first_line}]"}))
         else:
             result.append(turn)
     return result
 
 
-def _split_at_tool_boundary(turns: list[ConversationTurn], max_tokens: int) -> list[list[ConversationTurn]]:
-    """Split a list of turns at tool call boundaries to stay under max_tokens."""
-    chunks: list[list[ConversationTurn]] = []
-    current: list[ConversationTurn] = []
-    current_tokens = 0
-
+def _split_at_tool_boundary(turns: list[Turn], max_tokens: int) -> list[list[Turn]]:
+    chunks, current, current_tokens = [], [], 0
     for turn in turns:
-        turn_tokens = estimate_tokens(turn.content)
-        if current and current_tokens + turn_tokens > max_tokens:
-            # Try to split at a role boundary
+        n = estimate_tokens(render_turn(turn))
+        if current and current_tokens + n > max_tokens:
             chunks.append(current)
-            current = [turn]
-            current_tokens = turn_tokens
+            current, current_tokens = [turn], n
         else:
             current.append(turn)
-            current_tokens += turn_tokens
-
+            current_tokens += n
     if current:
         chunks.append(current)
     return chunks
 
 
-def read_conversation(
-    repo_root: Path,
-    config_path: str | None = None,
-    since_commit: str | None = None,
-    since_datetime: str | None = None,
-) -> list[ConversationTurn]:
-    """Unified entry point for reading conversation turns.
-
-    If config_path is set and points to an existing file, use the legacy
-    read_conversation_log(). Otherwise, auto-detect Claude Code session files.
-
-    since_datetime (ISO format) takes priority over since_commit when both
-    are provided, giving a tighter time bound.
-    """
-    if config_path:
-        log_path = locate_conversation_log(config_path)
-        if log_path is not None:
-            return read_conversation_log(log_path, since=since_datetime or since_commit)
-
-    from plumb.claude_session import read_claude_sessions
-
-    return read_claude_sessions(
-        repo_root, since_commit=since_commit, since_datetime=since_datetime
-    )
+def _chunk_session(turns: list[Turn], max_tokens: int) -> list[list[Turn]]:
+    groups: list[list[Turn]] = []
+    current: list[Turn] = []
+    for turn in turns:
+        if turn.role == "user" and current:
+            groups.append(current)
+            current = [turn]
+        else:
+            current.append(turn)
+    if current:
+        groups.append(current)
+    final: list[list[Turn]] = []
+    for g in groups:
+        if sum(estimate_tokens(render_turn(t)) for t in g) <= max_tokens:
+            final.append(g)
+        else:
+            final.extend(_split_at_tool_boundary(g, max_tokens))
+    return final
 
 
-def chunk_conversation(
-    turns: list[ConversationTurn], max_tokens: int = 6000
-) -> list[Chunk]:
-    """Chunk conversation into groups bounded by user turn boundaries.
+def chunk_conversation(turns: list[Turn], max_tokens: int = 6000) -> list[Chunk]:
+    """Group by (agent, session_id) in first-seen order, then by user turn.
 
-    1. Group by user turn boundary (user msg + all following assistant turns)
-    2. If chunk > max_tokens, split at turn boundaries
-    3. One-turn overlap between chunks
+    One-turn overlap between consecutive chunks of the *same* session; the
+    turn range excludes the overlap so provenance points at new content only.
     """
     if not turns:
         return []
+    sessions: dict[tuple[str, str], list[Turn]] = {}
+    for t in turns:
+        sessions.setdefault((t.agent, t.session_id), []).append(t)
 
-    # Step 1: Group by user turn
-    groups: list[list[ConversationTurn]] = []
-    current_group: list[ConversationTurn] = []
-
-    for turn in turns:
-        if turn.role == "user" and current_group:
-            groups.append(current_group)
-            current_group = [turn]
-        else:
-            current_group.append(turn)
-
-    if current_group:
-        groups.append(current_group)
-
-    # Step 2: Check sizes, split oversized groups
-    final_groups: list[list[ConversationTurn]] = []
-    for group in groups:
-        group_tokens = sum(estimate_tokens(t.content) for t in group)
-        if group_tokens <= max_tokens:
-            final_groups.append(group)
-        else:
-            # Split at turn boundaries
-            sub_chunks = _split_at_tool_boundary(group, max_tokens)
-            final_groups.extend(sub_chunks)
-
-    # Step 3: Build Chunk objects with one-turn overlap
     chunks: list[Chunk] = []
-    for i, group in enumerate(final_groups):
-        overlap_turns = []
-        if i > 0 and final_groups[i - 1]:
-            overlap_turns = [final_groups[i - 1][-1]]
-
-        all_turns = overlap_turns + group
-        timestamps = [t.timestamp for t in all_turns if t.timestamp]
-
-        chunks.append(
-            Chunk(
-                chunk_index=i,
-                start_timestamp=timestamps[0] if timestamps else None,
-                end_timestamp=timestamps[-1] if timestamps else None,
-                truncated=False,
+    for (agent, session_id), sturns in sessions.items():
+        sturns = sorted(sturns, key=lambda t: t.ordinal)
+        groups = _chunk_session(sturns, max_tokens)
+        for i, group in enumerate(groups):
+            overlap = [groups[i - 1][-1]] if i > 0 else []
+            all_turns = overlap + group
+            stamps = [t.timestamp for t in all_turns if t.timestamp]
+            chunks.append(Chunk(
+                chunk_index=len(chunks), agent=agent, session_id=session_id,
+                turn_start=group[0].ordinal, turn_end=group[-1].ordinal,
+                start_timestamp=stamps[0] if stamps else None,
+                end_timestamp=stamps[-1] if stamps else None,
                 turns=all_turns,
-            )
-        )
-
+            ))
     return chunks
+
+
+def read_conversation_with_refs(
+    repo_root: Path,
+    since_commit: str | None = None,
+    since_datetime: str | None = None,
+) -> tuple[list[Turn], dict[tuple[str, str], SessionRef]]:
+    """Stage 1: every registered TraceSource, every session in this repo since the cutoff.
+
+    Returns the turns plus the SessionRef for each (agent, session_id), which
+    the hook needs for source_path / parent_session_id provenance.
+    """
+    from plumb.traces import all_sources
+    from plumb.traces.repo import resolve_cutoff
+
+    cutoff = resolve_cutoff(repo_root, since_commit, since_datetime)
+    turns: list[Turn] = []
+    refs: dict[tuple[str, str], SessionRef] = {}
+    for source in all_sources():
+        for ref in source.discover(repo_root, cutoff):
+            refs[(ref.agent, ref.session_id)] = ref
+            turns.extend(source.parse(ref, cutoff))
+    return turns, refs
+
+
+def read_conversation(
+    repo_root: Path,
+    config_path: str | None = None,   # accepted and ignored; legacy config field
+    since_commit: str | None = None,
+    since_datetime: str | None = None,
+) -> list[Turn]:
+    return read_conversation_with_refs(repo_root, since_commit, since_datetime)[0]
