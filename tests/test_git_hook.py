@@ -360,9 +360,11 @@ class TestSpecRelevantFiltering:
             ),
         ]
 
-        mock_chunks = [MagicMock(text="conversation text", chunk_index=0)]
+        from plumb.conversation import Chunk
+        mock_chunks = [Chunk(chunk_index=0, agent="claude", session_id="s1",
+                             turn_start=0, turn_end=0, turns=[])]
 
-        with patch("plumb.git_hook.read_conversation", return_value=[MagicMock()]), \
+        with patch("plumb.git_hook.read_conversation_with_refs", return_value=([MagicMock()], {})), \
              patch("plumb.git_hook.reduce_noise", return_value=[MagicMock()]), \
              patch("plumb.git_hook.chunk_conversation", return_value=mock_chunks), \
              patch("plumb.programs.configure_dspy"), \
@@ -420,3 +422,56 @@ class TestSpecRelevantFiltering:
              patch("plumb.programs.run_with_retries", return_value=none_relevant):
             decisions = _extract_decisions_from_diff("diff summary", "main")
             assert len(decisions) == 0
+
+
+# --- Task 9: provenance + file_refs stamping -------------------------------
+
+from plumb.traces import SessionRef, ToolCall, Turn
+
+
+def test_extraction_stamps_provenance_and_file_refs(initialized_repo):
+    from plumb.config import load_config
+
+    # stage an edit to src/a.py so hunks exist
+    (initialized_repo / "src").mkdir()
+    (initialized_repo / "src" / "a.py").write_text("x = 1\n")
+    Repo(initialized_repo).index.add(["src/a.py"])
+
+    ref = SessionRef(agent="codex", session_id="019a", path="/tmp/r.jsonl", cwd=str(initialized_repo))
+    sub = SessionRef(agent="codex", session_id="agent-k", path="/tmp/k.jsonl",
+                     cwd=str(initialized_repo), parent_session_id="019a")
+    turns = [
+        Turn(agent="codex", session_id="019a", ordinal=4, role="user", content="make x 1"),
+        Turn(agent="codex", session_id="019a", ordinal=5, role="assistant", content="done",
+             tool_calls=[ToolCall(name="apply_patch", category="Edit", file_path="src/a.py")]),
+        Turn(agent="codex", session_id="agent-k", ordinal=0, role="user", content="subtask"),
+    ]
+    refs = {("codex", "019a"): ref, ("codex", "agent-k"): sub}
+    extracted = [ExtractedDecision(question="x?", decision="x is 1", made_by="user", confidence=0.9)]
+
+    with patch("plumb.git_hook.read_conversation_with_refs", return_value=(turns, refs)), \
+         patch("plumb.programs.configure_dspy"), \
+         patch("plumb.programs.run_with_retries", return_value=extracted):
+        decisions = _extract_decisions_from_conversation(
+            initialized_repo, load_config(initialized_repo), "summary")
+
+    assert len(decisions) == 2  # one per chunk: parent session, subagent session
+    by_session = {d.session_id: d for d in decisions}
+    d = by_session["019a"]
+    assert (d.agent, d.turn_range, d.source_path) == ("codex", [4, 5], "/tmp/r.jsonl")
+    assert d.parent_session_id is None
+    assert len(d.evidence_digest) == 64
+    assert [(r.file, r.lines) for r in d.file_refs] == [("src/a.py", [1, 1])]
+    assert d.chunk_index is None
+    k = by_session["agent-k"]
+    assert (k.parent_session_id, k.source_path, k.file_refs) == ("019a", "/tmp/k.jsonl", [])
+
+
+def test_read_conversation_no_longer_accepts_config_path(tmp_repo):
+    import inspect
+    from plumb.conversation import read_conversation
+    assert "config_path" not in inspect.signature(read_conversation).parameters
+    assert "claude_log_path" not in PlumbConfig.model_fields
+    # old config files with the key still load
+    cfg = PlumbConfig(**{"spec_paths": ["s.md"], "claude_log_path": "/x"})
+    assert cfg.spec_paths == ["s.md"]

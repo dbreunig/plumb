@@ -15,7 +15,6 @@ class TestPlumbConfig:
         cfg = PlumbConfig()
         assert cfg.spec_paths == []
         assert cfg.test_paths == []
-        assert cfg.claude_log_path is None
         assert cfg.last_commit is None
         assert cfg.program_models == {}
 
@@ -23,10 +22,9 @@ class TestPlumbConfig:
         cfg = PlumbConfig(
             spec_paths=["docs/spec.md"],
             test_paths=["tests/"],
-            claude_log_path="/tmp/log.jsonl",
         )
         assert cfg.spec_paths == ["docs/spec.md"]
-        assert cfg.claude_log_path == "/tmp/log.jsonl"
+        assert cfg.test_paths == ["tests/"]
 
     def test_serialization_roundtrip(self):
         cfg = PlumbConfig(spec_paths=["a.md"], test_paths=["t/"])

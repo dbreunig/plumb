@@ -12,7 +12,8 @@ from plumb import PlumbAuthError
 from plumb.config import load_config, save_config, find_repo_root
 from plumb.ignore import parse_plumbignore, is_ignored
 from plumb.conversation import (
-    read_conversation,
+    read_conversation_with_refs,
+    parents_from_refs,
     reduce_noise,
     chunk_conversation,
 )
@@ -106,13 +107,15 @@ def _analyze_diff(diff: str) -> str:
 def _extract_decisions_from_conversation(
     repo_root: Path, config, diff_summary: str
 ) -> list[Decision]:
-    """Read conversation log, chunk it, run DecisionExtractor per chunk."""
+    """Stage 1+2: read every agent's sessions, chunk per session, run
+    DecisionExtractor per chunk, and stamp provenance + deterministic file_refs."""
+    import hashlib
     from plumb.programs import configure_dspy, run_with_retries
     from plumb.programs.decision_extractor import DecisionExtractor
+    from plumb.traces.hunks import staged_hunks, file_refs_for
 
-    turns = read_conversation(
+    turns, refs = read_conversation_with_refs(
         repo_root,
-        config_path=config.claude_log_path,
         since_commit=config.last_commit,
         since_datetime=config.last_extracted_at,
     )
@@ -120,21 +123,33 @@ def _extract_decisions_from_conversation(
         return []
 
     turns = reduce_noise(turns)
-    chunks = chunk_conversation(turns)
+    chunks = chunk_conversation(turns, parents=parents_from_refs(refs))
 
     configure_dspy()
     extractor = DecisionExtractor()
     now = datetime.now(timezone.utc).isoformat()
-    branch = _get_branch_name(Repo(repo_root))
+    repo = Repo(repo_root)
+    branch = _get_branch_name(repo)
+    hunks = staged_hunks(repo)
 
     all_decisions: list[Decision] = []
     for chunk in chunks:
         try:
-            extracted = run_with_retries(
-                extractor, chunk.text, diff_summary
-            )
+            extracted = run_with_retries(extractor, chunk.text, diff_summary)
         except Exception:
             continue
+        ref = refs.get((chunk.agent, chunk.session_id))
+        digest = hashlib.sha256(chunk.text.encode("utf-8")).hexdigest()
+        # chunk.turns includes the one-turn overlap from the previous chunk;
+        # a file edited there is still relevant context for this chunk.
+        edited = [
+            p
+            for t in chunk.turns
+            for tc in t.tool_calls
+            if tc.category in ("Edit", "Write")
+            for p in tc.file_paths
+        ]
+        file_refs = file_refs_for(edited, hunks, repo_root, cwd=ref.cwd if ref else None)
         for ed in extracted:
             if not ed.spec_relevant:
                 continue
@@ -147,9 +162,16 @@ def _extract_decisions_from_conversation(
                     made_by=ed.made_by,
                     branch=branch,
                     confidence=ed.confidence,
-                    chunk_index=chunk.chunk_index,
                     conversation_available=True,
                     created_at=now,
+                    agent=chunk.agent,
+                    session_id=chunk.session_id,
+                    parent_session_id=chunk.parent_session_id,
+                    source_path=ref.path if ref else None,
+                    turn_range=[chunk.turn_start, chunk.turn_end],
+                    evidence_digest=digest,
+                    file_refs=file_refs,
+                    conversation_truncated=chunk.truncated,
                 )
             )
     return all_decisions

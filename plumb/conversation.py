@@ -210,8 +210,6 @@ def read_conversation_with_refs(
 
 def read_conversation(
     repo_root: Path,
-    # TODO(task-9): drop config_path/claude_log_path once the hook passes refs
-    config_path: str | None = None,   # accepted and ignored; legacy config field
     since_commit: str | None = None,
     since_datetime: str | None = None,
 ) -> list[Turn]:
