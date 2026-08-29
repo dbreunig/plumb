@@ -2,8 +2,11 @@
 
 One DuckDB query reads every ``.plumb/decisions/*.jsonl`` shard with
 latest-line-wins dedup (the same shape as ``read_all_decisions``) and applies
-every filter in SQL. Relevance is an in-process BM25 over
-``question + decision + user_note`` on the filtered rows; DuckDB's ``fts``
+every filter, sort, and limit in SQL. Column types are declared explicitly
+from ``Decision.model_fields`` so older shards that lack the provenance
+columns simply yield typed NULLs. Relevance is an in-process BM25 over
+``question + decision + user_note`` computed across every row passing the
+non-text filters (so idf reflects the whole corpus); DuckDB's ``fts``
 extension is a network download the wheel does not bundle, so v1 does not
 depend on it. The ranking is isolated in ``bm25_scores`` so swapping it is
 local.
@@ -25,10 +28,28 @@ _TOKEN = re.compile(r"[a-z0-9]+")
 # Statuses hidden unless --status names them explicitly.
 _HIDDEN_BY_DEFAULT_SQL = "status <> 'ignored' AND status NOT LIKE 'rejected%'"
 
-_FILE_REFS_TYPE = "STRUCT(file VARCHAR, lines BIGINT[])[]"
+# Explicit DuckDB types for read_json: no inference, so an all-null or absent
+# column never comes back as JSON, and every shard shares one schema.
+_COLUMN_TYPES: dict[str, str] = {c: "VARCHAR" for c in Decision.model_fields}
+_COLUMN_TYPES.update({
+    "file_refs": "STRUCT(file VARCHAR, lines BIGINT[])[]",
+    "related_requirement_ids": "VARCHAR[]",
+    "turn_range": "BIGINT[]",
+    "confidence": "DOUBLE",
+    "chunk_index": "BIGINT",
+    "conversation_available": "BOOLEAN",
+    "conversation_truncated": "BOOLEAN",
+})
+_COLUMNS_SQL = "{" + ", ".join(f"'{k}': '{v}'" for k, v in _COLUMN_TYPES.items()) + "}"
 
-# Text BM25 scores and the query prefilter look at.
+# Text BM25 scores.
 _TEXT_COLS = ("question", "decision", "user_note")
+
+_CREATED_TS = "try_cast(created_at AS TIMESTAMP)"
+_ORDER_BY = {
+    "date": f"{_CREATED_TS} DESC NULLS LAST, id",
+    "confidence": f"confidence DESC NULLS LAST, {_CREATED_TS} DESC NULLS LAST, id",
+}
 
 
 def tokenize(text: str) -> list[str]:
@@ -80,9 +101,21 @@ def _resolve_since(repo_root: Path, since: Optional[str]) -> Optional[datetime]:
     return dt
 
 
-def _text_expr(present: set[str]) -> str:
-    parts = [f"coalesce(try_cast({c} AS VARCHAR), '')" for c in _TEXT_COLS if c in present]
-    return "lower(" + " || ' ' || ".join(parts) + ")" if parts else "''"
+def _latest_cte(decisions_dir: Path) -> str:
+    # read_json cannot take its path as a parameter; escape it instead.
+    glob = str(decisions_dir / "*.jsonl").replace("'", "''")
+    return f"""
+        WITH raw AS (SELECT *, ROW_NUMBER() OVER () AS _n
+                     FROM read_json('{glob}', format='newline_delimited', columns={_COLUMNS_SQL})),
+             latest AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id ORDER BY _n DESC) AS _rn FROM raw)
+    """
+
+
+def _row_to_decision(cols: list[str], row: tuple) -> Decision:
+    cleaned = _clean_duckdb_row(dict(zip(cols, row)))
+    # A column absent from an older shard arrives as NULL; let the model's
+    # defaults stand in (file_refs -> [], ref_status -> "ok", ...).
+    return Decision(**{k: v for k, v in cleaned.items() if v is not None})
 
 
 def search_decisions(
@@ -100,9 +133,10 @@ def search_decisions(
 ) -> list[Hit]:
     """Enumerate, filter, and rank decisions across every branch shard.
 
-    *sort* is ``relevance`` (default when *query* is given), ``date`` (newest
-    first; default otherwise), or ``confidence`` (desc, nulls last). Without
-    an explicit *status*, ``ignored`` and ``rejected*`` rows are hidden.
+    *sort* is ``relevance`` (default when *query* is given; falls back to
+    ``date`` without one), ``date`` (newest first; default otherwise), or
+    ``confidence`` (desc, nulls last). Without an explicit *status*,
+    ``ignored`` and ``rejected*`` rows are hidden. ``limit`` of 0/None = all.
     """
     import duckdb
 
@@ -112,97 +146,72 @@ def search_decisions(
         return []
     since_dt = _resolve_since(repo_root, since)
 
-    # read_json_auto cannot take its path as a parameter; escape it instead.
-    glob = str(d / "*.jsonl").replace("'", "''")
-    source = f"read_json_auto('{glob}', format='newline_delimited', union_by_name=true)"
+    where: list[str] = ["_rn = 1"]
+    params: list = []
+
+    def col_in(col: str, values: list[str]) -> None:
+        where.append(f"{col} IN ({','.join('?' * len(values))})")
+        params.extend(values)
+
+    if status:
+        col_in("status", list(status))
+    else:
+        where.append(_HIDDEN_BY_DEFAULT_SQL)
+    if agent:
+        col_in("agent", list(agent))
+    if branch:
+        col_in("branch", [branch])
+    if made_by:
+        col_in("made_by", [made_by])
+    if file:
+        where.append("len(list_filter(file_refs, r -> r.file = ?)) > 0")
+        params.append(file)
+    if since_dt is not None:
+        where.append(f"{_CREATED_TS} >= ?")
+        params.append(since_dt.astimezone(timezone.utc).replace(tzinfo=None))
+
+    cte = _latest_cte(d)
+    cols = list(Decision.model_fields)
+    select_full = f"{cte} SELECT {', '.join(cols)} FROM latest WHERE {' AND '.join(where)}"
+
+    sort = sort or ("relevance" if query else "date")
+    if sort == "relevance" and not query:
+        sort = "date"
 
     con = duckdb.connect(":memory:")
     try:
-        # ISO strings with an offset infer as UTC-naive TIMESTAMP; keep every
-        # timestamp cast in UTC so --since compares apples to apples.
+        # ISO strings with an offset cast to UTC-naive TIMESTAMP; keep the
+        # session in UTC so --since compares apples to apples.
         con.execute("SET TimeZone = 'UTC'")
-        # Older shards lack the provenance columns (agent, session_id, ...);
-        # only reference what this log actually has.
-        present = {r[0] for r in con.execute(f"DESCRIBE SELECT * FROM {source}").fetchall()}
+        if sort == "relevance":
+            # Score every row passing the non-text filters so idf sees the
+            # whole corpus, then fetch full records only for the survivors.
+            light = con.execute(
+                f"{cte} SELECT id, {', '.join(_TEXT_COLS)}, created_at FROM latest WHERE {' AND '.join(where)}",
+                params,
+            ).fetchall()
+            scores = bm25_scores([" ".join(c or "" for c in r[1:-1]) for r in light], query)
+            ranked = sorted(
+                ((s, r[-1] or "", r[0]) for r, s in zip(light, scores) if s > 0),
+                reverse=True,
+            )
+            if limit:
+                ranked = ranked[:limit]
+            if not ranked:
+                return []
+            ids = [i for _, _, i in ranked]
+            rel = con.execute(
+                f"{cte} SELECT {', '.join(cols)} FROM latest WHERE _rn = 1 AND id IN ({','.join('?' * len(ids))})",
+                ids,
+            )
+            by_id = {x.id: x for x in (_row_to_decision(cols, r) for r in rel.fetchall())}
+            return [Hit(by_id[i], s) for s, _, i in ranked]
 
-        where: list[str] = []
-        params: list = []
-
-        def col_in(col: str, values: list[str]) -> None:
-            if col not in present:
-                where.append("FALSE")
-                return
-            where.append(f"{col} IN ({','.join('?' * len(values))})")
-            params.extend(values)
-
-        if status:
-            col_in("status", list(status))
-        else:
-            where.append(_HIDDEN_BY_DEFAULT_SQL)
-        if agent:
-            col_in("agent", list(agent))
-        if branch:
-            col_in("branch", [branch])
-        if made_by:
-            col_in("made_by", [made_by])
-        if file:
-            if "file_refs" in present:
-                where.append(
-                    f"len(list_filter(try_cast(file_refs AS {_FILE_REFS_TYPE}), r -> r.file = ?)) > 0"
-                )
-                params.append(file)
-            else:
-                where.append("FALSE")
-        if since_dt is not None:
-            if "created_at" in present:
-                where.append("try_cast(created_at AS TIMESTAMP) >= ?")
-                params.append(since_dt.astimezone(timezone.utc).replace(tzinfo=None))
-            else:
-                where.append("FALSE")
-        if query:
-            # Cheap prefilter: any query token appears somewhere in the text;
-            # BM25 then orders, so partial matches rank instead of vanishing.
-            toks = tokenize(query)
-            text = _text_expr(present)
-            if toks:
-                where.append("(" + " OR ".join(f"regexp_matches({text}, ?)" for _ in toks) + ")")
-                params.extend(re.escape(t) for t in toks)
-
-        select_cols = [c for c in Decision.model_fields if c in present]
-        select_list = ", ".join(
-            f"try_cast(file_refs AS {_FILE_REFS_TYPE}) AS file_refs" if c == "file_refs" else c
-            for c in select_cols
-        )
-        sql = f"""
-            WITH raw AS (SELECT *, ROW_NUMBER() OVER () AS _n FROM {source}),
-                 latest AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY id ORDER BY _n DESC) AS _rn FROM raw)
-            SELECT {select_list} FROM latest WHERE _rn = 1 AND {' AND '.join(where)}
-        """
+        sql = f"{select_full} ORDER BY {_ORDER_BY[sort]}"
+        if limit:
+            sql += " LIMIT ?"
+            params.append(limit)
         rel = con.execute(sql, params)
-        cols = [c[0] for c in rel.description]
-        rows = [Decision(**_clean_duckdb_row(dict(zip(cols, r)))) for r in rel.fetchall()]
+        return [Hit(_row_to_decision(cols, r), 0.0) for r in rel.fetchall()]
     finally:
         con.close()
-
-    sort = sort or ("relevance" if query else "date")
-    if sort == "relevance" and query:
-        scores = bm25_scores(
-            [" ".join(getattr(x, c) or "" for c in _TEXT_COLS) for x in rows], query
-        )
-        hits = sorted(
-            (Hit(x, s) for x, s in zip(rows, scores)),
-            key=lambda h: (h.score, h.decision.created_at or ""),
-            reverse=True,
-        )
-    elif sort == "confidence":
-        hits = sorted(
-            (Hit(x, 0.0) for x in rows),
-            key=lambda h: (
-                h.decision.confidence is None,
-                -(h.decision.confidence or 0.0),
-                h.decision.created_at or "",
-            ),
-        )
-    else:
-        hits = sorted((Hit(x, 0.0) for x in rows), key=lambda h: h.decision.created_at or "", reverse=True)
-    return hits[:limit] if limit else hits

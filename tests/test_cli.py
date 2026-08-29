@@ -825,3 +825,38 @@ def test_search_cli(initialized_repo, monkeypatch):
 
     r = runner.invoke(cli, ["search", "zzzz-nothing"])
     assert r.exit_code == 0 and "No decisions." in r.output
+
+
+@pytest.mark.parametrize("args", [["search"], ["log"]])
+def test_search_and_log_exit_quietly_on_broken_pipe(initialized_repo, monkeypatch, args):
+    from tests.test_search import _seed
+    _seed(initialized_repo)
+    monkeypatch.chdir(initialized_repo)
+    with patch("plumb.cli.console.print", side_effect=BrokenPipeError):
+        r = CliRunner().invoke(cli, args)
+    assert r.exit_code == 0, r.output
+    assert not isinstance(r.exception, BrokenPipeError)
+
+
+@pytest.mark.parametrize("args", [["search"], ["search", "--json"], ["log"]])
+def test_search_and_log_survive_real_broken_pipe(initialized_repo, args):
+    """Pipe a large output into a reader that closes after one line; the
+    process must exit 0 with no traceback (Rich's own handler exits 1)."""
+    import sys
+    from plumb.decision_log import append_decisions
+    append_decisions(initialized_repo, [
+        Decision(id=f"dec-{i:05d}", status="approved", branch="main", decision=("long decision text " * 20) + str(i),
+                 created_at=f"2026-01-01T00:00:{i % 60:02d}+00:00")
+        for i in range(3000)
+    ], branch="main")
+    proc = subprocess.Popen(
+        [sys.executable, "-c", "from plumb.cli import cli; cli()", *args, "--limit", "0"] if args[0] == "search"
+        else [sys.executable, "-c", "from plumb.cli import cli; cli()", *args],
+        cwd=initialized_repo, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    first = proc.stdout.readline()
+    proc.stdout.close()
+    _, err = proc.communicate(timeout=60)
+    assert first, err
+    assert proc.returncode == 0, err.decode()
+    assert b"Traceback" not in err

@@ -33,7 +33,25 @@ from plumb.decision_log import (
     find_decision_branch,
 )
 
-console = Console()
+def _quiet_broken_pipe() -> None:
+    """stdout's reader went away (e.g. `plumb search | head`): stop printing
+    and exit cleanly instead of tracing back."""
+    try:
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+    except (OSError, ValueError):
+        pass
+    raise SystemExit(0)
+
+
+class _Console(Console):
+    """Rich swallows BrokenPipeError itself and exits 1; exit 0 quietly instead."""
+
+    def on_broken_pipe(self) -> None:
+        self.quiet = True
+        _quiet_broken_pipe()
+
+
+console = _Console()
 
 
 def _find_spec_suggestions(repo_root: Path) -> list[str]:
@@ -1026,6 +1044,16 @@ def log_cmd(since_ref, verify):
     if not decisions:
         console.print("No decisions.")
         return
+    try:
+        _print_log(repo_root, decisions, verify)
+    except BrokenPipeError:
+        _quiet_broken_pipe()
+
+
+def _print_log(repo_root: Path, decisions: list[Decision], verify: bool) -> None:
+    from rich.markup import escape
+    from plumb.log_view import UNCOMMITTED, group_decisions, verify_evidence
+
     for commit, agents in group_decisions(decisions).items():
         console.print(f"[bold]{commit if commit == UNCOMMITTED else commit[:12]}[/bold]")
         for agent, ds in agents.items():
@@ -1058,14 +1086,14 @@ def log_cmd(since_ref, verify):
 @cli.command()
 @click.argument("query", nargs=-1)
 @click.option("--sort", type=click.Choice(["relevance", "date", "confidence"]), default=None,
-              help="Default: relevance with a query, date otherwise")
+              help="Default: relevance with a query, date otherwise. relevance requires a query (falls back to date)")
 @click.option("--status", multiple=True, help="Repeatable. Default hides ignored and rejected*")
 @click.option("--agent", multiple=True, help="Repeatable")
 @click.option("--branch")
 @click.option("--file", help="Match file_refs[*].file")
 @click.option("--made-by", type=click.Choice(["user", "agent"]))
 @click.option("--since", help="ISO date or git ref")
-@click.option("--limit", type=int, default=50, show_default=True)
+@click.option("--limit", type=int, default=50, show_default=True, help="Max hits; 0 = all")
 @click.option("--json", "as_json", is_flag=True)
 def search(query, sort, status, agent, branch, file, made_by, since, limit, as_json):
     """Search the decision log across every branch (flat, newest first by default)."""
@@ -1086,12 +1114,24 @@ def search(query, sort, status, agent, branch, file, made_by, since, limit, as_j
         console.print(f"[red]Error: {escape(str(e))}[/red]")
         raise SystemExit(1)
     if as_json:
-        click.echo(json.dumps([h.decision.model_dump() | {"score": h.score} for h in hits], indent=2))
+        try:
+            click.echo(json.dumps([h.decision.model_dump() | {"score": h.score} for h in hits], indent=2))
+        except BrokenPipeError:
+            _quiet_broken_pipe()
         return
     if not hits:
         console.print("No decisions.")
         return
     show_score = (sort or ("relevance" if text else "date")) == "relevance" and bool(text)
+    try:
+        _print_hits(hits, show_score)
+    except BrokenPipeError:
+        _quiet_broken_pipe()
+
+
+def _print_hits(hits, show_score: bool) -> None:
+    from rich.markup import escape
+
     for h in hits:
         d = h.decision
         conf = f"{d.confidence:.2f}" if d.confidence is not None else "-"

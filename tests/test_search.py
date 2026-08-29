@@ -1,3 +1,5 @@
+import json
+import time
 from datetime import datetime, timezone, timedelta
 
 import pytest
@@ -53,6 +55,9 @@ def test_search_relevance_default_and_ignored_rejected_excluded(initialized_repo
 
 
 def test_search_any_token_prefilter_ranks_partial_matches(initialized_repo):
+    """No SQL token prefilter: BM25 runs over every row passing the non-text
+    filters, so a doc matching only some query tokens still ranks (below full
+    matches) instead of vanishing, and idf reflects the whole corpus."""
     _seed(initialized_repo)
     hits = search_decisions(initialized_repo, query="cache ttl")
     assert [h.decision.id for h in hits] == ["d1", "d3"]        # TTL decision first; eviction still present
@@ -109,3 +114,40 @@ def test_search_pre_provenance_shard(initialized_repo):
     # Filters on columns the shard does not have match nothing rather than erroring.
     assert search_decisions(initialized_repo, agent=["claude"]) == []
     assert search_decisions(initialized_repo, file="src/x.py") == []
+
+
+def test_bm25_idf_over_full_corpus_and_no_match_yields_nothing(initialized_repo):
+    t0 = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    rows = [Decision(id=f"n{i}", status="approved", branch="main", decision=f"Unrelated note number {i} about auth tokens.",
+                     created_at=(t0 + timedelta(hours=i)).isoformat()) for i in range(8)]
+    rows += [
+        Decision(id="c1", status="approved", branch="main", decision="Use a cache with TTL.", created_at=(t0 + timedelta(days=1)).isoformat()),
+        Decision(id="c2", status="approved", branch="main", decision="Evict cache entries by LRU.", created_at=(t0 + timedelta(days=2)).isoformat()),
+    ]
+    append_decisions(initialized_repo, rows, branch="main")
+    hits = search_decisions(initialized_repo, query="cache")
+    # idf = log(1 + (10 - 2 + 0.5) / (2 + 0.5)) > 1 only if idf sees all 10 docs, not just the 2 containing the token.
+    assert sorted(h.decision.id for h in hits) == ["c1", "c2"]
+    assert hits[0].score > 1.0
+    assert search_decisions(initialized_repo, query="zzzz") == []
+    assert len(search_decisions(initialized_repo, query="cache", limit=1)) == 1
+
+
+def test_search_sql_sort_and_limit_on_large_shard(initialized_repo):
+    t0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    rows = [Decision(id=f"big-{i:05d}", status="approved", branch="main", decision=f"decision {i}",
+                     confidence=(i % 100) / 100, created_at=(t0 + timedelta(minutes=(i * 7919) % 5000)).isoformat())
+            for i in range(5000)]
+    path = initialized_repo / ".plumb" / "decisions" / "main.jsonl"
+    path.write_text("".join(json.dumps(r.model_dump()) + "\n" for r in rows))
+
+    t = time.perf_counter()
+    hits = search_decisions(initialized_repo, sort="date", limit=10)
+    assert time.perf_counter() - t < 1.0
+    assert len(hits) == 10
+    expected = sorted(rows, key=lambda r: (r.created_at, r.id), reverse=True)[:10]
+    assert [h.decision.id for h in hits] == [r.id for r in expected]
+
+    hits = search_decisions(initialized_repo, sort="confidence", limit=5)
+    assert [h.decision.confidence for h in hits] == [0.99] * 5
+    assert len(search_decisions(initialized_repo, limit=0)) == 5000
