@@ -14,6 +14,8 @@ from pydantic import BaseModel, Field
 
 class FileRef(BaseModel):
     file: str
+    # [start, end]: one inclusive line range per FileRef. A file with N
+    # staged hunks yields N FileRefs, not one FileRef with N ranges.
     lines: list[int] = Field(default_factory=list)
 
 
