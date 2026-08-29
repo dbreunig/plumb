@@ -39,3 +39,39 @@ def test_commit_datetime(tmp_repo):
     sha = Repo(tmp_repo).head.commit.hexsha
     assert commit_datetime(tmp_repo, sha) is not None
     assert commit_datetime(tmp_repo, "0" * 40) is None
+
+
+from datetime import datetime, timezone
+from plumb.traces.repo import resolve_cutoff, parse_ts, after_cutoff
+
+
+def test_resolve_cutoff_prefers_datetime(tmp_repo):
+    from git import Repo
+    sha = Repo(tmp_repo).head.commit.hexsha
+    dt = resolve_cutoff(tmp_repo, since_commit=sha, since_datetime="2030-01-01T00:00:00Z")
+    assert dt.year == 2030
+
+
+def test_resolve_cutoff_falls_back_to_commit(tmp_repo):
+    from git import Repo
+    sha = Repo(tmp_repo).head.commit.hexsha
+    assert resolve_cutoff(tmp_repo, since_commit=sha, since_datetime=None) is not None
+
+
+def test_resolve_cutoff_none(tmp_repo):
+    assert resolve_cutoff(tmp_repo, None, None) is None
+
+
+def test_parse_ts_handles_z_and_epoch_ms():
+    assert parse_ts("2026-01-01T00:00:00Z").tzinfo is not None
+    assert parse_ts(1786916035750).year == 2026
+    assert parse_ts("garbage") is None
+    assert parse_ts(None) is None
+
+
+def test_after_cutoff():
+    cut = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    assert after_cutoff("2026-01-02T00:00:00Z", cut)
+    assert not after_cutoff("2025-12-31T00:00:00Z", cut)
+    assert after_cutoff(None, cut)          # unknown timestamps are kept
+    assert after_cutoff("2025-01-01T00:00:00Z", None)
