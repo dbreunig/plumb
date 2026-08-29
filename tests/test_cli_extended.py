@@ -38,7 +38,7 @@ class TestInitExtended:
         spec.write_text("# Spec\n")
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\nnew_tests/\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\nnew_tests/\n\n")
             assert result.exit_code == 0
             assert (tmp_repo / "new_tests").exists()
 

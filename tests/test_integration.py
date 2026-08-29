@@ -216,7 +216,7 @@ class TestCLIEndToEnd:
 
         with patch("plumb.cli.find_repo_root", return_value=tmp_path), \
              patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
             assert result.exit_code == 0
 
         with patch("plumb.cli.find_repo_root", return_value=tmp_path):

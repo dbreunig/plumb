@@ -15,7 +15,9 @@ from rich.console import Console
 from rich.table import Table
 
 from plumb.config import (
+    MODES,
     PlumbConfig,
+    effective_mode,
     find_repo_root,
     ensure_plumb_dir,
     load_config,
@@ -105,6 +107,18 @@ def cli():
     pass
 
 
+def _install_hooks(repo_root: Path) -> None:
+    """Write the pre-commit and post-commit hooks into .git/hooks and make them executable."""
+    hooks_dir = repo_root / ".git" / "hooks"
+    hooks_dir.mkdir(exist_ok=True)
+    hook_path = hooks_dir / "pre-commit"
+    hook_path.write_text("#!/bin/sh\nplumb hook\nexit $?\n")
+    hook_path.chmod(0o755)
+    post_commit_path = hooks_dir / "post-commit"
+    post_commit_path.write_text("#!/bin/sh\nplumb post-commit\n")
+    post_commit_path.chmod(0o755)
+
+
 def _init_clone_setup(repo_root: Path, cfg: PlumbConfig) -> None:
     """Set up plumb on a freshly cloned repo that already has .plumb/ config."""
     console.print("[cyan]Plumb is already initialized in this repo.[/cyan]")
@@ -113,14 +127,7 @@ def _init_clone_setup(repo_root: Path, cfg: PlumbConfig) -> None:
     with console.status("[bold cyan]Setting up plumb...", spinner="dots") as status:
         # Install git hooks (may be missing after clone)
         status.update("[bold cyan]Installing git hooks...")
-        hooks_dir = repo_root / ".git" / "hooks"
-        hooks_dir.mkdir(exist_ok=True)
-        hook_path = hooks_dir / "pre-commit"
-        hook_path.write_text("#!/bin/sh\nplumb hook\nexit $?\n")
-        hook_path.chmod(0o755)
-        post_commit_path = hooks_dir / "post-commit"
-        post_commit_path.write_text("#!/bin/sh\nplumb post-commit\n")
-        post_commit_path.chmod(0o755)
+        _install_hooks(repo_root)
 
         # Verify API access
         status.update("[bold cyan]Verifying API access...")
@@ -194,6 +201,15 @@ def init():
         console.print(f"[yellow]Warning: Path '{test_input}' does not exist. Creating it.[/yellow]")
         test_path.mkdir(parents=True, exist_ok=True)
 
+    # Mode
+    mode_input = click.prompt(
+        "How should Plumb handle decisions? review = stop each commit until you approve; "
+        "record = record after each commit, review later with plumb log/search",
+        type=click.Choice(list(MODES)),
+        default="review",
+        show_choices=True,
+    )
+
     # Pytest compatibility check
     pytest_installed = importlib.util.find_spec("pytest") is not None
     if not pytest_installed:
@@ -242,19 +258,13 @@ def init():
             spec_paths=[spec_input],
             test_paths=[test_input],
             initialized_at=datetime.now(timezone.utc).isoformat(),
+            mode=mode_input,
         )
         save_config(repo_root, cfg)
 
         # Install git hooks
         status.update("[bold cyan]Installing git hooks...")
-        hooks_dir = repo_root / ".git" / "hooks"
-        hooks_dir.mkdir(exist_ok=True)
-        hook_path = hooks_dir / "pre-commit"
-        hook_path.write_text("#!/bin/sh\nplumb hook\nexit $?\n")
-        hook_path.chmod(0o755)
-        post_commit_path = hooks_dir / "post-commit"
-        post_commit_path.write_text("#!/bin/sh\nplumb post-commit\n")
-        post_commit_path.chmod(0o755)
+        _install_hooks(repo_root)
 
         # Create default .plumbignore
         status.update("[bold cyan]Creating .plumbignore...")
@@ -292,6 +302,7 @@ def init():
     console.print(f"  Skill: .claude/skills/plumb/SKILL.md")
     console.print(f"  Spec: {spec_input}")
     console.print(f"  Tests: {test_input}")
+    console.print(f"  Mode: {mode_input}")
 
 
 def _coverage_bar(covered: int, total: int, width: int = 20) -> str:
@@ -354,6 +365,28 @@ This project uses Plumb to keep the spec, tests, and code in sync.
 
     for name in ("CLAUDE.md", "AGENTS.md"):
         _write_block(repo_root / name, block)
+
+
+@cli.command()
+@click.argument("new_mode", required=False, type=click.Choice(list(MODES)))
+def mode(new_mode):
+    """Show or set how Plumb handles decisions (review | record)."""
+    repo_root = find_repo_root()
+    if repo_root is None:
+        console.print("[red]Error: Not a git repository.[/red]")
+        raise SystemExit(1)
+    cfg = load_config(repo_root)
+    if cfg is None:
+        console.print("[yellow]Plumb not initialized. Run 'plumb init'.[/yellow]")
+        raise SystemExit(1)
+    if new_mode is None:
+        m, src = effective_mode(cfg)
+        console.print(f"{m}  (from {src})")
+        return
+    cfg.mode = new_mode
+    save_config(repo_root, cfg)
+    _install_hooks(repo_root)
+    console.print(f"[green]Mode set to {new_mode}. Hooks reinstalled.[/green]")
 
 
 @cli.command()
@@ -998,6 +1031,10 @@ def status():
         console.print("[yellow]Plumb not initialized. Run 'plumb init'.[/yellow]")
         return
     
+    # Mode
+    m, src = effective_mode(config)
+    console.print(f"[cyan]Mode:[/cyan] {m} (from {src})")
+
     # Spec files
     console.print(f"[cyan]Spec files:[/cyan] {', '.join(config.spec_paths)}")
 

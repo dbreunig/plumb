@@ -36,7 +36,7 @@ class TestInit:
 
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
             assert result.exit_code == 0
             assert "initialized" in result.output.lower()
 
@@ -59,7 +59,7 @@ class TestInitPlumbignore:
 
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
             assert result.exit_code == 0
 
         plumbignore = tmp_repo / ".plumbignore"
@@ -78,7 +78,7 @@ class TestInitPlumbignore:
 
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
             assert result.exit_code == 0
 
         assert (tmp_repo / ".plumbignore").read_text() == custom
@@ -311,7 +311,7 @@ class TestInitPytestDetection:
              patch("plumb.sync.parse_spec_files", return_value=[]), \
              patch("plumb.cli.importlib.util") as mock_importlib:
             mock_importlib.find_spec.return_value = None
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
             assert result.exit_code == 0
             assert "pytest was not detected" in result.output
             assert "pip install pytest" in result.output
@@ -322,7 +322,7 @@ class TestInitPytestDetection:
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]):
             # Don't mock find_spec — pytest IS installed in test env
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
             assert result.exit_code == 0
             assert "pytest was not detected" not in result.output
 
@@ -334,7 +334,7 @@ class TestInitPytestDetection:
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]), \
              patch("plumb.cli.subprocess.run", return_value=MagicMock(returncode=0)):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
             assert result.exit_code == 0
 
     def test_collect_only_fails_aborts_init(self, runner, tmp_repo):
@@ -346,7 +346,7 @@ class TestInitPytestDetection:
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]), \
              patch("plumb.cli.subprocess.run", return_value=mock_result):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
             assert result.exit_code != 0
             assert "pytest failed to collect tests" in result.output
             assert not (tmp_repo / ".plumb" / "config.json").exists()
@@ -357,7 +357,7 @@ class TestInitPytestDetection:
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]), \
              patch("plumb.cli.subprocess.run") as mock_run:
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
             assert result.exit_code == 0
             mock_run.assert_not_called()
 
@@ -371,7 +371,7 @@ class TestInitPytestDetection:
              patch("plumb.cli.importlib.util") as mock_importlib, \
              patch("plumb.cli.subprocess.run") as mock_run:
             mock_importlib.find_spec.return_value = None
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
             assert result.exit_code == 0
             mock_run.assert_not_called()
 
@@ -383,7 +383,7 @@ class TestInitPytestDetection:
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]), \
              patch("plumb.cli.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="pytest", timeout=30)):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
             assert result.exit_code == 0
             assert "timed out" in result.output
 
@@ -396,7 +396,7 @@ class TestInitValidation:
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.cli._find_spec_suggestions", return_value=[]), \
              patch("plumb.cli._find_test_suggestions", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.txt\ntests/\n")
+            result = runner.invoke(cli, ["init"], input="spec.txt\ntests/\n\n")
             assert result.exit_code != 0
             assert "not a markdown file" in result.output.lower()
 
@@ -406,7 +406,7 @@ class TestInitValidation:
         (tmp_repo / "tests").mkdir(exist_ok=True)
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="1\ntests/\n")
+            result = runner.invoke(cli, ["init"], input="1\ntests/\n\n")
             assert result.exit_code == 0
             assert "my_spec.md" in result.output
 
@@ -418,7 +418,7 @@ class TestInitValidation:
         (tests_dir / "test_foo.py").write_text("def test_foo(): pass\n")
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\n1\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\n1\n\n")
             assert result.exit_code == 0
             assert "tests/" in result.output
 
@@ -644,3 +644,68 @@ class TestStatusStale:
              patch("plumb.coverage_reporter.check_spec_to_code_coverage", return_value=[]):
             result = runner.invoke(cli, ["status"])
         assert "Stale evidence" in result.output and "2" in result.output.split("Stale evidence")[1][:6]
+
+
+class TestModeCommand:
+    def test_mode_command_prints_and_sets(self, initialized_repo, monkeypatch):
+        from click.testing import CliRunner
+        from plumb.cli import cli
+        from plumb.config import load_config
+        monkeypatch.chdir(initialized_repo)
+        r = CliRunner().invoke(cli, ["mode"])
+        assert r.exit_code == 0 and "review" in r.output and "config" in r.output
+        r = CliRunner().invoke(cli, ["mode", "record"])
+        assert r.exit_code == 0, r.output
+        assert load_config(initialized_repo).mode == "record"
+        hook = initialized_repo / ".git" / "hooks" / "pre-commit"
+        assert hook.exists() and "plumb hook" in hook.read_text()
+        assert (initialized_repo / ".git" / "hooks" / "post-commit").exists()
+        r = CliRunner().invoke(cli, ["mode", "gate"])
+        assert r.exit_code != 0
+
+    def test_mode_command_reports_env_override(self, initialized_repo, monkeypatch):
+        from click.testing import CliRunner
+        from plumb.cli import cli
+        monkeypatch.chdir(initialized_repo)
+        monkeypatch.setenv("PLUMB_MODE", "record")
+        r = CliRunner().invoke(cli, ["mode"])
+        assert "record" in r.output and "env" in r.output
+
+    def test_mode_command_not_initialized(self, runner, tmp_repo, monkeypatch):
+        monkeypatch.chdir(tmp_repo)
+        result = runner.invoke(cli, ["mode"])
+        assert "not initialized" in result.output.lower()
+
+
+class TestInitMode:
+    def test_init_prompts_for_mode(self, runner, tmp_repo):
+        from plumb.config import load_config
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        (tmp_repo / "tests").mkdir(exist_ok=True)
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\nrecord\n")
+            assert result.exit_code == 0, result.output
+            assert "How should Plumb handle decisions" in result.output
+        assert load_config(tmp_repo).mode == "record"
+
+    def test_init_defaults_mode_to_review(self, runner, tmp_repo):
+        from plumb.config import load_config
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        (tmp_repo / "tests").mkdir(exist_ok=True)
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
+            assert result.exit_code == 0, result.output
+        assert load_config(tmp_repo).mode == "review"
+
+
+class TestStatusMode:
+    def test_status_shows_effective_mode(self, runner, initialized_repo, monkeypatch):
+        with patch("plumb.cli.find_repo_root", return_value=initialized_repo):
+            result = runner.invoke(cli, ["status"])
+            assert result.exit_code == 0
+            assert "Mode: review (from config)" in result.output
+            monkeypatch.setenv("PLUMB_MODE", "record")
+            result = runner.invoke(cli, ["status"])
+            assert "Mode: record (from env)" in result.output
