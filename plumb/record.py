@@ -9,7 +9,6 @@ depending on ``record_threshold``.
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -20,6 +19,10 @@ from git import Repo
 from plumb.config import load_config
 from plumb.decision_log import Decision, append_decisions, delete_decisions_by_commit
 from plumb.traces.hunks import parse_unified_hunks
+from plumb.traces.repo import commit_datetime
+
+# Transcript cutoff for a root commit: there is no previous commit, so read everything.
+_EPOCH = "1970-01-01T00:00:00+00:00"
 
 _GIT = ["git", "-c", "core.quotePath=false"]
 
@@ -44,6 +47,14 @@ def commit_diff(repo: Repo, config, sha: str) -> tuple[str, dict[str, list[list[
     return diff, hunks
 
 
+def _on_any_ref(repo: Repo, sha: str) -> bool:
+    """True if some local or remote branch (or HEAD) contains ``sha``."""
+    try:
+        return repo.git.branch("--all", "--contains", sha).strip() != ""
+    except Exception:
+        return False
+
+
 def _same_parent(repo: Repo, old_sha: str, new_sha: str) -> bool:
     try:
         o, n = repo.commit(old_sha), repo.commit(new_sha)
@@ -55,20 +66,27 @@ def _same_parent(repo: Repo, old_sha: str, new_sha: str) -> bool:
 def delete_replaced_commit_decisions(
     repo_root: Path, repo: Repo, last_commit: str | None, sha: str, branch: str
 ) -> int:
-    """If ``sha`` amended ``last_commit`` (same parent, different commit), drop
-    the replaced commit's decisions — they describe a commit that no longer
-    exists. Returns the number of lines removed."""
+    """If ``sha`` amended ``last_commit`` (same parent, different commit, and the
+    old commit is no longer on any ref), drop the replaced commit's decisions —
+    they describe a commit that no longer exists. A same-parent sibling whose
+    predecessor still lives on some branch is not an amend. Returns the number
+    of lines removed."""
     if not last_commit or last_commit == sha or not _same_parent(repo, last_commit, sha):
+        return 0
+    if _on_any_ref(repo, last_commit):
         return 0
     return delete_decisions_by_commit(repo_root, last_commit, branch=branch)
 
 
-def record_extract(repo_root, sha: str) -> list[Decision]:
-    """Extract decisions for commit ``sha`` and append them as recorded/pending.
+def record_extract(repo_root, sha: str, branch: str | None = None) -> list[Decision]:
+    """Extract decisions for commit ``sha`` and append them as recorded/pending
+    to the ``branch`` shard (default: the currently checked-out branch; the
+    worker passes the branch the commit landed on, since the user may have
+    switched branches by the time it runs).
 
     Returns the decisions written. Writes nothing (and skips the LLM) when the
-    commit touches only ignored/managed files, or is no longer reachable from
-    HEAD (it was amended or reset away while the worker waited for the lock).
+    commit touches only ignored/managed files, or is no longer on any ref (it
+    was amended or reset away while the worker waited for the lock).
     """
     from plumb import git_hook  # late import: git_hook imports this module
 
@@ -79,9 +97,10 @@ def record_extract(repo_root, sha: str) -> list[Decision]:
         return []
     c = repo.commit(sha)
     sha = c.hexsha
-    branch = git_hook._get_branch_name(repo)
+    if branch is None:
+        branch = git_hook._get_branch_name(repo)
 
-    if not repo.is_ancestor(sha, repo.head.commit):
+    if not _on_any_ref(repo, sha):
         return []
 
     prev = c.parents[0].hexsha if c.parents else None
@@ -91,9 +110,14 @@ def record_extract(repo_root, sha: str) -> list[Decision]:
     if not diff.strip():
         return []
 
+    # Explicit cutoff: transcripts since the parent commit. Passing
+    # since_commit=None alone would fall back to config.last_commit, which
+    # post-commit has already advanced to this very commit.
+    prev_dt = commit_datetime(repo_root, prev) if prev else None
+    since_datetime = prev_dt.isoformat() if prev_dt is not None else _EPOCH
     decisions = git_hook.extract_decisions(
         repo_root, cfg, diff, branch,
-        since_commit=prev, since_datetime=None, hunks=hunks,
+        since_commit=None, since_datetime=since_datetime, hunks=hunks,
     )
     now = datetime.now(timezone.utc).isoformat()
     out: list[Decision] = []
@@ -117,6 +141,8 @@ def record_extract(repo_root, sha: str) -> list[Decision]:
 def record_lock(repo_root, wait: bool = True):
     """Advisory lock on ``.plumb/record.lock``; yields True when held, False when
     ``wait=False`` and another worker holds it."""
+    import fcntl
+
     path = Path(repo_root) / ".plumb" / "record.lock"
     path.parent.mkdir(exist_ok=True)
     with open(path, "a+") as f:
@@ -131,14 +157,14 @@ def record_lock(repo_root, wait: bool = True):
             fcntl.flock(f, fcntl.LOCK_UN)
 
 
-def spawn_worker(repo_root, sha: str) -> None:
-    """Launch ``plumb record-extract <sha>`` detached; the commit returns immediately.
-    Worker output is appended to ``.plumb/record.log``."""
+def spawn_worker(repo_root, sha: str, branch: str) -> None:
+    """Launch ``plumb record-extract <sha> --branch <branch>`` detached; the
+    commit returns immediately. Worker output is appended to ``.plumb/record.log``."""
     plumb_dir = Path(repo_root) / ".plumb"
     plumb_dir.mkdir(exist_ok=True)
     with open(plumb_dir / "record.log", "ab") as log:
         subprocess.Popen(
-            [sys.executable, "-m", "plumb.cli", "record-extract", sha],
+            [sys.executable, "-m", "plumb.cli", "record-extract", sha, "--branch", branch],
             cwd=str(repo_root),
             stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
             start_new_session=True,

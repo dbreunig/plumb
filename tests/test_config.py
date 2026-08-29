@@ -158,3 +158,12 @@ def test_other_validation_errors_still_return_none(tmp_repo):
     p = tmp_repo / ".plumb"; p.mkdir(exist_ok=True)
     (p / "config.json").write_text('{"spec_paths": "not-a-list"}')
     assert load_config(tmp_repo) is None
+
+
+def test_ensure_plumb_dir_ignores_record_runtime_files(tmp_path):
+    ensure_plumb_dir(tmp_path)
+    gi = tmp_path / ".plumb" / ".gitignore"
+    assert gi.read_text() == "record.log\nrecord.lock\n"
+    gi.write_text("custom\n")
+    ensure_plumb_dir(tmp_path)  # idempotent: never clobbers an existing file
+    assert gi.read_text() == "custom\n"

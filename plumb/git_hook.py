@@ -420,8 +420,9 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
             return 0
 
         # Record mode extracts after the commit lands (see plumb.record);
-        # the pre-commit hook has nothing to do.
-        if effective_mode(config)[0] == "record":
+        # the pre-commit hook has nothing to do. `plumb diff` (dry run) is a
+        # read-only preview and still works in either mode.
+        if effective_mode(config)[0] == "record" and not dry_run:
             return 0
 
         repo = Repo(repo_root)
@@ -520,7 +521,7 @@ def run_post_commit(repo_root: str | Path | None = None) -> None:
 
         if record_mode:
             # Detached worker; the commit returns immediately.
-            record.spawn_worker(repo_root, new_sha)
+            record.spawn_worker(repo_root, new_sha, branch)
     except Exception:
         pass
 

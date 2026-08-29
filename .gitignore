@@ -3,5 +3,3 @@ __pycache__/
 .coverage
 .pytest_cache/
 .env
-.plumb/record.log
-.plumb/record.lock

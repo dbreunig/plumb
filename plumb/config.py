@@ -69,10 +69,17 @@ def find_repo_root(start: str | Path | None = None) -> Path | None:
     return None
 
 
+# Runtime files written by the record-mode worker; never meant to be committed.
+_PLUMB_GITIGNORE = "record.log\nrecord.lock\n"
+
+
 def ensure_plumb_dir(repo_root: str | Path) -> Path:
-    """Create .plumb/ directory if it doesn't exist. Returns the path."""
+    """Create .plumb/ (and its .gitignore for runtime files) if absent. Returns the path."""
     plumb_dir = Path(repo_root) / ".plumb"
     plumb_dir.mkdir(exist_ok=True)
+    gitignore = plumb_dir / ".gitignore"
+    if not gitignore.exists():
+        gitignore.write_text(_PLUMB_GITIGNORE)
     return plumb_dir
 
 

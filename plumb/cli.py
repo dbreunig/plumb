@@ -430,8 +430,9 @@ def post_commit():
 
 @cli.command(name="record-extract")
 @click.argument("sha")
-@click.option("--wait", is_flag=True, help="Run inline and print results (the default; kept for the documented interface)")
-def record_extract_cmd(sha, wait):
+@click.option("--branch", default=None, help="Decision shard to write to (default: the checked-out branch)")
+@click.option("--wait", is_flag=True, help="Accepted for compatibility; the command always runs inline once it holds the lock.")
+def record_extract_cmd(sha, branch, wait):
     """Extract decisions for a landed commit (record mode worker)."""
     from plumb.record import record_extract, record_lock
 
@@ -444,7 +445,7 @@ def record_extract_cmd(sha, wait):
         raise SystemExit(1)
 
     with record_lock(repo_root):
-        written = record_extract(repo_root, sha)
+        written = record_extract(repo_root, sha, branch=branch)
     recorded = sum(d.status == "recorded" for d in written)
     pending = sum(d.status == "pending" for d in written)
     console.print(f"Recorded {recorded} decision(s), {pending} pending for {sha[:12]}.")
@@ -1070,10 +1071,11 @@ def status():
     # Mode
     m, src = effective_mode(config)
     console.print(f"[cyan]Mode:[/cyan] {m} (from {src})")
-    from plumb.record import record_lock
-    with record_lock(repo_root, wait=False) as free:
-        if not free:
-            console.print("[yellow]Recording in progress…[/yellow]")
+    if m == "record" and (Path(repo_root) / ".plumb" / "record.lock").exists():
+        from plumb.record import record_lock
+        with record_lock(repo_root, wait=False) as free:
+            if not free:
+                console.print("[yellow]Recording in progress…[/yellow]")
 
     # Spec files
     console.print(f"[cyan]Spec files:[/cyan] {', '.join(config.spec_paths)}")
