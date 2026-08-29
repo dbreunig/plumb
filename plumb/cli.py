@@ -428,6 +428,28 @@ def post_commit():
     run_post_commit(repo_root)
 
 
+@cli.command(name="record-extract")
+@click.argument("sha")
+@click.option("--wait", is_flag=True, help="Run inline and print results (the default; kept for the documented interface)")
+def record_extract_cmd(sha, wait):
+    """Extract decisions for a landed commit (record mode worker)."""
+    from plumb.record import record_extract, record_lock
+
+    repo_root = find_repo_root()
+    if repo_root is None:
+        console.print("[red]Error: Not a git repository.[/red]")
+        raise SystemExit(1)
+    if load_config(repo_root) is None:
+        console.print("[yellow]Plumb not initialized. Run 'plumb init'.[/yellow]")
+        raise SystemExit(1)
+
+    with record_lock(repo_root):
+        written = record_extract(repo_root, sha)
+    recorded = sum(d.status == "recorded" for d in written)
+    pending = sum(d.status == "pending" for d in written)
+    console.print(f"Recorded {recorded} decision(s), {pending} pending for {sha[:12]}.")
+
+
 @cli.command()
 def diff():
     """Preview what Plumb will capture from staged changes (read-only)."""
@@ -1048,6 +1070,10 @@ def status():
     # Mode
     m, src = effective_mode(config)
     console.print(f"[cyan]Mode:[/cyan] {m} (from {src})")
+    from plumb.record import record_lock
+    with record_lock(repo_root, wait=False) as free:
+        if not free:
+            console.print("[yellow]Recording in progress…[/yellow]")
 
     # Spec files
     console.print(f"[cyan]Spec files:[/cyan] {', '.join(config.spec_paths)}")
@@ -1174,3 +1200,7 @@ def merge_decisions(branch, target):
         console.print(f"No decisions found for branch '{branch}'.")
     else:
         console.print(f"[green]Merged {result['merged']} decision lines from '{branch}' into '{target}'.[/green]")
+
+
+if __name__ == "__main__":
+    cli()

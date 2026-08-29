@@ -10,7 +10,7 @@ from pathlib import Path
 from git import Repo
 
 from plumb import PlumbAuthError
-from plumb.config import load_config, save_config, find_repo_root
+from plumb.config import load_config, save_config, find_repo_root, effective_mode
 from plumb.ignore import parse_plumbignore, is_ignored
 from plumb.conversation import (
     read_conversation_with_refs,
@@ -18,6 +18,7 @@ from plumb.conversation import (
     reduce_noise,
     chunk_conversation,
 )
+from plumb import record
 from plumb.decision_log import (
     Decision,
     generate_decision_id,
@@ -37,18 +38,21 @@ def _get_plumb_managed_paths(config) -> list[str]:
     return [".plumb/"] + list(config.spec_paths)
 
 
-def _get_staged_diff_filtered(repo: Repo, config) -> str:
-    """Get staged diff excluding plumb-managed and ignored files."""
+def _filter_paths(repo: Repo, config, paths: list[str]) -> list[str]:
+    """Drop plumb-managed paths and ``.plumbignore`` matches from ``paths``."""
     managed = _get_plumb_managed_paths(config)
     ignore_patterns = parse_plumbignore(repo.working_dir)
-    staged_files = repo.git.diff("--cached", "--name-only").splitlines()
-    if not staged_files:
-        return ""
-    unmanaged = [
-        f for f in staged_files
+    return [
+        f for f in paths
         if not any(f == m or f.startswith(m) for m in managed)
         and not is_ignored(f, ignore_patterns)
     ]
+
+
+def _get_staged_diff_filtered(repo: Repo, config) -> str:
+    """Get staged diff excluding plumb-managed and ignored files."""
+    staged_files = repo.git.diff("--cached", "--name-only").splitlines()
+    unmanaged = _filter_paths(repo, config, staged_files)
     if not unmanaged:
         return ""
     return repo.git.diff("--cached", "--", *unmanaged)
@@ -415,6 +419,11 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
         if config is None:
             return 0
 
+        # Record mode extracts after the commit lands (see plumb.record);
+        # the pre-commit hook has nothing to do.
+        if effective_mode(config)[0] == "record":
+            return 0
+
         repo = Repo(repo_root)
 
     # 2. Get staged diff and branch (excluding plumb-managed files)
@@ -494,6 +503,13 @@ def run_post_commit(repo_root: str | Path | None = None) -> None:
 
         new_sha = str(repo.head.commit)
         branch = _get_branch_name(repo)
+        record_mode = effective_mode(config)[0] == "record"
+        if record_mode:
+            # An amend replaced last_commit; its decisions go with it. Must run
+            # before last_commit is overwritten below.
+            record.delete_replaced_commit_decisions(
+                repo_root, repo, config.last_commit, new_sha, branch
+            )
         config.last_commit = new_sha
         config.last_commit_branch = branch
         config.last_extracted_at = None
@@ -501,6 +517,10 @@ def run_post_commit(repo_root: str | Path | None = None) -> None:
 
         if prev_dt is not None:
             _stamp_commit_sha(repo_root, new_sha, branch, prev_dt)
+
+        if record_mode:
+            # Detached worker; the commit returns immediately.
+            record.spawn_worker(repo_root, new_sha)
     except Exception:
         pass
 
