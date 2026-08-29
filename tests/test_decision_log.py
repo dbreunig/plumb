@@ -445,3 +445,36 @@ def test_decision_provenance_via_duckdb(initialized_repo):
                                                  agent="pi", turn_range=[0, 3])], branch="main")
     back = {x.id: x for x in read_all_decisions(initialized_repo)}["dec-prov2"]
     assert back.agent == "pi" and back.turn_range == [0, 3]
+
+
+def test_approved_by_roundtrip(initialized_repo):
+    from plumb.decision_log import Decision, append_decisions, read_all_decisions, read_decisions
+    append_decisions(initialized_repo, [Decision(id="dec-r1", status="recorded", decision="x", approved_by="auto", branch="main")], branch="main")
+    d = {x.id: x for x in read_all_decisions(initialized_repo)}["dec-r1"]
+    assert (d.status, d.approved_by) == ("recorded", "auto")
+    d2 = {x.id: x for x in read_decisions(initialized_repo, branch="main")}["dec-r1"]
+    assert d2.approved_by == "auto"
+
+
+def test_dedup_treats_recorded_as_existing():
+    """_llm_dedup always sends accepted decisions (incl. recorded) to the LLM as existing,
+    even when the capacity for unresolved decisions is exhausted."""
+    from plumb.decision_log import Decision, _llm_dedup
+    # 200 pending decisions fill the non-accepted capacity; the recorded one must still be sent.
+    existing = [Decision(id="dec-old", status="recorded", question="Cache?", decision="In-memory dict cache.")]
+    existing += [Decision(id=f"dec-p{i}", status="pending", question=f"Q{i}?", decision=f"D{i}") for i in range(200)]
+    cand = [Decision(id="dec-new", status="pending", question="Cache?", decision="In-memory dict cache.")]
+
+    captured = {}
+
+    class FakeDeduplicator:
+        def __call__(self, candidates, existing):
+            captured["existing"] = existing
+            return []
+
+    with patch("plumb.programs.decision_deduplicator.DecisionDeduplicator", FakeDeduplicator), \
+         patch("plumb.programs.get_program_lm", return_value=None):
+        result = _llm_dedup(cand, existing)
+
+    assert result == []
+    assert "In-memory dict cache." in captured["existing"]

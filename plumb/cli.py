@@ -480,7 +480,10 @@ def review(branch):
 
         now = datetime.now(timezone.utc).isoformat()
         if action == "a":
-            update_decision_status(repo_root, d.id, branch=branch_for.get(d.id), status="approved", reviewed_at=now)
+            update_decision_status(
+                repo_root, d.id, branch=branch_for.get(d.id), status="approved",
+                approved_by="user", reviewed_at=now,
+            )
             approved_ids.append(d.id)
             console.print("  [green]Approved.[/green]\n")
         elif action == "i":
@@ -499,7 +502,7 @@ def review(branch):
             new_text = click.prompt("  New decision text")
             update_decision_status(
                 repo_root, d.id, branch=branch_for.get(d.id), status="edited",
-                decision=new_text, reviewed_at=now,
+                decision=new_text, approved_by="user", reviewed_at=now,
             )
             approved_ids.append(d.id)
             console.print("  [yellow]Edited.[/yellow]\n")
@@ -632,7 +635,8 @@ def approve(decision_id, approve_all):
         branch_for = {d.id: find_decision_branch(repo_root, d.id) for d in pending}
         for d in pending:
             update_decision_status(
-                repo_root, d.id, branch=branch_for.get(d.id), status="approved", reviewed_at=now,
+                repo_root, d.id, branch=branch_for.get(d.id), status="approved",
+                approved_by="user", reviewed_at=now,
             )
         console.print(f"[green]Approved {len(pending)} decision(s).[/green]")
         console.print("Run [bold]plumb sync[/bold] to update spec and tests.")
@@ -641,7 +645,8 @@ def approve(decision_id, approve_all):
     now = datetime.now(timezone.utc).isoformat()
     branch = find_decision_branch(repo_root, decision_id)
     result = update_decision_status(
-        repo_root, decision_id, branch=branch, status="approved", reviewed_at=now,
+        repo_root, decision_id, branch=branch, status="approved",
+        approved_by="user", reviewed_at=now,
     )
     if result is None:
         console.print(f"[red]Decision '{decision_id}' not found.[/red]")
@@ -719,6 +724,7 @@ def edit(decision_id, text):
         branch=branch,
         status="edited",
         decision=text,
+        approved_by="user",
         reviewed_at=now,
     )
     if result is None:
@@ -743,7 +749,7 @@ def modify(decision_id):
 
 @cli.command(name="sync")
 def sync_cmd():
-    """Sync all unsynced approved/edited decisions."""
+    """Sync all unsynced approved/edited/recorded decisions."""
     repo_root = find_repo_root()
     if repo_root is None:
         console.print("[red]Error: Not a git repository.[/red]")
@@ -751,7 +757,7 @@ def sync_cmd():
 
     # Check for unsynced decisions before doing expensive work
     decisions = read_all_decisions(repo_root)
-    to_sync = [d for d in decisions if d.status in ("approved", "edited") and not d.synced_at]
+    to_sync = [d for d in decisions if d.status in ("approved", "edited", "recorded") and not d.synced_at]
     if not to_sync:
         console.print("No unsynced decisions to sync.")
         return
@@ -1082,6 +1088,7 @@ def status():
     # Decisions
     decisions = read_all_decisions(repo_root)
     pending = [d for d in decisions if d.status == "pending"]
+    recorded_unsynced = [d for d in decisions if d.status == "recorded" and not d.synced_at]
     broken = [d for d in decisions if d.ref_status == "broken"]
     stale = [d for d in decisions if d.ref_status == "stale"]
 
@@ -1097,6 +1104,9 @@ def status():
         console.print("[cyan]Pending decisions:[/cyan] 0 [yellow](uncommitted changes — commit to capture decisions)[/yellow]")
     else:
         console.print("[cyan]Pending decisions:[/cyan] 0")
+
+    if recorded_unsynced:
+        console.print(f"[cyan]Sync debt:[/cyan] {len(recorded_unsynced)} recorded, unsynced (run 'plumb sync')")
 
     if broken:
         console.print(f"[red]Broken references:[/red] {len(broken)}")

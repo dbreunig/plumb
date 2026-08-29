@@ -234,10 +234,10 @@ def sync_decisions(
     decisions = read_all_decisions(repo_root)
     now = datetime.now(timezone.utc).isoformat()
 
-    # Filter to approved/edited without synced_at
+    # Filter to approved/edited/recorded without synced_at
     to_sync = []
     for d in decisions:
-        if d.status not in ("approved", "edited"):
+        if d.status not in ("approved", "edited", "recorded"):
             continue
         if d.synced_at:
             continue

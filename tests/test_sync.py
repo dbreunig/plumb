@@ -268,3 +268,32 @@ class TestSyncDecisionsWholeFile:
         spec_content = (initialized_repo / "spec.md").read_text()
         assert "## Logging" in spec_content
         assert "Structured logging." in spec_content
+
+
+def test_sync_includes_recorded(initialized_repo):
+    d = Decision(
+        id="dec-rec1",
+        status="recorded",
+        approved_by="auto",
+        question="How to cache?",
+        decision="Use in-memory dict.",
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+    append_decision(initialized_repo, d, branch="main")
+
+    call_count = [0]
+
+    def mock_run(fn, *args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return [{"header": "## Features", "content": "The system uses in-memory dict cache.\n"}], []
+        return []
+
+    with patch("plumb.programs.configure_dspy"), \
+         patch("plumb.programs.run_with_retries", side_effect=mock_run):
+        result = sync_decisions(initialized_repo)
+
+    assert result["spec_updated"] == 1
+    synced = {x.id: x for x in read_decisions(initialized_repo, branch="main")}["dec-rec1"]
+    assert synced.synced_at is not None
+    assert (synced.status, synced.approved_by) == ("recorded", "auto")

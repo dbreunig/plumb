@@ -714,3 +714,78 @@ class TestStatusMode:
             monkeypatch.setenv("PLUMB_MODE", "record")
             result = runner.invoke(cli, ["status"])
             assert "Mode: record (from env)" in result.output
+
+
+def test_status_shows_recorded_unsynced(initialized_repo, monkeypatch):
+    from plumb.decision_log import append_decisions
+    monkeypatch.chdir(initialized_repo)
+    append_decisions(initialized_repo, [
+        Decision(id="dec-a", status="recorded", decision="a", branch="main"),
+        Decision(id="dec-b", status="recorded", decision="b", branch="main", synced_at="2026-01-01T00:00:00Z"),
+        Decision(id="dec-c", status="recorded", decision="c", branch="main"),
+    ], branch="main")
+    r = CliRunner().invoke(cli, ["status"])
+    assert r.exit_code == 0, r.output
+    assert "2 recorded, unsynced" in r.output
+
+
+def test_status_omits_recorded_line_when_none(initialized_repo, monkeypatch):
+    monkeypatch.chdir(initialized_repo)
+    r = CliRunner().invoke(cli, ["status"])
+    assert r.exit_code == 0, r.output
+    assert "recorded, unsynced" not in r.output
+
+
+def test_approve_sets_approved_by_user(initialized_repo, monkeypatch):
+    from plumb.decision_log import append_decisions
+    monkeypatch.chdir(initialized_repo)
+    append_decisions(initialized_repo, [Decision(id="dec-p", status="pending", decision="p", branch="main")], branch="main")
+    r = CliRunner().invoke(cli, ["approve", "dec-p"])
+    assert r.exit_code == 0, r.output
+    d = {x.id: x for x in read_all_decisions(initialized_repo)}["dec-p"]
+    assert (d.status, d.approved_by) == ("approved", "user")
+
+
+def test_approve_all_sets_approved_by_user(initialized_repo, monkeypatch):
+    from plumb.decision_log import append_decisions
+    monkeypatch.chdir(initialized_repo)
+    append_decisions(initialized_repo, [
+        Decision(id="dec-p1", status="pending", decision="p1", branch="main"),
+        Decision(id="dec-p2", status="pending", decision="p2", branch="main"),
+    ], branch="main")
+    r = CliRunner().invoke(cli, ["approve", "--all"])
+    assert r.exit_code == 0, r.output
+    by_id = {x.id: x for x in read_all_decisions(initialized_repo)}
+    assert all(by_id[i].approved_by == "user" for i in ("dec-p1", "dec-p2"))
+
+
+def test_edit_sets_approved_by_user(initialized_repo, monkeypatch):
+    from plumb.decision_log import append_decisions
+    monkeypatch.chdir(initialized_repo)
+    append_decisions(initialized_repo, [Decision(id="dec-e", status="pending", decision="e", branch="main")], branch="main")
+    r = CliRunner().invoke(cli, ["edit", "dec-e", "new text"])
+    assert r.exit_code == 0, r.output
+    d = {x.id: x for x in read_all_decisions(initialized_repo)}["dec-e"]
+    assert (d.status, d.decision, d.approved_by) == ("edited", "new text", "user")
+
+
+def test_review_approve_sets_approved_by_user(initialized_repo, monkeypatch):
+    from plumb.decision_log import append_decisions
+    monkeypatch.chdir(initialized_repo)
+    append_decisions(initialized_repo, [Decision(id="dec-rv", status="pending", decision="rv", branch="main")], branch="main")
+    r = CliRunner().invoke(cli, ["review"], input="a\n")
+    assert r.exit_code == 0, r.output
+    d = {x.id: x for x in read_all_decisions(initialized_repo)}["dec-rv"]
+    assert (d.status, d.approved_by) == ("approved", "user")
+
+
+def test_sync_cli_precheck_counts_recorded(initialized_repo, monkeypatch):
+    from plumb.decision_log import append_decisions
+    monkeypatch.chdir(initialized_repo)
+    append_decisions(initialized_repo, [Decision(id="dec-rs", status="recorded", decision="rs", branch="main")], branch="main")
+    stub = MagicMock(return_value={"spec_updated": 0, "tests_generated": 0})
+    with patch("plumb.sync.sync_decisions", stub):
+        r = CliRunner().invoke(cli, ["sync"])
+    assert r.exit_code == 0, r.output
+    assert "No unsynced decisions to sync." not in r.output
+    stub.assert_called_once()

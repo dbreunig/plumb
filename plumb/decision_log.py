@@ -42,6 +42,9 @@ class Decision(BaseModel):
     confidence: Optional[float] = None
     chunk_index: Optional[int] = None
     conversation_truncated: bool = False
+    # Who accepted this decision: "user" | "auto" (record mode).
+    # Survives later status changes so provenance is never lost.
+    approved_by: Optional[str] = None
     rejection_reason: Optional[str] = None
     user_note: Optional[str] = None
     synced_at: Optional[str] = None
@@ -455,13 +458,13 @@ def _llm_dedup(
     candidates_str = "\n".join(
         _format_decision_line(i + 1, d) for i, d in enumerate(candidates)
     )
-    # Smart selection: always include all approved/synced decisions (validated
+    # Smart selection: always include all approved/synced/recorded decisions (accepted
     # choices must never be re-proposed), then fill remaining capacity with
     # recent unresolved decisions.
     max_existing = 200
     if existing_decisions:
-        approved = [d for d in existing_decisions if d.status in ("approved", "edited", "synced")]
-        others = [d for d in existing_decisions if d.status not in ("approved", "edited", "synced")]
+        approved = [d for d in existing_decisions if d.status in ("approved", "edited", "synced", "recorded")]
+        others = [d for d in existing_decisions if d.status not in ("approved", "edited", "synced", "recorded")]
         remaining_cap = max(0, max_existing - len(approved))
         recent_existing = approved + others[-remaining_cap:] if remaining_cap else approved
     else:
