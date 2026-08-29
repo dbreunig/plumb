@@ -448,7 +448,7 @@ def _format_decision_line(index: int, d: Decision) -> str:
 
 
 # Accepted decisions sent to LLM dedup as "existing": the newest this many by
-# created_at, plus any older one sharing a file_ref file or branch with a candidate.
+# created_at, plus any older one sharing a file_ref file with a candidate.
 MAX_ACCEPTED_FOR_DEDUP = 300
 
 _ACCEPTED_STATUSES = ("approved", "edited", "synced", "recorded")
@@ -458,8 +458,10 @@ def _select_accepted_for_dedup(
     accepted: list[Decision], candidates: list[Decision]
 ) -> list[Decision]:
     """Newest MAX_ACCEPTED_FOR_DEDUP accepted decisions by created_at (missing
-    created_at sorts oldest), plus any older one that shares a file_refs file or
-    a branch with a candidate. Preserves the input order of the selection."""
+    created_at sorts oldest), plus any older one that shares a file_refs file
+    with a candidate. Sharing a branch is deliberately not a match: nearly every
+    accepted decision shares `main` with a candidate on main, which would make
+    the cap inert. Preserves the input order of the selection."""
     if len(accepted) <= MAX_ACCEPTED_FOR_DEDUP:
         return list(accepted)
 
@@ -474,12 +476,8 @@ def _select_accepted_for_dedup(
     keep = set(by_age[-MAX_ACCEPTED_FOR_DEDUP:])
 
     cand_files = {r.file for c in candidates for r in c.file_refs}
-    cand_branches = {c.branch for c in candidates if c.branch}
     for i in by_age[:-MAX_ACCEPTED_FOR_DEDUP]:
-        d = accepted[i]
-        if (d.branch and d.branch in cand_branches) or any(
-            r.file in cand_files for r in d.file_refs
-        ):
+        if any(r.file in cand_files for r in accepted[i].file_refs):
             keep.add(i)
     return [d for i, d in enumerate(accepted) if i in keep]
 
@@ -491,8 +489,8 @@ def _llm_dedup(
     """Use LLM to catch semantic duplicates.
 
     Accepted decisions are capped to the newest MAX_ACCEPTED_FOR_DEDUP (by
-    created_at) plus older ones sharing a file or branch with a candidate; the
-    non-accepted tail fills whatever remains of ``max_existing``."""
+    created_at) plus older ones sharing a file with a candidate; the
+    non-accepted tail fills whatever remains of ``max_unresolved_tail``."""
     import dspy
     from plumb.programs.decision_deduplicator import DecisionDeduplicator
 
@@ -501,14 +499,14 @@ def _llm_dedup(
     )
     # Smart selection: include approved/synced/recorded decisions (accepted
     # choices must never be re-proposed) within the recency window plus any
-    # related older ones, then fill remaining capacity with recent unresolved
-    # decisions.
-    max_existing = 200
+    # same-file older ones, then fill whatever is left of max_unresolved_tail
+    # with recent unresolved decisions.
+    max_unresolved_tail = 200
     if existing_decisions:
         approved = [d for d in existing_decisions if d.status in _ACCEPTED_STATUSES]
         approved = _select_accepted_for_dedup(approved, candidates)
         others = [d for d in existing_decisions if d.status not in _ACCEPTED_STATUSES]
-        remaining_cap = max(0, max_existing - len(approved))
+        remaining_cap = max(0, max_unresolved_tail - len(approved))
         recent_existing = approved + others[-remaining_cap:] if remaining_cap else approved
     else:
         recent_existing = []

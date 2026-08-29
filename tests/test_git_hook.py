@@ -559,7 +559,7 @@ def test_extract_decisions_is_mode_agnostic_and_writes_nothing(initialized_repo)
     from plumb.decision_log import Decision, read_all_decisions
     mock = [Decision(id="dec-x", status="pending", question="Q?", decision="A.", made_by="user", confidence=0.9, branch="main")]
     seen = {}
-    def fake_conv(repo_root, config, diff_summary, since_commit=None, since_datetime=None):
+    def fake_conv(repo_root, config, diff_summary, since_commit=None, since_datetime=None, hunks=None):
         seen.update(since_commit=since_commit, since_datetime=since_datetime); return mock
     with patch("plumb.programs.validate_api_access"), \
          patch("plumb.git_hook._analyze_diff", return_value="summary") as an, \
@@ -585,3 +585,43 @@ def test_extract_decisions_falls_back_to_diff_only(initialized_repo):
          patch("plumb.git_hook._synthesize_questions", side_effect=lambda ds: ds):
         out = extract_decisions(initialized_repo, load_config(initialized_repo), diff="+x", branch="main")
     assert [d.id for d in out] == ["dec-d"]
+
+
+def test_conversation_extraction_uses_given_hunks(initialized_repo):
+    """When hunks are passed explicitly (record mode: the landed commit's hunks),
+    file_refs come from them and nothing is read from the index."""
+    from plumb.config import load_config
+    from plumb.decision_log import FileRef
+
+    assert Repo(initialized_repo).git.diff("--cached") == ""   # nothing staged
+    ref = SessionRef(agent="codex", session_id="019a", path="/tmp/r.jsonl", cwd=str(initialized_repo))
+    turns = [
+        Turn(agent="codex", session_id="019a", ordinal=0, role="user", content="make x 1"),
+        Turn(agent="codex", session_id="019a", ordinal=1, role="assistant", content="done",
+             tool_calls=[ToolCall(name="apply_patch", category="Edit", file_path="src/a.py")]),
+    ]
+    extracted = [ExtractedDecision(question="x?", decision="x is 1", made_by="user", confidence=0.9)]
+
+    with patch("plumb.git_hook.read_conversation_with_refs", return_value=(turns, {("codex", "019a"): ref})), \
+         patch("plumb.programs.configure_dspy"), \
+         patch("plumb.programs.run_with_retries", return_value=extracted), \
+         patch("plumb.traces.hunks.staged_hunks", side_effect=AssertionError("must not read the index")):
+        decisions = _extract_decisions_from_conversation(
+            initialized_repo, load_config(initialized_repo), "summary",
+            hunks={"src/a.py": [[7, 7]]})
+
+    assert len(decisions) == 1
+    assert decisions[0].file_refs == [FileRef(file="src/a.py", lines=[7, 7])]
+
+
+def test_extract_decisions_passes_hunks_through(initialized_repo):
+    from plumb.git_hook import extract_decisions
+    from plumb.config import load_config
+    hunks = {"src/a.py": [[7, 7]]}
+    with patch("plumb.programs.validate_api_access"), \
+         patch("plumb.git_hook._analyze_diff", return_value="summary"), \
+         patch("plumb.git_hook._extract_decisions_from_conversation", return_value=[]) as conv, \
+         patch("plumb.git_hook._extract_decisions_from_diff", return_value=[]), \
+         patch("plumb.git_hook._synthesize_questions", side_effect=lambda ds: ds):
+        extract_decisions(initialized_repo, load_config(initialized_repo), diff="+x", branch="main", hunks=hunks)
+    assert conv.call_args.kwargs["hunks"] is hunks

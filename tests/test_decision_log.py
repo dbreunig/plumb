@@ -486,7 +486,9 @@ def test_dedup_treats_recorded_as_existing():
 def test_dedup_caps_accepted_to_recency_window_plus_related():
     """_llm_dedup sends only the newest MAX_ACCEPTED_FOR_DEDUP accepted decisions
     (by created_at; missing created_at sorts oldest), plus any older accepted decision
-    that shares a file_ref file or a branch with a candidate."""
+    that shares a file_ref file with a candidate. Sharing a branch is NOT enough:
+    on the real log every accepted decision shares `main` with a candidate on main,
+    which would make the cap inert."""
     from datetime import timedelta
     from plumb.decision_log import Decision, FileRef, MAX_ACCEPTED_FOR_DEDUP, _llm_dedup
 
@@ -500,8 +502,9 @@ def test_dedup_caps_accepted_to_recency_window_plus_related():
             created_at=(base + timedelta(minutes=i)).isoformat(),
         )
         existing.append(d)
-    # Old (outside the newest-300 window) but related to a candidate:
+    # Old (outside the newest-300 window) but sharing a file with a candidate:
     existing[5] = existing[5].model_copy(update={"file_refs": [FileRef(file="src/foo.py", lines=[1, 2])]})
+    # Old and sharing only the candidate's branch: not enough to be re-admitted.
     existing[7] = existing[7].model_copy(update={"branch": "feat/x"})
     # Missing created_at sorts oldest -> excluded even though it is listed last.
     existing.append(Decision(id="dec-nots", status="approved", question="Q?", decision="accepted-nots"))
@@ -527,8 +530,8 @@ def test_dedup_caps_accepted_to_recency_window_plus_related():
     for i in range(50, 350):
         assert f"accepted-{i:03d}" in sent, i          # newest 300
     assert "accepted-005" in sent                        # older, shares a file with a candidate
-    assert "accepted-007" in sent                        # older, shares the candidate's branch
+    assert "accepted-007" not in sent                    # older, shares only the branch
     for i in [0, 1, 6, 8, 49]:
         assert f"accepted-{i:03d}" not in sent, i      # older and unrelated
     assert "accepted-nots" not in sent                   # no created_at -> oldest
-    assert sent.count("[Q]") == 302
+    assert sent.count("[Q]") == 301

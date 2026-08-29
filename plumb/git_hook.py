@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -110,13 +111,17 @@ def _extract_decisions_from_conversation(
     diff_summary: str,
     since_commit: str | None = None,
     since_datetime: str | None = None,
+    hunks: dict[str, list[list[int]]] | None = None,
 ) -> list[Decision]:
     """Stage 1+2: read every agent's sessions, chunk per session, run
     DecisionExtractor per chunk, and stamp provenance + deterministic file_refs.
 
     ``since_commit`` / ``since_datetime`` bound which transcript turns are read.
     Either defaults to the config's ``last_commit`` / ``last_extracted_at`` when
-    ``None`` (review mode); record mode passes the previous commit explicitly."""
+    ``None`` (review mode); record mode passes the previous commit explicitly.
+    ``hunks`` (file -> [[start, end], ...]) is the line-range source for
+    file_refs; when ``None`` the staged hunks are read (review mode), record
+    mode passes the landed commit's hunks."""
     from plumb.programs import configure_dspy, run_with_retries
     from plumb.programs.decision_extractor import DecisionExtractor
     from plumb.traces.hunks import staged_hunks, file_refs_for
@@ -141,7 +146,8 @@ def _extract_decisions_from_conversation(
     now = datetime.now(timezone.utc).isoformat()
     repo = Repo(repo_root)
     branch = _get_branch_name(repo)
-    hunks = staged_hunks(repo)
+    if hunks is None:
+        hunks = staged_hunks(repo)
 
     all_decisions: list[Decision] = []
     for chunk in chunks:
@@ -260,12 +266,10 @@ class _StageTimer:
         self.label = label
 
     def __enter__(self):
-        import time
         self.start = time.monotonic()
         return self
 
     def __exit__(self, *args):
-        import time
         if self.timings is not None:
             self.timings.append((self.label, time.monotonic() - self.start))
 
@@ -277,6 +281,7 @@ def extract_decisions(
     branch: str,
     since_commit: str | None = None,
     since_datetime: str | None = None,
+    hunks: dict[str, list[list[int]]] | None = None,
     timings: list | None = None,
 ) -> list[Decision]:
     """Stages 1–2 for one diff: analyze, read transcripts since the cutoff, extract,
@@ -284,8 +289,8 @@ def extract_decisions(
 
     Shared by review mode (pre-commit, staged diff) and record mode (post-commit,
     landed commit's diff). ``since_commit`` / ``since_datetime`` default to the
-    config's cutoffs when ``None``. If ``timings`` is given, ``(label, seconds)``
-    is appended per stage."""
+    config's cutoffs when ``None``; ``hunks`` defaults to the staged hunks. If
+    ``timings`` is given, ``(label, seconds)`` is appended per stage."""
     repo_root = Path(repo_root)
     repo = Repo(repo_root)
 
@@ -314,6 +319,7 @@ def extract_decisions(
             diff_summary,
             since_commit=since_commit,
             since_datetime=since_datetime,
+            hunks=hunks,
         )
         if not decisions:
             decisions = _extract_decisions_from_diff(diff_summary, branch)
