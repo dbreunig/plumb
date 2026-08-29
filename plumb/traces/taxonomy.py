@@ -17,6 +17,9 @@ _CATEGORIES: dict[str, str] = {
     # Codex
     "shell_command": "Bash", "exec_command": "Bash", "write_stdin": "Bash", "shell": "Bash",
     "exec": "Bash", "list_files": "Read", "apply_patch": "Edit", "spawn_agent": "Task",
+    # Codex built-ins
+    "run": "Tool", "update_plan": "Tool", "wait": "Tool", "view_image": "Read", "imagegen": "Tool",
+    "load_workspace_dependencies": "Tool", "search_openai_docs": "Tool", "fetch_openai_doc": "Tool",
     # Pi
     "read_file": "Read", "read": "Read", "find": "Read", "ls": "Read",
     "str_replace": "Edit", "edit": "Edit", "create_file": "Write", "write": "Write",
@@ -31,6 +34,9 @@ _CATEGORIES: dict[str, str] = {
 _PATH_KEYS = ("file_path", "path", "filePath", "notebook_path", "target_file")
 _SUMMARY_KEYS = ("command", "cmd", "url", "skill", "message", "pattern", "prompt", "description", "query")
 _PATCH_FILE_RE = re.compile(r"^\*\*\* (?:Update|Add|Delete) File: (.+)$", re.MULTILINE)
+# Codex `exec` input is a JS snippet: const r = await tools.exec_command({cmd:"...", workdir:"..."})
+_EXEC_CMD_RE = re.compile(r'\b(?:cmd|command)\s*:\s*"((?:[^"\\]|\\.)*)"')
+_EXEC_WRAP_RE = re.compile(r"^\s*const \w+ = await tools\.")
 
 
 def categorize(name: str) -> str:
@@ -86,6 +92,10 @@ def input_summary(name: str, tool_input: Any, limit: int = 120) -> str:
             q = questions[0].get("question")
             if isinstance(q, str) and q:
                 return q.replace("\n", " ")[:limit]
+    if name == "exec" and isinstance(tool_input, str):
+        m = _EXEC_CMD_RE.search(tool_input)
+        text = m.group(1) if m else _EXEC_WRAP_RE.sub("", tool_input)
+        return text.replace("\n", " ")[:limit]
     if isinstance(tool_input, str) and not tool_input.lstrip().startswith("{"):
         return tool_input[:limit]
     d = _as_dict(tool_input)

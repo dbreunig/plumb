@@ -60,13 +60,15 @@ class CodexSource:
             meta = sniff_head(path, _session_meta)
             if not isinstance(meta, dict) or not same_repo(meta.get("cwd", ""), repo_root):
                 continue
-            branch = sniff_head(path, _turn_branch)
+            # session_meta.git.branch is present in most rollouts; turn_context often is not.
+            branch = ((meta.get("git") or {}).get("branch")) or sniff_head(path, _turn_branch)
             found.append((mtime, SessionRef(
                 agent=self.name,
                 session_id=meta.get("id") or path.stem,
                 path=str(path),
                 cwd=meta["cwd"],
                 branch=branch or None,
+                parent_session_id=meta.get("parent_thread_id") or None,
             )))
         found.sort(key=lambda pair: pair[0])
         return [ref for _, ref in found]

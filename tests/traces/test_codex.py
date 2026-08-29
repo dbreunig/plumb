@@ -90,3 +90,53 @@ def test_parse_since_keeps_ordinals(tmp_repo, tmp_path):
 def test_all_sources_includes_codex():
     from plumb.traces import all_sources
     assert [s.name for s in all_sources()] == ["claude", "codex"]
+
+
+def test_discover_subagent_parent_link(tmp_repo, tmp_path):
+    f = _rollout(tmp_path, str(tmp_repo), sid="sub1")
+    lines = [
+        _line("session_meta", {"id": "sub1", "cwd": str(tmp_repo), "thread_source": "subagent",
+                               "parent_thread_id": "01a0"}),
+        _line("event_msg", {"type": "user_message", "message": "subtask"}),
+    ]
+    f.write_text("\n".join(json.dumps(l) for l in lines) + "\n")
+    refs = CodexSource(root=tmp_path / "sessions").discover(tmp_repo, None)
+    assert [(r.session_id, r.parent_session_id) for r in refs] == [("sub1", "01a0")]
+
+
+def test_discover_branch_falls_back_to_session_meta(tmp_repo, tmp_path):
+    f = _rollout(tmp_path, str(tmp_repo))
+    lines = [
+        _line("session_meta", {"id": "01a0", "cwd": str(tmp_repo), "git": {"branch": "meta-br"}}),
+        _line("event_msg", {"type": "user_message", "message": "hi"}),
+    ]
+    f.write_text("\n".join(json.dumps(l) for l in lines) + "\n")
+    refs = CodexSource(root=tmp_path / "sessions").discover(tmp_repo, None)
+    assert [r.branch for r in refs] == ["meta-br"]
+
+
+def test_discover_includes_archived_root(tmp_repo, tmp_path):
+    archived = tmp_path / "archived_sessions"
+    archived.mkdir()
+    f = archived / "rollout-2026-06-01T00-00-00-arch.jsonl"
+    lines = [
+        _line("session_meta", {"id": "arch", "cwd": str(tmp_repo)}),
+        _line("event_msg", {"type": "user_message", "message": "hi"}),
+    ]
+    f.write_text("\n".join(json.dumps(l) for l in lines) + "\n")
+    refs = CodexSource(root=tmp_path / "sessions", archived=archived).discover(tmp_repo, None)
+    assert [(r.session_id, r.path) for r in refs] == [("arch", str(f))]
+
+
+def test_parse_non_json_function_call_arguments(tmp_repo, tmp_path):
+    f = _rollout(tmp_path, str(tmp_repo))
+    lines = [
+        _line("session_meta", {"id": "01a0", "cwd": str(tmp_repo)}),
+        _line("response_item", {"type": "function_call", "name": "shell_command", "call_id": "c1",
+                                "arguments": "not json"}),
+    ]
+    f.write_text("\n".join(json.dumps(l) for l in lines) + "\n")
+    ref = SessionRef(agent="codex", session_id="01a0", path=str(f), cwd=str(tmp_repo))
+    turns = CodexSource().parse(ref, None)
+    tc = turns[0].tool_calls[0]
+    assert (tc.name, tc.input_summary, tc.file_path) == ("shell_command", "not json", None)

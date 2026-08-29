@@ -19,6 +19,9 @@ from plumb.traces.taxonomy import (
     ("run_command", "Bash"), ("bash", "Bash"),
     ("grep", "Grep"), ("glob", "Glob"), ("report_intent", "Tool"),
     ("mcp__pencil__batch_get", "Tool"),
+    ("run", "Tool"), ("update_plan", "Tool"), ("wait", "Tool"), ("view_image", "Read"),
+    ("imagegen", "Tool"), ("load_workspace_dependencies", "Tool"),
+    ("search_openai_docs", "Tool"), ("fetch_openai_doc", "Tool"),
     ("something_new", "Other"),
 ])
 def test_categorize(name, expected):
@@ -75,3 +78,8 @@ def test_input_summary_ask_user_question_and_send_message():
     q = {"questions": [{"question": "Approve or reject?", "header": "x", "options": []}]}
     assert input_summary("AskUserQuestion", q) == "Approve or reject?"
     assert input_summary("SendMessage", {"to": "a", "message": "hi there"}) == "hi there"
+
+
+def test_input_summary_exec_extracts_command():
+    assert input_summary("exec", 'const r = await tools.exec_command({cmd:"pytest -x", workdir:"/r"})') == "pytest -x"
+    assert input_summary("exec", 'const r = await tools.web__run({search_query:[{q:"x"}]})').startswith("web__run(")
