@@ -480,22 +480,24 @@ def diff():
 
 @cli.command()
 @click.option("--branch", default=None, help="Filter by branch")
-def review(branch):
-    """Interactive review of pending decisions."""
+@click.option("--recorded", is_flag=True, help="Walk auto-recorded decisions instead of pending ones")
+def review(branch, recorded):
+    """Interactive review of pending (or, with --recorded, auto-recorded) decisions."""
     repo_root = find_repo_root()
     if repo_root is None:
         console.print("[red]Error: Not a git repository.[/red]")
         raise SystemExit(1)
 
-    pending = filter_decisions(repo_root, status="pending")
+    kind = "recorded" if recorded else "pending"
+    pending = filter_decisions(repo_root, status=kind)
     if branch:
         pending = [d for d in pending if d.branch == branch]
 
     if not pending:
-        console.print("No pending decisions.")
+        console.print(f"No {kind} decisions.")
         return
 
-    console.print(f"\n[bold]Plumb Review: {len(pending)} pending decision(s)[/bold]\n")
+    console.print(f"\n[bold]Plumb Review: {len(pending)} {kind} decision(s)[/bold]\n")
 
     # Pre-compute branch for each decision so updates target the correct shard
     branch_for = {d.id: find_decision_branch(repo_root, d.id) for d in pending}
@@ -537,7 +539,12 @@ def review(branch):
                 rejection_reason=reason, reviewed_at=now,
             )
             console.print("  [red]Rejected.[/red]")
-            _run_modify(repo_root, d.id)
+            if recorded:
+                # The code landed with the commit; rewriting it is a separate,
+                # explicit act — never run modify from here.
+                console.print("  Code already committed; rejection recorded, no automatic modification.")
+            else:
+                _run_modify(repo_root, d.id)
             console.print()
         elif action == "e":
             new_text = click.prompt("  New decision text")

@@ -860,3 +860,47 @@ def test_search_and_log_survive_real_broken_pipe(initialized_repo, args):
     assert first, err
     assert proc.returncode == 0, err.decode()
     assert b"Traceback" not in err
+
+
+class TestReviewRecorded:
+    def _seed(self, repo):
+        from plumb.decision_log import append_decisions
+        append_decisions(repo, [
+            Decision(id="dec-rec1", status="recorded", approved_by="auto", commit_sha="abc",
+                     decision="first recorded", branch="main"),
+            Decision(id="dec-rec2", status="recorded", approved_by="auto", commit_sha="abc",
+                     decision="second recorded", branch="main"),
+        ], branch="main")
+
+    def test_review_recorded_walks_recorded_decisions(self, initialized_repo, monkeypatch):
+        self._seed(initialized_repo)
+        monkeypatch.chdir(initialized_repo)
+        with patch("plumb.cli._run_modify") as mock_modify:
+            r = CliRunner().invoke(cli, ["review", "--recorded"], input="a\nr\nwrong call\n")
+        assert r.exit_code == 0, r.output
+        assert "2 recorded decision(s)" in r.output
+        assert "already committed" in r.output
+        mock_modify.assert_not_called()
+        by_id = {d.id: d for d in read_all_decisions(initialized_repo)}
+        assert (by_id["dec-rec1"].status, by_id["dec-rec1"].approved_by) == ("approved", "user")
+        assert by_id["dec-rec2"].status == "rejected"
+        assert by_id["dec-rec2"].rejection_reason == "wrong call"
+        assert by_id["dec-rec2"].commit_sha == "abc"
+
+    def test_review_recorded_none(self, initialized_repo, monkeypatch):
+        monkeypatch.chdir(initialized_repo)
+        r = CliRunner().invoke(cli, ["review", "--recorded"])
+        assert r.exit_code == 0, r.output
+        assert "No recorded decisions." in r.output
+
+    def test_review_without_flag_lists_only_pending(self, initialized_repo, monkeypatch):
+        from plumb.decision_log import append_decisions
+        self._seed(initialized_repo)
+        append_decisions(initialized_repo, [
+            Decision(id="dec-pend", status="pending", decision="pending one", branch="main"),
+        ], branch="main")
+        monkeypatch.chdir(initialized_repo)
+        r = CliRunner().invoke(cli, ["review"], input="i\n")
+        assert r.exit_code == 0, r.output
+        assert "1 pending decision(s)" in r.output
+        assert "dec-rec1" not in r.output and "dec-rec2" not in r.output
