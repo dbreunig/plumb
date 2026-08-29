@@ -2,14 +2,22 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 MODES = ("review", "record")
+
+# Fields whose invalid values in config.json fall back to defaults with a warning
+# rather than disabling Plumb.
+_LENIENT_FIELDS = {
+    "mode": "|".join(MODES),
+    "record_threshold": "0.0–1.0",
+}
 
 
 class PlumbConfig(BaseModel):
@@ -79,8 +87,31 @@ def load_config(repo_root: str | Path) -> PlumbConfig | None:
         return None
     try:
         data = json.loads(cp.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    try:
         return PlumbConfig(**data)
-    except (json.JSONDecodeError, Exception):
+    except ValidationError as e:
+        bad = {err["loc"][0] for err in e.errors() if err["loc"]}
+        if not bad or not bad <= _LENIENT_FIELDS.keys():
+            return None
+        details = ", ".join(
+            f"{field}={data.get(field)!r} (accepted: {_LENIENT_FIELDS[field]})"
+            for field in sorted(bad)
+        )
+        print(
+            f"plumb: warning: ignoring invalid value(s) in {cp}: {details}; using defaults.",
+            file=sys.stderr,
+        )
+        for field in bad:
+            data.pop(field, None)
+        try:
+            return PlumbConfig(**data)
+        except ValidationError:
+            return None
+    except Exception:
         return None
 
 

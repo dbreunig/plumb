@@ -202,9 +202,11 @@ def init():
         test_path.mkdir(parents=True, exist_ok=True)
 
     # Mode
+    console.print("How should Plumb handle decisions?")
+    console.print("  review  — stop each commit until you approve/ignore/reject (default)", soft_wrap=True)
+    console.print("  record  — record decisions after each commit; review later with plumb log/search", soft_wrap=True)
     mode_input = click.prompt(
-        "How should Plumb handle decisions? review = stop each commit until you approve; "
-        "record = record after each commit, review later with plumb log/search",
+        "Mode",
         type=click.Choice(list(MODES)),
         default="review",
         show_choices=True,
@@ -387,6 +389,12 @@ def mode(new_mode):
     save_config(repo_root, cfg)
     _install_hooks(repo_root)
     console.print(f"[green]Mode set to {new_mode}. Hooks reinstalled.[/green]")
+    env_mode, src = effective_mode(cfg)
+    if src == "env":
+        console.print(
+            f"[yellow](PLUMB_MODE={os.environ['PLUMB_MODE'].strip()} overrides this "
+            "in the current environment)[/yellow]"
+        )
 
 
 @cli.command()

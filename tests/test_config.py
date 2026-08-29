@@ -137,3 +137,24 @@ def test_old_config_without_mode_loads(tmp_repo):
     p.write_text(json.dumps(data))
     cfg = load_config(tmp_repo)
     assert cfg is not None and cfg.mode == "review" and cfg.record_threshold is None
+
+
+def test_invalid_mode_in_file_falls_back_with_warning(tmp_repo, capsys):
+    import json
+    from plumb.config import PlumbConfig, save_config, load_config
+    save_config(tmp_repo, PlumbConfig(spec_paths=["s.md"], last_commit="abc"))
+    p = tmp_repo / ".plumb" / "config.json"
+    data = json.loads(p.read_text()); data["mode"] = "gate"; data["record_threshold"] = 1.5
+    p.write_text(json.dumps(data))
+    cfg = load_config(tmp_repo)
+    assert cfg is not None and cfg.mode == "review" and cfg.record_threshold is None
+    assert cfg.last_commit == "abc"                     # nothing else lost
+    err = capsys.readouterr().err
+    assert "mode" in err and "gate" in err and "record_threshold" in err
+
+
+def test_other_validation_errors_still_return_none(tmp_repo):
+    from plumb.config import load_config
+    p = tmp_repo / ".plumb"; p.mkdir(exist_ok=True)
+    (p / "config.json").write_text('{"spec_paths": "not-a-list"}')
+    assert load_config(tmp_repo) is None

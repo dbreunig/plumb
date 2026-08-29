@@ -670,6 +670,8 @@ class TestModeCommand:
         monkeypatch.setenv("PLUMB_MODE", "record")
         r = CliRunner().invoke(cli, ["mode"])
         assert "record" in r.output and "env" in r.output
+        r = CliRunner().invoke(cli, ["mode", "review"])
+        assert r.exit_code == 0 and "PLUMB_MODE=record overrides" in r.output
 
     def test_mode_command_not_initialized(self, runner, tmp_repo, monkeypatch):
         monkeypatch.chdir(tmp_repo)
@@ -687,6 +689,9 @@ class TestInitMode:
             result = runner.invoke(cli, ["init"], input="spec.md\ntests/\nrecord\n")
             assert result.exit_code == 0, result.output
             assert "How should Plumb handle decisions" in result.output
+            assert "review  — stop each commit until you approve/ignore/reject (default)" in result.output
+            assert "record  — record decisions after each commit; review later with plumb log/search" in result.output
+            assert "Mode (review, record) [review]" in result.output
         assert load_config(tmp_repo).mode == "record"
 
     def test_init_defaults_mode_to_review(self, runner, tmp_repo):
