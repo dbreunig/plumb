@@ -89,7 +89,7 @@ def test_parse_since_keeps_ordinals(tmp_repo, tmp_path):
 
 def test_all_sources_includes_codex():
     from plumb.traces import all_sources
-    assert [s.name for s in all_sources()] == ["claude", "codex"]
+    assert [s.name for s in all_sources()] == ["claude", "codex", "pi"]
 
 
 def test_discover_subagent_parent_link(tmp_repo, tmp_path):
