@@ -69,3 +69,9 @@ def test_patch_helpers_tolerate_non_string_input():
         assert file_path_from_input("apply_patch", bad) is None
         assert file_paths_from_input("apply_patch", bad) == []
         assert input_summary("apply_patch", bad) == ""
+
+
+def test_input_summary_ask_user_question_and_send_message():
+    q = {"questions": [{"question": "Approve or reject?", "header": "x", "options": []}]}
+    assert input_summary("AskUserQuestion", q) == "Approve or reject?"
+    assert input_summary("SendMessage", {"to": "a", "message": "hi there"}) == "hi there"

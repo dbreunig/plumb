@@ -29,7 +29,7 @@ _CATEGORIES: dict[str, str] = {
 }
 
 _PATH_KEYS = ("file_path", "path", "filePath", "notebook_path", "target_file")
-_SUMMARY_KEYS = ("command", "cmd", "url", "skill", "pattern", "prompt", "description", "query")
+_SUMMARY_KEYS = ("command", "cmd", "url", "skill", "message", "pattern", "prompt", "description", "query")
 _PATCH_FILE_RE = re.compile(r"^\*\*\* (?:Update|Add|Delete) File: (.+)$", re.MULTILINE)
 
 
@@ -80,6 +80,12 @@ def file_paths_from_input(name: str, tool_input: Any) -> list[str]:
 def input_summary(name: str, tool_input: Any, limit: int = 120) -> str:
     if name == "apply_patch":
         return (file_path_from_input(name, tool_input) or "")[:limit]
+    if name == "AskUserQuestion":
+        questions = _as_dict(tool_input).get("questions")
+        if isinstance(questions, list) and questions and isinstance(questions[0], dict):
+            q = questions[0].get("question")
+            if isinstance(q, str) and q:
+                return q.replace("\n", " ")[:limit]
     if isinstance(tool_input, str) and not tool_input.lstrip().startswith("{"):
         return tool_input[:limit]
     d = _as_dict(tool_input)

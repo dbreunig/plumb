@@ -1,7 +1,7 @@
 """Claude Code adapter: ~/.claude/projects/<enc>/<session>.jsonl (+ subagents/)."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -41,31 +41,36 @@ class ClaudeSource:
                 continue
             for f in proj.glob("*.jsonl"):
                 yield f, None
-            for sub in proj.glob("*/subagents/agent-*.jsonl"):
-                yield sub, sub.parent.parent.name  # <session_id>/subagents/agent-x.jsonl
+            # <session_id>/subagents/agent-x.jsonl, or nested:
+            # <session_id>/subagents/workflows/wf_<id>/agent-x.jsonl
+            for sub in proj.glob("*/subagents/**/agent-*.jsonl"):
+                yield sub, sub.relative_to(proj).parts[0]
 
     def discover(self, repo_root, since: Optional[datetime]) -> list[SessionRef]:
-        refs: list[SessionRef] = []
+        if since is not None and since.tzinfo is None:
+            since = since.replace(tzinfo=timezone.utc)
         cutoff_ts = since.timestamp() if since else None
+        found: list[tuple[float, SessionRef]] = []
         for path, parent in self._candidates():
             try:
-                if cutoff_ts is not None and path.stat().st_mtime < cutoff_ts:
-                    continue
+                mtime = path.stat().st_mtime
             except OSError:
+                continue
+            if cutoff_ts is not None and mtime < cutoff_ts:
                 continue
             head = sniff_head(path, lambda e: e if e.get("cwd") else None)
             if not head or not same_repo(head["cwd"], repo_root):
                 continue
-            refs.append(SessionRef(
+            found.append((mtime, SessionRef(
                 agent=self.name,
                 session_id=path.stem if parent else (head.get("sessionId") or path.stem),
                 path=str(path),
                 cwd=head["cwd"],
                 branch=head.get("gitBranch") or None,
                 parent_session_id=parent,
-            ))
-        refs.sort(key=lambda r: Path(r.path).stat().st_mtime)
-        return refs
+            )))
+        found.sort(key=lambda pair: pair[0])
+        return [ref for _, ref in found]
 
     # -- parsing -------------------------------------------------------------
 
@@ -76,7 +81,8 @@ class ClaudeSource:
         for e in iter_jsonl(Path(ref.path)):
             if e.get("type") not in ("user", "assistant") or e.get("isMeta"):
                 continue
-            content = (e.get("message") or {}).get("content", "")
+            msg = e.get("message")
+            content = msg.get("content", "") if isinstance(msg, dict) else ""
             ts = e.get("timestamp")
 
             if e["type"] == "user":
@@ -86,14 +92,26 @@ class ClaudeSource:
                                           role="user", content=content, timestamp=ts))
                         ordinal += 1
                 elif isinstance(content, list):
+                    texts, saw_result = [], False
                     for b in content:
-                        if isinstance(b, dict) and b.get("type") == "tool_result":
+                        if not isinstance(b, dict):
+                            continue
+                        if b.get("type") == "tool_result":
+                            saw_result = True
                             tc = by_tool_id.get(b.get("tool_use_id", ""))
                             if tc is not None:
                                 text = _result_text(b.get("content"))
                                 if b.get("is_error"):
                                     text = "ERROR: " + text
                                 tc.result_summary = text.strip()[:RESULT_LIMIT] or None
+                        elif b.get("type") == "text" and b.get("text"):
+                            texts.append(b["text"])
+                    # A list-form prompt (e.g. text + image) is a real user turn;
+                    # text riding alongside tool_results is not.
+                    if texts and not saw_result:
+                        turns.append(Turn(agent=ref.agent, session_id=ref.session_id, ordinal=ordinal,
+                                          role="user", content="\n".join(texts), timestamp=ts))
+                        ordinal += 1
                 continue
 
             # assistant
@@ -120,4 +138,6 @@ class ClaudeSource:
                               role="assistant", content="\n".join(texts), timestamp=ts, tool_calls=calls))
             ordinal += 1
 
+        # Turns without a timestamp are deliberately kept: losing a turn is worse
+        # than re-seeing one, and dedup happens downstream.
         return [t for t in turns if after_cutoff(t.timestamp, since)]
