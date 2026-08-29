@@ -127,4 +127,5 @@ Present these gaps clearly so the user can prioritize.
 | `plumb review` | Interactive terminal review (not needed in Claude Code) |
 | `plumb sync` | **Run after approving decisions** — updates spec and generates tests |
 | `plumb coverage` | Report coverage across all three dimensions |
+| `plumb log [--since <ref>] [--verify]` | Show decisions grouped by commit and agent; `--verify` re-checks evidence against transcripts |
 | `plumb parse-spec` | Re-parse spec after manual edits |

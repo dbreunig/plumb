@@ -6,9 +6,9 @@
 
 `plumb` keeps your spec, tests, and code in sync during AI-assisted development.
 
-When you work with Claude Code, decisions get made — a caching strategy is chosen, an API contract changes, a behavior is refined. These decisions live in conversation history and staged diffs, but they never make it back to the spec or tests. Over time, the spec drifts from reality, tests cover the wrong behavior, and the codebase becomes its own undocumented source of truth.
+When you work with a coding agent (Claude Code, Codex, Pi, Copilot CLI), decisions get made — a caching strategy is chosen, an API contract changes, a behavior is refined. These decisions live in conversation history and staged diffs, but they never make it back to the spec or tests. Over time, the spec drifts from reality, tests cover the wrong behavior, and the codebase becomes its own undocumented source of truth.
 
-Plumb fixes this by intercepting `git commit` via a pre-commit hook. It analyzes your staged changes and Claude Code conversation, extracts the decisions that were made, and gates the commit on your review. Approved decisions are automatically synced back to the spec and tests. Rejected decisions trigger code modifications to undo them. The result: every committed state has a spec and test suite that could reconstruct the program.
+Plumb fixes this by intercepting `git commit` via a pre-commit hook. It analyzes your staged changes and your agents' transcripts, extracts the decisions that were made, and gates the commit on your review. Approved decisions are automatically synced back to the spec and tests. Rejected decisions trigger code modifications to undo them. The result: every committed state has a spec and test suite that could reconstruct the program.
 
 ## Install
 
@@ -35,7 +35,7 @@ This will:
 2. Create a `.plumb/` directory for state (commit this to version control)
 3. Install a git pre-commit hook
 4. Install a Claude Code skill file at `.claude/skills/plumb/SKILL.md`
-5. Add a Plumb block to `CLAUDE.md`
+5. Add a Plumb block to `CLAUDE.md` and `AGENTS.md`
 6. Create a `.plumbignore` file for excluding irrelevant files from analysis
 7. Parse your spec into requirements
 
@@ -46,7 +46,7 @@ From here, just work normally. Plumb activates when you commit.
 ### Committing inside Claude Code
 
 1. You run `git commit` (or Claude Code does)
-2. The pre-commit hook fires, analyzes the staged diff and conversation log
+2. The pre-commit hook fires, analyzes the staged diff and the agent transcripts for this repo
 3. It writes pending decisions and exits non-zero, aborting the commit
 4. Claude Code's skill reads the output and presents each decision:
    > **Question:** Should we cache API responses in memory or on disk?
@@ -59,6 +59,10 @@ From here, just work normally. Plumb activates when you commit.
 ### Committing from the terminal
 
 Same flow, but you drive it with `plumb review` instead of the skill.
+
+### Which agents Plumb reads
+
+Plumb reads transcripts from Claude Code, Codex, Pi, and Copilot CLI (the Copilot adapter is unverified against live sessions). Sessions are matched to your repo by the working directory each agent records in its transcript, so linked worktrees attribute to the main repo and no path configuration is needed. Subagent sessions are read too. Every decision records which agent, session, and turn range it came from; `plumb log` shows decisions grouped by commit and agent, and `plumb log --verify` re-checks that evidence against the transcripts on disk.
 
 ## Commands
 
@@ -76,6 +80,7 @@ Same flow, but you drive it with `plumb review` instead of the skill.
 | `plumb sync` | Sync all unsynced approved/edited decisions to spec and tests |
 | `plumb parse-spec` | Re-parse spec files into requirements |
 | `plumb coverage` | Report code coverage, spec-to-test, and spec-to-code coverage |
+| `plumb log` | Show decisions grouped by commit and agent; `--since <ref>`, `--verify` |
 
 ## Coverage
 

@@ -7,7 +7,7 @@ Plumb is a Python library and CLI tool that keeps three artifacts in sync throug
 2. **The Tests** — a comprehensive pytest-based test suite covering those requirements with unit tests, integration tests, and edge cases
 3. **The Code** — the implementation
 
-As code is written with an AI coding agent (Claude Code), decisions are made that deviate from the spec. Bugs are fixed. Features are refined. Plumb captures these decisions, surfaces them to the user, and ensures the spec, tests, and code are updated together so that on any given day, the spec and tests alone are sufficient to reconstruct the program.
+As code is written with an AI coding agent (Claude Code, Codex, Pi, Copilot CLI), decisions are made that deviate from the spec. Bugs are fixed. Features are refined. Plumb captures these decisions, surfaces them to the user, and ensures the spec, tests, and code are updated together so that on any given day, the spec and tests alone are sufficient to reconstruct the program.
 
 Plumb supports loading environment variables from .env files to manage configuration settings. The `plumb init` command creates a .env file in the project directory to facilitate environment-based configuration management. The system supports ANTHROPIC_API_KEY configuration through both environment variables and .env files.
 
@@ -15,19 +15,19 @@ Tests are linked to requirements through requirement ID comments (e.g., `# plumb
 
 The system supports file ignore patterns through a '.plumbignore' file and provides a '--all' command option for the 'plumb approve' command to approve all changes at once. Generated cache and coverage files are excluded from commits, and the system includes a 'check' command as an alias for manual decision scanning.
 
-Plumb can handle conversations that span multiple Claude Code session files by reading and merging them chronologically to support exit-and-relaunch scenarios. The sync command provides progress indicators with status updates to give users feedback during operation. The workflow requires an explicit sync step after approving decisions, with staging of sync output before re-committing changes.
+Plumb reads transcripts from several coding agents through per-agent `TraceSource` adapters (see **Conversation Log Parsing and Chunking**) and handles conversations that span multiple session files, including exit-and-relaunch. The sync command provides progress indicators with status updates to give users feedback during operation. The workflow requires an explicit sync step after approving decisions, with staging of sync output before re-committing changes.
 
 The system uses a branch-sharded structure for decision logs and provides CLI commands for merging decision logs from different branches. Users can migrate existing decision logs from the old monolithic format to the new branch-sharded layout through dedicated CLI commands. The `plumb merge-decisions <branch>` command allows users to merge decisions from feature branches back to main. A find_decision_branch() function helps locate which branch file contains a specific decision ID.
 
 The core LLM integration is designed with a WholeFileSpecUpdater that takes full spec content and decisions as input, and outputs section_updates for existing sections and new_sections for brand new sections. This approach accepts rewriting whole sections instead of making surgical edits for markdown specs. An OutlineMerger component handles structural changes when new sections need to be added or content needs reordering. The system includes helper functions for DuckDB result type conversion, using _clean_duckdb_row() and _to_python_native() functions to convert DuckDB result types to Python native types for Pydantic compatibility. Comprehensive test coverage is implemented for migration and merge functionality, including edge cases and error conditions.
 
-The conversation log parser preserves full tool call information from Claude Code transcripts. Tool calls are structured with category, tool_name, file_path, and input fields using agentsview's 9-category tool taxonomy. Bash and Edit operation results are preserved in truncated form to enable deterministic file_refs population and improve decision extraction quality.
+The conversation log parser preserves full tool call information from every supported agent's transcripts. Tool calls are normalized to a `ToolCall` record with `name`, `category`, `file_path`/`file_paths`, `input_summary`, and `result_summary` using a nine-category tool taxonomy. Tool results are preserved in truncated form when the agent records them, to enable deterministic `file_refs` population and improve decision extraction quality.
 ### Design Principles
 - **Simple over clever.** Plumb solves a bounded problem. It should be holdable in a single programmer's head.- **DSPy for LLM workflows.** All LLM-powered functions are implemented as DSPy programs, not open-ended agents. This ensures they are controllable, auditable, and reliable.
 - **Inference via Claude.** Plumb uses the Anthropic Claude SDK (via the user's existing account) as its inference provider. Claude Haiku 4.5 (`claude-haiku-4-5`) serves as the default model for all programs; per-program overrides are configured in `program_models`.
 - **Non-intrusive.** Plumb operates as a git hook and CLI tool. It does not change how the user writes code.
 - **The commit is canonical.** The pre-commit hook ensures that every committed state has been reviewed and approved. A commit represents a fully reconciled snapshot of spec, tests, and code.
-- **Conversation analysis is opportunistic.** Plumb uses Claude Code session data when available. When it is not (e.g., committing from a bare terminal), Plumb falls back to diff-only analysis. Decisions still get captured; they are just derived from code changes rather than reasoning.
+- **Conversation analysis is opportunistic.** Plumb uses agent transcript data (Claude Code, Codex, Pi, Copilot CLI) when available. When it is not (e.g., committing from a bare terminal with no matching session), Plumb falls back to diff-only analysis. Decisions still get captured; they are just derived from code changes rather than reasoning.
 - **Multi-stage deduplication.** The system prevents duplicate decisions through a multi-stage pipeline using exact matching, Jaccard similarity, and LLM semantic analysis to catch different types of duplicates.
 - **Decision filtering.** Only prescriptive choices that affect system design, behavior, architecture, or data models are captured as decisions. Process observations, tooling choices, and diagnostic findings are filtered out.
 - **Search-and-replace updates.** Spec updates use a search-and-replace approach with edits containing old_text/new_text pairs rather than full section replacement for more precise modifications.
@@ -79,7 +79,18 @@ Plumb integrates with git hooks to automatically trigger workflows based on repo
 ├── cli.py                  # Click CLI entrypoint
 ├── config.py               # Config loading/saving (.plumb/config.json)
 ├── git_hook.py             # Git pre-commit hook installer and runner
-├── conversation.py         # Claude Code conversation history parser and chunker
+├── conversation.py         # Agent-agnostic turn rendering, per-session chunking, evidence digests
+├── log_view.py             # Grouping and evidence verification behind `plumb log`
+├── traces/                 # TraceSource adapters: find and normalize agent transcripts
+│   ├── __init__.py             # SessionRef, ToolCall, Turn, TraceSource protocol, all_sources()
+│   ├── claude.py               # Claude Code adapter
+│   ├── codex.py                # Codex rollout adapter
+│   ├── pi.py                   # Pi adapter (active-ancestry walk)
+│   ├── copilot.py              # Copilot CLI adapter (unverified against live sessions)
+│   ├── taxonomy.py             # Nine-category tool taxonomy and path/summary extraction
+│   ├── repo.py                 # cwd-to-repo matching via git-common-dir; cutoff helpers
+│   ├── hunks.py                # Staged hunk parsing and deterministic file_refs
+│   └── jsonl.py                # Tolerant JSONL helpers
 ├── decision_log.py         # Read/write .plumb/decisions.jsonl
 ├── coverage_reporter.py    # Code, spec, and test coverage analysis
 ├── sync.py                 # Spec and test sync logic
@@ -118,7 +129,7 @@ There are two paths through review, both of which use the same underlying CLI co
 This is the primary workflow. The user works inside a Claude Code session. When they run `git commit` (or Claude Code runs it on their behalf), the pre-commit hook fires as a subprocess.
 
 1. The hook validates API access before proceeding with analysis. If API authentication fails, the hook must exit non-zero and block the commit.
-2. The hook analyzes the staged diff and the Claude Code conversation log using the unified conversation reading system that auto-detects Claude Code sessions vs legacy logs and reads from Claude Code's actual session files at `~/.claude/projects/<encoded-path>/<uuid>.jsonl`.
+2. The hook analyzes the staged diff and the agent transcripts for this repository. Every registered `TraceSource` (Claude Code, Codex, Pi, Copilot CLI) discovers the sessions whose recorded `cwd` resolves to this repository and normalizes them into turns (see **Conversation Log Parsing and Chunking**).
 3. It writes pending decisions to branch-specific decision log files with filesystem-safe path sanitization and sets the `last_extracted_at` timestamp.
 4. It **prints a machine-readable JSON summary of pending decisions to stdout** and **exits non-zero**, aborting the commit.
 5. Claude Code's skill reads that output and begins presenting decisions to the user using AskUserQuestion format, one at a time:
@@ -136,7 +147,7 @@ The pre-commit hook must validate API access before performing any LLM operation
 
 The system uses gitignore-style patterns for ignore functionality, with default patterns used when no .plumbignore file exists. After commit completion, the post-commit hook clears the `last_extracted_at` timestamp to reset the filter for future extractions.
 
-The conversation parser handles Claude Code's type/message schema format and converts tool usage blocks to text format '[tool: Name] description' for consistency. The system includes comprehensive documentation for the Plumb skill with detailed instructions for managing spec/test/code alignment and decision review processes.
+Each adapter handles its agent's native transcript schema and normalizes tool usage into `ToolCall` records, which are rendered for the extractor with file paths, commands, and truncated results. The system includes comprehensive documentation for the Plumb skill with detailed instructions for managing spec/test/code alignment and decision review processes.
 
 The system implements intelligent deduplication by first running Jaccard similarity filtering, then applying LLM deduplication as a second pass when 2 or more candidates remain, using DSPy's context manager with Haiku LM for deduplication while preserving Sonnet for other operations. The deduplication process prioritizes approved and synced decisions over recent ones in the comparison set and uses an expanded context window of 200 decisions instead of 50 for more comprehensive duplicate detection.
 
@@ -150,14 +161,14 @@ The legacy decisions path function is maintained for migration detection purpose
 ### Path 2: Committing from the terminal (Interactive Review)
 The user commits directly from a terminal, outside of Claude Code. The pre-commit hook fires the same way:
 
-1. The hook analyzes the staged diff. It reads Claude Code's native session files directly from auto-detected paths (~/.claude/conversations.jsonl, etc.) and extracts prescriptive choices while excluding observations and diagnostics. Within-batch similarity deduplication prevents duplicate decisions in the same batch. Time awareness uses both last_commit datetime and last_extracted_at timestamp as cutoffs, taking the later of the two to determine which conversations to process.
+1. The hook analyzes the staged diff. It reads the transcripts of every supported agent that recorded this repository as its working directory and extracts prescriptive choices while excluding observations and diagnostics. Within-batch similarity deduplication prevents duplicate decisions in the same batch. Time awareness uses both last_commit datetime and last_extracted_at timestamp as cutoffs, taking the later of the two to determine which conversations to process.
 2. It writes pending decisions to `decisions.jsonl`, passing current decisions and recent decisions from the last couple commits to the deduplication pass using a context window of 200 decisions and prioritizing approved/synced decisions over recent ones in the comparison set.
 3. It prints a human-readable summary of pending decisions and exits non-zero, aborting the commit.
 4. The user runs `plumb review` in their terminal, which presents decisions interactively and accepts keypresses.
 5. Rejected decisions can be modified via `plumb modify <id>`, which stages the modified code and reports test results.
 6. The user re-runs `git commit`. Hook fires again, finds no pending decisions, exits zero. Commit lands.
 
-Both paths use the same hook, the same decision log, the same per-decision commands, and the same sync logic. The only difference is who drives the review loop: Claude Code's skill or the interactive `plumb review` CLI. The system uses exact deduplication and LLM-based semantic deduplication with groq/openai/gpt-oss-120b configured for both decision_deduplicator and question_synthesizer (8192 max_tokens). Source summaries are structured as per-file mappings to enable granular tracking. All documentation files including SKILL files and CLAUDE.md must be kept consistent with the same sync workflow requirements.
+Both paths use the same hook, the same decision log, the same per-decision commands, and the same sync logic. The only difference is who drives the review loop: Claude Code's skill or the interactive `plumb review` CLI. Agents other than Claude Code do not get the conversational review loop; their sessions are still read for decisions, and the human reviews with `plumb review`. The system uses exact deduplication and LLM-based semantic deduplication with groq/openai/gpt-oss-120b configured for both decision_deduplicator and question_synthesizer (8192 max_tokens). Source summaries are structured as per-file mappings to enable granular tracking. All documentation files including SKILL files and CLAUDE.md must be kept consistent with the same sync workflow requirements.
 ## CLI Commands
 All commands are invoked as `plumb <command>`.
 ---
@@ -191,10 +202,10 @@ Initializes Plumb in the current git repository.
 {
   "spec_paths": ["docs/spec.md"],
   "test_paths": ["tests/"],
-  "claude_log_path": null,
   "initialized_at": "<ISO timestamp>",
   "last_commit": null,
-  "last_commit_branch": null
+  "last_commit_branch": null,
+  "last_extracted_at": null
 }
 ```
 ### `plumb hook`
@@ -206,9 +217,9 @@ Called automatically by the git pre-commit hook. Not intended to be called direc
 4. **Detects amends:** Compare the HEAD commit's parent SHA to `last_commit`. If equal, delete decisions in `decisions.jsonl` where `commit_sha == last_commit` before re-running analysis.
 5. **Detects broken references (rebase):** Check all SHAs in `decisions.jsonl` against git history. Flag unreachable SHAs with `"ref_status": "broken"` and include a warning in output.
 6. Runs the **Diff Analysis** DSPy program on the staged diff.
-7. Attempts to locate and read the Claude Code conversation log (see **Conversation Log Parsing and Chunking**).
-   - If found: reads and chunks turns since `last_commit` timestamp. Uses unified conversation reading interface to support multiple sessions. Merges conversation turns from all relevant session files modified after the last commit and sorts chronologically. Handles multi-line assistant responses that span multiple JSONL lines. Converts tool_use blocks to '[tool: Name] description' format in conversation turns. Runs **Decision Extraction** per chunk.
-   - If not found: skips conversation analysis. Notes `"conversation_available": false` in each decision object.
+7. Discovers and reads agent transcripts for this repository (see **Conversation Log Parsing and Chunking**).
+   - If any session is found: reads turns since the cutoff (the later of `last_commit` and `last_extracted_at`), chunks them per `(agent, session_id)`, and runs **Decision Extraction** per chunk. Each decision is stamped with provenance (`agent`, `session_id`, `parent_session_id`, `source_path`, `turn_range`, `evidence_digest`) and deterministic `file_refs`. A session that fails to parse is logged and skipped; the other sessions still load.
+   - If none is found: skips conversation analysis and runs extraction on the diff summary alone. Notes `"conversation_available": false` and leaves `agent` null in each decision object.
 8. Filters out decisions marked as non-spec-relevant during extraction before creating Decision records.
 9. Merges and deduplicates decisions across chunks using DuckDB for cross-shard queries to read and deduplicate decisions across all branch JSONL files. Deduplication checks against all existing decisions (both pending and resolved) instead of only resolved ones. Implements within-batch similarity deduplication to compare new decisions against each other using Jaccard similarity check.
 10. For each decision with no associated question, runs **Question Synthesizer** with program-specific model configuration.
@@ -384,6 +395,14 @@ Reports coverage across all three dimensions.
 6. Measures and reports coverage improvement achieved by marker injection.
 
 ---
+### `plumb log`
+Shows the decision log grouped by commit, then by agent. Read-only unless `--verify` finds a definitive answer.
+**Behavior:**
+1. Reads all decisions across every branch shard, excluding `ignored`, sorted by `created_at` then `id` so output is reproducible.
+2. `--since <ref>` keeps only decisions whose `commit_sha` is in `<ref>..HEAD`. Uncommitted decisions (`commit_sha` null) are always shown.
+3. Groups by `commit_sha` (uncommitted first, then commits newest first), then by `agent` (`unknown` when null, e.g. diff-only decisions), and prints each decision's id, status, `made_by`, confidence, session id, and turn range.
+4. `--verify` re-reads each decision's transcript at `source_path` with the same adapter and no cutoff, applies the per-turn transforms the hook applied (`prepare_for_digest`), recomputes the sha256 digest over `turn_range`, and reports one of: `ok`, `stale` (digest mismatch or the range is gone), `missing` (transcript file no longer exists), or `unverifiable` (no provenance, unknown agent, or parse failure). Only `ok` and `stale` are written back to `ref_status`; `missing` and `unverifiable` leave it alone, and a `broken` ref is never overwritten.
+
 ### `plumb status`
 Prints a human-readable summary:
 - Tracked spec files and total requirements
@@ -400,7 +419,7 @@ Prints a human-readable summary:
 Plumb ships with a Claude Code skill file at `plumb/skill/SKILL.md`. During `plumb init`, this file is copied to `.claude/SKILL.md` in the project root — a project-local installation only. It is never installed globally. Claude Code automatically reads files in `.claude/` at the start of each session, so no additional configuration is required after `plumb init`.
 The skill file provides structured guidance for AI-assisted development workflow. It teaches Claude Code the Plumb workflow so it can guide the user naturally through the development process, and it provides the machine-readable protocol for parsing hook output and calling per-decision commands during conversational review.
 
-The system supports reading Claude Code native session files with JSONL parsing from the `~/.claude/projects/` directory structure. Conversation logs are located in the real session JSONL files using the format `~/.claude/projects/<project>/<session-uuid>.jsonl`.
+Transcript discovery and parsing are not the skill's job; they live in the `plumb/traces/` adapters described under **Conversation Log Parsing and Chunking**.
 ### Skill File Location
 - **Source (in Plumb package):** `plumb/skill/SKILL.md`- **Installed to (per project):** `<project_root>/.claude/SKILL.md`
 - **Scope:** Local to the project. Not installed globally. Not shared across projects.
@@ -517,12 +536,13 @@ Present these gaps clearly so the user can prioritize.
 | `plumb sync` | Called automatically by approve/edit — updates spec and tests |
 | `plumb coverage` | Run coverage across all three dimensions |
 | `plumb parse-spec` | Re-parse spec after manual edits |
+| `plumb log [--since <ref>] [--verify]` | Show decisions grouped by commit and agent; `--verify` re-checks evidence against transcripts |
 
 The conversation log reader must work seamlessly across different repositories without requiring additional user setup or configuration overhead.
 
 ---
 ## CLAUDE.md Integration
-`plumb init` appends the following block to `CLAUDE.md`. Delimited by comment markers so future Plumb commands can update it without affecting surrounding content.
+`plumb init` appends the following block to `CLAUDE.md` and to `AGENTS.md` (read by Codex, Pi, Copilot, and other agents). Each file is created if absent. The block is delimited by comment markers so future Plumb commands can update it without affecting surrounding content.
 ```markdown
 <!-- plumb:start -->
 ## Plumb (Spec/Test/Code Sync)
@@ -543,43 +563,86 @@ This project uses Plumb to keep the spec, tests, and code in sync.
 - Never edit `.plumb/decisions.jsonl` directly.
 - Treat the spec markdown files as the source of truth for intended behavior.
   Plumb will keep them updated as decisions are approved.
-- When parsing session files, skip assistant entries that contain 'thinking' blocks, have 'isSidechain: true', or have 'isMeta: true'.
 <!-- plumb:end -->
 ```
 
 ---
 ## Conversation Log Parsing and Chunking
-### Locating the Log
-- Configurable in `.plumb/config.json` under `claude_log_path`.- If not set, Plumb attempts to auto-detect using common Claude Code log locations.
-- If not found, Plumb skips conversation analysis, notes `"conversation_available": false` in each decision, prints a warning, and continues with diff-only analysis.
-- The log is a JSONL file where each line is a turn with at minimum `role` (`user` | `assistant`), `content` (string), and `timestamp`.
-- Session files are pre-filtered by modification time to avoid reading old files, then individual entries are filtered by timestamp.
-- Plumb reads only turns recorded after the `last_commit` timestamp in `config.json`.
-- The conversation parser handles the native session JSONL format with type/message schema used by Claude Code.
+### Trace Sources
+Transcript reading is agent-agnostic after a thin per-agent adapter. A `TraceSource` (in `plumb/traces/`) implements:
+- `discover(repo_root, since) -> list[SessionRef]`: sessions that touched this repository and were active after the cutoff.
+- `parse(ref, since) -> list[Turn]`: normalized turns for one session, in order, after the cutoff.
+
+Sources are a plain list returned by `all_sources()`; there is no registry, plugin system, or config-driven session root. Four adapters ship:
+
+| Agent | Files | Subagents |
+|---|---|---|
+| Claude Code | `~/.claude/projects/*/*.jsonl` plus `*/subagents/**/agent-*.jsonl` | first-class sessions; the parent is the session directory that encloses the subagent file |
+| Codex | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (and `archived_sessions/`) | linked via `parent_thread_id` |
+| Pi | `~/.pi/agent/sessions/<project>/<session>.jsonl` | child files nested under the parent's directory |
+| Copilot CLI | `~/.copilot/session-state/<uuid>/events.jsonl` (or `<uuid>.jsonl`) | — |
+
+The Copilot adapter is written from a third-party parser and is **unverified against live sessions**. Pi's log is tree-structured (`id`/`parentId`); the adapter walks the active ancestry from the last entry and ignores abandoned branches. Compaction nodes stay in the chain and pre-compaction messages are kept so ordinals remain stable; the compaction summary is never emitted as a turn.
+
+**Records.** `SessionRef(agent, session_id, path, cwd, branch, parent_session_id)`; `Turn(agent, session_id, ordinal, role, content, timestamp, tool_calls)` where `ordinal` is the turn's position within its session and is stable across runs; `ToolCall(name, category, file_path, file_paths, input_summary, result_summary, tool_use_id)` where `file_paths` lists every path a multi-file edit touches (e.g. Codex `apply_patch`) and `file_path` is its first entry.
+
+### Discovery by `cwd`
+Discovery does not encode the repository path into a directory name. For every adapter:
+1. Glob the agent's candidate files whose mtime is after the cutoff.
+2. Read the file head for the working directory the agent recorded (`cwd`).
+3. Keep the session if that `cwd` resolves to the same repository as `repo_root`, compared on `git rev-parse --git-common-dir` (not `--show-toplevel`), so a linked worktree attributes to its main repository.
+- If no session matches, Plumb skips conversation analysis, notes `"conversation_available": false` in each decision, prints a warning, and continues with diff-only analysis.
+- Plumb reads only turns recorded after the cutoff: the later of the `last_commit` commit time and `last_extracted_at` in `config.json`.
+- A source or session that fails to discover or parse is logged and skipped; the remaining sessions still load.
+- There is no `claude_log_path` config key and no legacy log path.
+
+### Tool Taxonomy
+Every tool call is classified into one of nine categories: `Read`, `Edit`, `Write`, `Bash`, `Grep`, `Glob`, `Task`, `Tool`, `Other`. The mapping from each agent's raw tool names lives in `plumb/traces/taxonomy.py`; unknown names fall through to `Other` and are still emitted. `file_path`/`file_paths` are extracted for `Read`/`Edit`/`Write` from the agent-specific argument (`file_path`, `path`, or the patch headers of `apply_patch`).
+
+### Rendering Turns
+Chunk text keeps the `[role]: content` form; tool calls render with substance rather than as `[tool: Name]`. An `Edit` renders with its file path, a `Bash` call with its command and a truncated result, and so on:
+```
+[assistant]: I'll switch the cache to an in-memory dict.
+  [Edit plumb/cache.py]
+  [Bash: pytest tests/test_cache.py -x] -> 12 passed
+```
 ### Chunking Strategy
 Chunking is performed in `conversation.py` before any DSPy program is called. No LLM is involved in this step — chunks are created deterministically.
-**Primary unit: user turn.** A chunk is one user message plus all following assistant turns up to but not including the next user message.
+**Per-session segmentation.** Turns are grouped by `(agent, session_id)` in first-seen order before chunking; sessions are never interleaved. Subagent sessions are chunked as their own sessions with `parent_session_id` set (from the `SessionRef`).
 
-**Chunk size cap.** If a chunk exceeds 6,000 tokens, split at tool call boundaries. If no tool call boundary exists, split at the midpoint of the largest assistant turn.
+**Primary unit: user turn.** Within a session, a chunk is one user message plus all following assistant turns up to but not including the next user message.
 
-**Overlap.** Prepend the final assistant turn of the previous chunk as a header to the next chunk. One turn of overlap preserves continuity without meaningfully increasing size.
+**Chunk size cap.** If a chunk exceeds `DEFAULT_MAX_TOKENS` (6,000 estimated tokens), split at turn boundaries into groups that fit. A single turn whose rendering alone exceeds the budget is truncated to `DEFAULT_MAX_TOKENS * 4` characters and the chunk is marked `truncated`. This truncation is the one pre-digest transform besides noise reduction, so `plumb log --verify` can reproduce it.
+
+**Header and overlap.** Each chunk's text begins with `[agent=<agent> session=<session_id> parent=<parent_session_id> turns <start>-<end>]` (the `parent=` field is present only for subagent sessions) so the extractor can attribute `made_by` and so provenance round-trips. The final turn of the previous chunk of the *same* session is prepended as one turn of overlap. `turn_start`/`turn_end` exclude the overlap so provenance points at new content only.
 
 **Noise reduction.** Before chunking, replace tool result turns longer than 500 tokens whose content appears to be a raw file read (heuristic: content begins with a file path or code fence) with `[file read: <filename>]`.
 
-**Multi-line assistant parsing.** Assistant messages that span multiple JSONL entries (one content block per line) must be properly parsed and reassembled.
+**Multi-line assistant parsing.** Assistant messages that span multiple JSONL entries (one content block per line) must be properly parsed and reassembled by the adapter.
 
 **Chunk metadata:**
 ```json
 {
   "chunk_index": 0,
+  "agent": "codex",
+  "session_id": "019a...",
+  "parent_session_id": null,
+  "turn_start": 12,
+  "turn_end": 19,
   "start_timestamp": "<ISO>",
   "end_timestamp": "<ISO>",
   "truncated": false,
   "turns": [...]
 }
 ```
+`chunk_index` is the chunk's position in this run only and is not stored on decisions.
 ### Running DecisionExtractor per Chunk
-- Called once per chunk with the `diff_summary` passed identically to every call.- Results merged after all chunks: near-duplicate decisions (same question + substantively same decision) are collapsed into one, preserving the earliest `chunk_index`.
+- Called once per chunk with the `diff_summary` passed identically to every call.- Results merged after all chunks: near-duplicate decisions (same question + substantively same decision) are collapsed into one, preserving the earliest occurrence (by session order, then turn ordinal).
+### Enrichment and Provenance
+Deterministic, no model calls. Both cover only `turn_start..turn_end`, never the overlap turn, so they are reproducible from `(source_path, turn_range)` alone:
+- `file_refs` = the `file_paths` of every `Edit`/`Write` tool call in the range, intersected with the files that have staged hunks. Relative paths are resolved against the session's `cwd`; paths outside the repository are dropped. One `FileRef` is emitted per staged hunk with `lines = [start, end]` from the hunk header.
+- `evidence_digest` = sha256 over the rendered turns in the range, after `prepare_for_digest` (noise reduction, ordinal order, single-turn truncation). The header and overlap are not included.
+- `agent`, `session_id`, `parent_session_id`, `source_path` (the transcript file), and `turn_range = [turn_start, turn_end]` are copied from the chunk and its `SessionRef`. `agent` is null for diff-only decisions.
 
 ---
 
@@ -608,7 +671,13 @@ Append-only. Existing lines are never modified in place. Status updates are writ
   ],
   "related_requirement_ids": ["req-014"],
   "confidence": 0.91,
-  "chunk_index": 2,
+  "agent": "codex",
+  "session_id": "019a3f2e-...",
+  "parent_session_id": null,
+  "source_path": "/Users/me/.codex/sessions/2026/08/29/rollout-....jsonl",
+  "turn_range": [12, 19],
+  "evidence_digest": "<sha256 hex>",
+  "chunk_index": null,
   "conversation_truncated": false,
   "rejection_reason": null,
   "user_note": null,
@@ -620,12 +689,13 @@ Append-only. Existing lines are never modified in place. Status updates are writ
 
 Datetime fields (`created_at`, `synced_at`, `reviewed_at`) are stored and round-tripped as ISO-8601 strings. The decision_log.py module handles serialization and deserialization of datetime and date types to ensure proper conversion between Python datetime objects and ISO-8601 string representations for JSON compatibility.
 
+**Provenance fields:** `agent` (`"claude" | "codex" | "pi" | "copilot"`, null for diff-only decisions), `session_id`, `parent_session_id` (set for subagent sessions), `source_path` (transcript file), `turn_range` (`[start, end]` ordinals within that session), `evidence_digest` (sha256 of the rendered turns in `turn_range`; see **Enrichment and Provenance**). `chunk_index` is **deprecated**: it is kept in the schema for old rows but the hook no longer populates it.  
 **Status values:** `pending` | `approved` | `edited` | `rejected` | `rejected_modified` | `rejected_manual`  
 **ref_status values:** `ok` | `broken` | `stale`  
 `stale`: the evidence digest no longer matches the transcript at `source_path` / `turn_range`; set and cleared by `plumb log --verify`.  
 **made_by values:** `"user" | "agent"` — user if human stated or confirmed the decision, agent otherwise
 
-Note: `commit_sha` is null until the commit lands. It is populated by the hook on the second pass (when no pending decisions remain and the commit proceeds).
+Note: `commit_sha` is null until the commit lands. The post-commit hook stamps it: every decision on the current branch with a null `commit_sha` and a `created_at` after the previous `last_commit`'s commit time is updated with the new HEAD SHA (ignored decisions are skipped). `plumb log` groups on this field.
 ## DSPy Programs
 ### `DiffAnalyzer`
 **Input:** Raw unified diff string  **Output:** List of change summaries, each with:
@@ -693,7 +763,9 @@ pytest, 80% coverage minimum for v0.1.0.
 - `cli.py`: all commands run without error given valid inputs; per-decision commands update `decisions.jsonl` correctly; coverage command provides progress feedback with progress bar and status text; spec and test suggestion functions cover various directory scenarios
 - `decision_log.py`: read/write/filter/dedup on `.jsonl`; latest-line-wins logic for status updates
 - `git_hook.py`: hook produces correct pending decisions given mock diffs and conversation logs; amend detection; TTY vs non-TTY output formats
-- `conversation.py`: correct chunk boundaries, overlap, noise reduction, metadata; oversized chunks split at tool call boundaries
+- `conversation.py`: correct per-session chunk boundaries, header, overlap, noise reduction, metadata; oversized turns truncated and flagged; evidence digest reproducible via `prepare_for_digest`
+- `traces/`: each adapter parses fixture transcripts into `Turn`/`ToolCall` records; `cwd` discovery matches on git-common-dir; taxonomy and path extraction; staged hunk parsing and `file_refs`
+- `log_view.py`: grouping order; `verify_evidence` returns `ok`/`stale`/`missing`/`unverifiable` correctly
 - `programs/`: each DSPy program produces correctly structured output given fixture inputs (schema validity, not LLM quality); comprehensive test suite for chunking functionality covering token estimation, item chunking, and chunked mapper execution scenarios
 - `coverage_reporter.py`: correct calculations given mock pytest output
 - `sync.py`: spec and test files updated correctly given approved decisions; no partial writes; newline formatting tests covering both apply_section_updates() and insert_new_sections() functions
@@ -712,7 +784,7 @@ pytest, 80% coverage minimum for v0.1.0.
 | **Requirement** | A single, atomic, testable statement of behavior extracted from the spec |
 | **Decision** | A choice made in staged code (by user or LLM) that may not yet be captured in the spec |
 | **Decision Log** | The append-only `.plumb/decisions.jsonl` file |
-| **Chunk** | A user turn plus all following assistant turns up to the next user turn; the unit passed to `DecisionExtractor` |
+| **Chunk** | Within one `(agent, session_id)`, a user turn plus all following assistant turns up to the next user turn; the unit passed to `DecisionExtractor` |
 | **Sync** | Updating the spec and tests to reflect approved decisions |
 | **Broken Reference** | A decision whose `commit_sha` is no longer reachable in git history |
 | **Conversational Review** | The review loop driven by the Claude Code skill, using per-decision commands |
@@ -721,6 +793,7 @@ pytest, 80% coverage minimum for v0.1.0.
 | **Plumb** | This library |
 | **Ignore Module** | A dedicated module (ignore.py) that handles file exclusion functionality |
 | **.plumbignore** | A configuration file using gitignore-style patterns to exclude files from plumb operations and analysis |
-| **Claude Session Module** | A module (plumb/claude_session.py) that reads Claude Code native session files from ~/.claude/projects/ |
+| **Trace Source** | A per-agent adapter in `plumb/traces/` that discovers an agent's sessions for a repository by recorded `cwd` and normalizes them into `Turn`/`ToolCall` records |
+| **Evidence Digest** | sha256 of a decision's rendered source turns (`turn_range`), used by `plumb log --verify` to detect a changed or missing transcript |
 | **Decision Cycling** | The phenomenon where LLMs rephrase decisions slightly differently on each run, causing them to slip past deduplication thresholds |
 | **DecisionDeduplicator** | A dedicated module that performs LLM-based deduplication of decisions |

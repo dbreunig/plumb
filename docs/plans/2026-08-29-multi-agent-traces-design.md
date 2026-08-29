@@ -1,7 +1,7 @@
 # Multi-Agent Traces: Find, Normalize, Extract
 
 **Date:** 2026-08-29
-**Status:** Proposed
+**Status:** Implemented (stages 1–2) on feat/multi-agent-traces
 **Companion:** [Record mode](2026-08-29-record-mode-design.md) owns stage 3 of the
 pipeline described here.
 
@@ -291,6 +291,35 @@ Two consequences worth stating:
   compute from `Turn.tool_calls` and would sharpen the record threshold, but
   they are a refinement after this lands.
 - Gemini, Cursor, OpenCode, or any agent whose trace does not record `cwd`.
+
+## Delivered vs. design
+
+Deltas that emerged during implementation and review:
+
+- `ToolCall.file_paths` lists every path a multi-file edit touches (Codex
+  `apply_patch`); `file_path` is its first entry.
+- `Chunk.parent_session_id` is rendered into the chunk header
+  (`[agent=… session=… parent=… turns A-B]`).
+- The evidence digest covers `turn_start..turn_end` only — no header, no
+  overlap turn — computed via `prepare_for_digest` (noise reduction, ordinal
+  order, single-turn truncation) so `--verify` reproduces it from
+  `(source_path, turn_range)` alone.
+- `file_refs` are restricted to the same turn range and relative paths are
+  resolved against the session `cwd`; one `FileRef` per staged hunk with
+  `lines = [start, end]`.
+- `read_conversation_with_refs` isolates errors per source and per session:
+  a transcript that fails to parse is logged and skipped, the rest still load.
+- `plumb log --verify` reports a `"missing"` state (transcript file gone)
+  alongside `ok` / `stale` / `unverifiable`; only `ok` and `stale` are written
+  back to `ref_status`.
+- Post-commit `commit_sha` stamping landed in this branch (it was listed as a
+  follow-up): the post-commit hook stamps the new HEAD onto decisions created
+  since the previous commit on the branch.
+- Codex subagents are linked to their parent via `parent_thread_id` in the
+  rollout's `session_meta`.
+- Pi compaction nodes stay in the active chain and pre-compaction messages
+  are kept so ordinals remain stable; the compaction summary is never
+  emitted as a turn.
 
 ## Implementation order
 

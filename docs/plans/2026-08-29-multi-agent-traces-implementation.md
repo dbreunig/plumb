@@ -2163,5 +2163,6 @@ git commit -m "docs: spec and README for multi-agent traces"
 - Codex `spawn_agent` child rollouts as subagent sessions.
 - `git blame` line resolution and `git patch-id` re-mapping (design doc, "Line attribution").
 - Re-enabling the pre-commit hook (`.git/hooks/pre-commit.disabled`) — the user's call once record mode lands.
-- `tests/test_generated.py` syntax error at line 4901 and the 12 pre-existing failures.
+- Repair the two pre-existing `tests/test_integration.py` amend/gate failures (now meaningful since `commit_sha` is stamped).
+- Regenerate `tests/test_generated.py` (SyntaxError at line 4901; 14 references to removed APIs).
 - Constraining `made_by` to `Literal["user", "agent"]` in `ExtractedDecision` (Haiku emitted `"assistant"` once in testing).
