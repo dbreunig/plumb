@@ -115,17 +115,57 @@ def test_parse_non_string_result_and_failure(tmp_repo, tmp_path):
         _ev("assistant.message", {"content": "", "toolRequests": [
             {"toolCallId": "a", "name": "view", "arguments": "{\"path\": \"a.py\"}"},
             {"toolCallId": "b", "name": "shell", "arguments": "{\"command\": \"false\"}"},
+            {"toolCallId": "c", "name": "shell", "arguments": "{\"command\": \"exit 2\"}"},
         ]}),
         _ev("tool.execution_complete", {"toolCallId": "a", "success": True, "result": {"files": ["a.py"]}}),
         _ev("tool.execution_complete", {"toolCallId": "b", "success": False, "result": "exit 1"}),
+        _ev("tool.execution_complete", {"toolCallId": "c", "success": "False", "result": "exit 2"}),
     ]
     f = _write(tmp_path / "copilot" / "session-state" / "s.jsonl", lines)
     ref = SessionRef(agent="copilot", session_id="s", path=str(f), cwd=str(tmp_repo))
     turns = CopilotSource().parse(ref, None)
     assert [t.role for t in turns] == ["assistant"]
-    a, b = turns[0].tool_calls
-    assert a.result_summary == '{"files": ["a.py"]}'
+    a, b, c = turns[0].tool_calls
+    assert a.result_summary == '{"files":["a.py"]}'
     assert b.result_summary == "ERROR: exit 1"
+    assert c.result_summary == "ERROR: exit 2"  # string "false" is tolerated, case-insensitively
+
+
+def test_discover_bare_form_with_empty_sibling_dir(tmp_repo, tmp_path):
+    root = tmp_path / "copilot"
+    f = _bare_session(root, str(tmp_repo), uuid="bare-2", sid="bare-2")
+    (root / "session-state" / "bare-2").mkdir()  # no events.jsonl inside
+    refs = CopilotSource(root=root / "session-state").discover(tmp_repo, None)
+    assert [(r.session_id, r.path) for r in refs] == [("bare-2", str(f))]
+
+
+def test_parse_reused_tool_call_id_binds_to_latest_call(tmp_repo, tmp_path):
+    lines = [
+        _ev("session.start", {"sessionId": "s", "context": {"cwd": str(tmp_repo)}}),
+        _ev("assistant.message", {"content": "", "toolRequests": [
+            {"toolCallId": "dup", "name": "shell", "arguments": "{\"command\": \"one\"}"}]}),
+        _ev("assistant.message", {"content": "", "toolRequests": [
+            {"toolCallId": "dup", "name": "shell", "arguments": "{\"command\": \"two\"}"}]}),
+        _ev("tool.execution_complete", {"toolCallId": "dup", "success": True, "result": "done"}),
+    ]
+    f = _write(tmp_path / "copilot" / "session-state" / "s.jsonl", lines)
+    ref = SessionRef(agent="copilot", session_id="s", path=str(f), cwd=str(tmp_repo))
+    first, second = CopilotSource().parse(ref, None)
+    assert first.tool_calls[0].result_summary is None
+    assert second.tool_calls[0].result_summary == "done"
+
+
+def test_parse_invalid_json_arguments(tmp_repo, tmp_path):
+    lines = [
+        _ev("session.start", {"sessionId": "s", "context": {"cwd": str(tmp_repo)}}),
+        _ev("assistant.message", {"content": "", "toolRequests": [
+            {"toolCallId": "a", "name": "shell", "arguments": "not json"}]}),
+    ]
+    f = _write(tmp_path / "copilot" / "session-state" / "s.jsonl", lines)
+    ref = SessionRef(agent="copilot", session_id="s", path=str(f), cwd=str(tmp_repo))
+    turns = CopilotSource().parse(ref, None)
+    tc = turns[0].tool_calls[0]
+    assert (tc.name, tc.category, tc.input_summary, tc.file_path) == ("shell", "Bash", "not json", None)
 
 
 def test_parse_skips_skill_messages(tmp_repo, tmp_path):

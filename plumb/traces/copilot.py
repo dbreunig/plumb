@@ -18,6 +18,14 @@ Assumed event shapes (one JSON object per line: {"type", "timestamp", "data"}):
 
 Layout: when both <uuid>/events.jsonl and <uuid>.jsonl exist the directory
 form wins and the bare file is dropped, matching agentsview.
+
+Further assumptions to confirm against real sessions:
+- session.start is the first line; discovery only looks at the first 64
+  events (the sniff_head limit), so a later session.start is missed.
+- Actual Copilot CLI tool names are unconfirmed; unknown names categorize
+  as Other, which is harmless.
+- toolCallId is unique per session. A reused id rebinds to the latest
+  call; the earlier call keeps result_summary=None.
 """
 from __future__ import annotations
 
@@ -41,7 +49,14 @@ def _result_text(result) -> str:
         return result
     if result is None:
         return ""
-    return json.dumps(result)
+    return json.dumps(result, separators=(",", ":"))
+
+
+def _failed(success) -> bool:
+    # Bool per agentsview; a string "false" is tolerated in case the CLI serializes it that way.
+    if success is False:
+        return True
+    return isinstance(success, str) and success.strip().lower() == "false"
 
 
 def _session_start(e: dict):
@@ -152,7 +167,7 @@ class CopilotSource:
                 tc = by_call.get(data.get("toolCallId") or "")
                 if tc is not None:
                     text = _result_text(data.get("result")).strip()
-                    if data.get("success") is False:
+                    if _failed(data.get("success")):
                         text = "ERROR: " + text
                     tc.result_summary = text[:RESULT_LIMIT] or None
         # Turns without a timestamp are deliberately kept (see claude.py).
