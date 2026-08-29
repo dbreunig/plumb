@@ -124,8 +124,8 @@ cadence and removes the encoding dependency entirely.
 
 | Agent | Files | `cwd` / branch | Tool call shape | Subagents |
 |---|---|---|---|---|
-| **Claude Code** | `~/.claude/projects/<enc>/<session>.jsonl`; subagents in `<enc>/subagents/agent-*.jsonl` and `isSidechain` entries | `cwd`, `gitBranch` on user entries | `tool_use` blocks in `message.content[]`; results as `tool_result` user entries | linked to the spawning `Task`/`Agent` call by `toolUseResult.agentId` |
-| **Codex** | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (+ `archived_sessions/`) | `turn_context.payload.cwd`, `git.branch` | `function_call` / `custom_tool_call` with `name`; `function_call_output` | `spawn_agent` → child rollout |
+| **Claude Code** | `~/.claude/projects/<enc>/<session>.jsonl`; subagents in `<enc>/subagents/agent-*.jsonl` and `isSidechain` entries | `cwd`, `gitBranch` on user entries | `tool_use` blocks in `message.content[]`; results as `tool_result` user entries | subagent transcripts at `<session>/subagents/**/agent-*.jsonl`; parent = enclosing session |
+| **Codex** | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (+ `archived_sessions/`) | `turn_context.payload.cwd`, `git.branch` | `function_call` / `custom_tool_call` with `name`; `function_call_output` | `session_meta.parent_thread_id` on subagent rollouts |
 | **Pi** | `~/.pi/agent/sessions/<project>/<session>.jsonl`; subagents at `<project>/<session>/<agent>.jsonl` | `cwd` on the `{"type":"session"}` header line | `toolCall` blocks with `name`; results keyed by `message.toolCallId` | child file nested under parent's directory; header may carry `branchedFrom` |
 | **Copilot CLI** | `~/.copilot/session-state/<uuid>/events.jsonl` (or bare `<uuid>.jsonl`) | `context.cwd`, branch | tool request events with `name` | — |
 

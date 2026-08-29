@@ -618,7 +618,7 @@ Chunking is performed in `conversation.py` before any DSPy program is called. No
 
 **Noise reduction.** Before chunking, replace tool result turns longer than 500 tokens whose content appears to be a raw file read (heuristic: content begins with a file path or code fence) with `[file read: <filename>]`.
 
-**Multi-line assistant parsing.** Assistant messages that span multiple JSONL entries (one content block per line) must be properly parsed and reassembled by the adapter.
+**Multi-line assistant parsing.** Claude Code writes one content block per JSONL entry, so a single assistant message (its text plus its tool calls) spans several consecutive `assistant` entries that share a `message.id`. The Claude adapter merges those consecutive entries into one assistant turn: text blocks are joined, tool calls are appended in order, the first entry's timestamp is kept, and the ordinal is not advanced. A user turn between two entries ends the merge, and entries without a `message.id` are never merged.
 
 **Chunk metadata:**
 ```json

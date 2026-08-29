@@ -78,6 +78,11 @@ class ClaudeSource:
         turns: list[Turn] = []
         by_tool_id: dict[str, ToolCall] = {}
         ordinal = 0
+        # Claude Code writes one content block per JSONL line; consecutive
+        # assistant entries sharing message.id are one logical message.
+        last_asst: Optional[Turn] = None
+        last_asst_msg_id: Optional[str] = None
+        first_ts: Optional[str] = None  # timestamp of the first entry seen for last_asst_msg_id
         for e in iter_jsonl(Path(ref.path)):
             if e.get("type") not in ("user", "assistant") or e.get("isMeta"):
                 continue
@@ -91,6 +96,7 @@ class ClaudeSource:
                         turns.append(Turn(agent=ref.agent, session_id=ref.session_id, ordinal=ordinal,
                                           role="user", content=content, timestamp=ts))
                         ordinal += 1
+                        last_asst = last_asst_msg_id = first_ts = None
                 elif isinstance(content, list):
                     texts, saw_result = [], False
                     for b in content:
@@ -112,6 +118,7 @@ class ClaudeSource:
                         turns.append(Turn(agent=ref.agent, session_id=ref.session_id, ordinal=ordinal,
                                           role="user", content="\n".join(texts), timestamp=ts))
                         ordinal += 1
+                        last_asst = last_asst_msg_id = first_ts = None
                 continue
 
             # assistant
@@ -132,10 +139,22 @@ class ClaudeSource:
                     calls.append(tc)
                     if tc.tool_use_id:
                         by_tool_id[tc.tool_use_id] = tc
+            msg_id = (msg.get("id") if isinstance(msg, dict) else None) or None
+            if msg_id != last_asst_msg_id:
+                # New logical message (a thinking-only first entry still counts
+                # as its first entry, so remember its timestamp).
+                last_asst, last_asst_msg_id, first_ts = None, msg_id, ts
             if not texts and not calls:
                 continue
-            turns.append(Turn(agent=ref.agent, session_id=ref.session_id, ordinal=ordinal,
-                              role="assistant", content="\n".join(texts), timestamp=ts, tool_calls=calls))
+            if msg_id and last_asst is not None:
+                # Continuation of the previous assistant message: fold in, keep
+                # the first entry's timestamp and ordinal.
+                last_asst.content = "\n".join(filter(None, [last_asst.content, *texts])).strip()
+                last_asst.tool_calls.extend(calls)
+                continue
+            last_asst = Turn(agent=ref.agent, session_id=ref.session_id, ordinal=ordinal, role="assistant",
+                             content="\n".join(texts), timestamp=first_ts if msg_id else ts, tool_calls=calls)
+            turns.append(last_asst)
             ordinal += 1
 
         # Turns without a timestamp are deliberately kept: losing a turn is worse

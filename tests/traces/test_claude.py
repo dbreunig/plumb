@@ -168,3 +168,55 @@ def test_parse_tolerates_non_dict_message(tmp_repo, tmp_path):
     f = _project(tmp_path, tmp_repo, entries=entries)
     ref = SessionRef(agent="claude", session_id="S1", path=str(f), cwd=repo)
     assert [t.content for t in ClaudeSource().parse(ref, None)] == ["valid"]
+
+
+def _asst(repo, msg_id, block, ts=TS.format(2)):
+    return _entry("assistant", repo, ts=ts,
+                  message={"id": msg_id, "role": "assistant", "content": [block]})
+
+
+def test_parse_merges_assistant_entries_sharing_message_id(tmp_repo, tmp_path):
+    repo = str(tmp_repo)
+    entries = [
+        _entry("user", repo, ts=TS.format(1), message={"role": "user", "content": "go"}),
+        _asst(repo, "msg_1", {"type": "thinking", "thinking": "hmm"}, ts=TS.format(2)),
+        _asst(repo, "msg_1", {"type": "text", "text": "Editing."}, ts=TS.format(3)),
+        _asst(repo, "msg_1", {"type": "tool_use", "id": "toolu_1", "name": "Edit",
+                              "input": {"file_path": "a.py", "old_string": "x", "new_string": "y"}},
+              ts=TS.format(4)),
+        _asst(repo, "msg_2", {"type": "text", "text": "Done."}, ts=TS.format(5)),
+    ]
+    f = _project(tmp_path, tmp_repo, entries=entries)
+    ref = SessionRef(agent="claude", session_id="S1", path=str(f), cwd=repo)
+    turns = ClaudeSource().parse(ref, None)
+    assert [(t.role, t.ordinal) for t in turns] == [("user", 0), ("assistant", 1), ("assistant", 2)]
+    merged = turns[1]
+    assert merged.content == "Editing."
+    assert [tc.name for tc in merged.tool_calls] == ["Edit"]
+    assert merged.timestamp == TS.format(2)
+    assert turns[2].content == "Done."
+
+
+def test_parse_user_turn_between_same_message_id_prevents_merge(tmp_repo, tmp_path):
+    repo = str(tmp_repo)
+    entries = [
+        _asst(repo, "msg_1", {"type": "text", "text": "first"}),
+        _entry("user", repo, message={"role": "user", "content": "interject"}),
+        _asst(repo, "msg_1", {"type": "text", "text": "second"}),
+    ]
+    f = _project(tmp_path, tmp_repo, entries=entries)
+    ref = SessionRef(agent="claude", session_id="S1", path=str(f), cwd=repo)
+    turns = ClaudeSource().parse(ref, None)
+    assert [(t.role, t.content, t.ordinal) for t in turns] == [
+        ("assistant", "first", 0), ("user", "interject", 1), ("assistant", "second", 2)]
+
+
+def test_parse_assistant_entries_without_message_id_never_merge(tmp_repo, tmp_path):
+    repo = str(tmp_repo)
+    entries = [
+        _entry("assistant", repo, message={"role": "assistant", "content": [{"type": "text", "text": "a"}]}),
+        _entry("assistant", repo, message={"role": "assistant", "content": [{"type": "text", "text": "b"}]}),
+    ]
+    f = _project(tmp_path, tmp_repo, entries=entries)
+    ref = SessionRef(agent="claude", session_id="S1", path=str(f), cwd=repo)
+    assert [(t.content, t.ordinal) for t in ClaudeSource().parse(ref, None)] == [("a", 0), ("b", 1)]
