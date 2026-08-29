@@ -426,3 +426,22 @@ class TestMergeBranchDecisions:
     def test_cannot_merge_main(self, initialized_repo):
         result = merge_branch_decisions(initialized_repo, "main")
         assert result["error"] == "cannot merge main into itself"
+
+
+def test_decision_provenance_fields_roundtrip(initialized_repo):
+    from plumb.decision_log import Decision, append_decisions, read_decisions
+    d = Decision(id="dec-prov1", status="pending", decision="x", branch="main",
+                 agent="codex", session_id="019a", parent_session_id=None,
+                 source_path="/tmp/r.jsonl", turn_range=[12, 19], evidence_digest="ab" * 32)
+    append_decisions(initialized_repo, [d], branch="main")
+    back = {x.id: x for x in read_decisions(initialized_repo, branch="main")}["dec-prov1"]
+    assert (back.agent, back.session_id, back.turn_range) == ("codex", "019a", [12, 19])
+    assert back.evidence_digest == "ab" * 32
+
+
+def test_decision_provenance_via_duckdb(initialized_repo):
+    from plumb.decision_log import Decision, append_decisions, read_all_decisions
+    append_decisions(initialized_repo, [Decision(id="dec-prov2", decision="y", branch="main",
+                                                 agent="pi", turn_range=[0, 3])], branch="main")
+    back = {x.id: x for x in read_all_decisions(initialized_repo)}["dec-prov2"]
+    assert back.agent == "pi" and back.turn_range == [0, 3]

@@ -29,6 +29,13 @@ class Decision(BaseModel):
     conversation_available: bool = True
     file_refs: list[FileRef] = Field(default_factory=list)
     related_requirement_ids: list[str] = Field(default_factory=list)
+    # Provenance (stage 2). turn_range is [start, end] ordinals within session.
+    agent: Optional[str] = None
+    session_id: Optional[str] = None
+    parent_session_id: Optional[str] = None
+    source_path: Optional[str] = None
+    turn_range: Optional[list[int]] = None
+    evidence_digest: Optional[str] = None
     confidence: Optional[float] = None
     chunk_index: Optional[int] = None
     conversation_truncated: bool = False
