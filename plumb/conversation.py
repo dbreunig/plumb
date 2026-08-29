@@ -1,6 +1,7 @@
 """Turn rendering and per-session chunking for the decision extractor."""
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from pathlib import Path
@@ -35,7 +36,18 @@ class Chunk(BaseModel):
 
     @property
     def text(self) -> str:
+        """What the extractor sees: header + one-turn overlap + this chunk's turns."""
         return "\n".join([self.header] + [render_turn(t) for t in self.turns])
+
+    @property
+    def evidence_text(self) -> str:
+        """Turns turn_start..turn_end only (no overlap, no header): the
+        self-contained text that `plumb log --verify` recomputes from
+        (source_path, turn_range)."""
+        return evidence_text_for(self.turns, self.turn_start, self.turn_end)
+
+    def evidence_digest(self) -> str:
+        return evidence_digest_for(self.turns, self.turn_start, self.turn_end)
 
 
 def estimate_tokens(text: str) -> int:
@@ -58,6 +70,17 @@ def render_turn(t: Turn) -> str:
     lines = [f"[{t.role}]: {t.content}" if t.content else f"[{t.role}]"]
     lines += [render_tool_call(tc) for tc in t.tool_calls]
     return "\n".join(lines)
+
+
+def evidence_text_for(turns: list[Turn], turn_start: int, turn_end: int) -> str:
+    """Rendered turns whose ordinal falls in [turn_start, turn_end], in order."""
+    return "\n".join(render_turn(t) for t in turns if turn_start <= t.ordinal <= turn_end)
+
+
+def evidence_digest_for(turns: list[Turn], turn_start: int, turn_end: int) -> str:
+    """sha256 of evidence_text_for(). Shared by Chunk.evidence_digest() and the
+    verifier so the hook's stamp and the recomputation cannot drift."""
+    return hashlib.sha256(evidence_text_for(turns, turn_start, turn_end).encode("utf-8")).hexdigest()
 
 
 def _looks_like_file_read(content: str) -> bool:

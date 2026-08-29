@@ -432,15 +432,21 @@ from plumb.traces import SessionRef, ToolCall, Turn
 def test_extraction_stamps_provenance_and_file_refs(initialized_repo):
     from plumb.config import load_config
 
-    # stage an edit to src/a.py so hunks exist
+    # stage edits to src/a.py and src/other.py so hunks exist for both
     (initialized_repo / "src").mkdir()
     (initialized_repo / "src" / "a.py").write_text("x = 1\n")
-    Repo(initialized_repo).index.add(["src/a.py"])
+    (initialized_repo / "src" / "other.py").write_text("y = 2\n")
+    Repo(initialized_repo).index.add(["src/a.py", "src/other.py"])
 
     ref = SessionRef(agent="codex", session_id="019a", path="/tmp/r.jsonl", cwd=str(initialized_repo))
     sub = SessionRef(agent="codex", session_id="agent-k", path="/tmp/k.jsonl",
                      cwd=str(initialized_repo), parent_session_id="019a")
     turns = [
+        # a preceding chunk in the same session; its last turn edits src/other.py
+        # and becomes the one-turn overlap of the next chunk
+        Turn(agent="codex", session_id="019a", ordinal=0, role="user", content="make y 2"),
+        Turn(agent="codex", session_id="019a", ordinal=1, role="assistant", content="ok",
+             tool_calls=[ToolCall(name="apply_patch", category="Edit", file_path="src/other.py")]),
         Turn(agent="codex", session_id="019a", ordinal=4, role="user", content="make x 1"),
         Turn(agent="codex", session_id="019a", ordinal=5, role="assistant", content="done",
              tool_calls=[ToolCall(name="apply_patch", category="Edit", file_path="src/a.py")]),
@@ -455,15 +461,18 @@ def test_extraction_stamps_provenance_and_file_refs(initialized_repo):
         decisions = _extract_decisions_from_conversation(
             initialized_repo, load_config(initialized_repo), "summary")
 
-    assert len(decisions) == 2  # one per chunk: parent session, subagent session
-    by_session = {d.session_id: d for d in decisions}
-    d = by_session["019a"]
+    assert len(decisions) == 3  # one per chunk: 019a[0-1], 019a[4-5], agent-k[0-0]
+    by_key = {(d.session_id, tuple(d.turn_range)): d for d in decisions}
+    first = by_key[("019a", (0, 1))]
+    assert [(r.file, r.lines) for r in first.file_refs] == [("src/other.py", [1, 1])]
+    d = by_key[("019a", (4, 5))]
     assert (d.agent, d.turn_range, d.source_path) == ("codex", [4, 5], "/tmp/r.jsonl")
     assert d.parent_session_id is None
     assert len(d.evidence_digest) == 64
+    # the overlap turn (ordinal 1, edits src/other.py) must NOT contribute file_refs
     assert [(r.file, r.lines) for r in d.file_refs] == [("src/a.py", [1, 1])]
     assert d.chunk_index is None
-    k = by_session["agent-k"]
+    k = by_key[("agent-k", (0, 0))]
     assert (k.parent_session_id, k.source_path, k.file_refs) == ("019a", "/tmp/k.jsonl", [])
 
 

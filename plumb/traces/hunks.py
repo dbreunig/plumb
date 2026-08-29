@@ -62,9 +62,11 @@ def file_refs_for(edited_paths: Iterable[str], hunks: dict[str, list[list[int]]]
 
     Absolute paths are made relative to *repo_root* (paths outside the repo are
     dropped). Relative paths are joined onto *cwd* (the session's working
-    directory) when given, otherwise normalized as repo-relative.
+    directory) when given, otherwise normalized as repo-relative. Both the root
+    and absolute candidates go through realpath so a symlinked checkout
+    (/tmp/repo vs /private/tmp/repo) still matches.
     """
-    root = os.path.normpath(os.path.abspath(str(repo_root)))
+    root = os.path.realpath(str(repo_root))
     seen: set[str] = set()
     refs: list[FileRef] = []
     for p in edited_paths:
@@ -73,7 +75,7 @@ def file_refs_for(edited_paths: Iterable[str], hunks: dict[str, list[list[int]]]
         if not os.path.isabs(p) and cwd is not None:
             p = os.path.join(str(cwd), p)
         if os.path.isabs(p):
-            norm = os.path.normpath(p)
+            norm = os.path.realpath(p)
             if not (norm == root or norm.startswith(root + os.sep)):
                 continue
             rel = os.path.relpath(norm, root)

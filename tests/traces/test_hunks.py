@@ -85,3 +85,16 @@ def test_file_refs_for_resolves_relative_against_cwd():
 def test_file_refs_for_drops_paths_when_cwd_outside_repo():
     hunks = {"a.py": [[1, 1]]}
     assert file_refs_for(["a.py"], hunks, repo_root="/abs", cwd="/elsewhere") == []
+
+
+def test_file_refs_for_matches_through_symlinked_paths(tmp_repo, tmp_path_factory):
+    import os
+    link = tmp_path_factory.mktemp("lnk") / "repo"
+    os.symlink(tmp_repo, link)
+    hunks = {"src/a.py": [[1, 1]]}
+    # cwd is the symlink, repo_root the real path
+    refs = file_refs_for(["src/a.py"], hunks, tmp_repo, cwd=link)
+    assert [(r.file, r.lines) for r in refs] == [("src/a.py", [1, 1])]
+    # repo_root is the symlink, edited path is absolute under the real path
+    refs = file_refs_for([str(tmp_repo / "src" / "a.py")], hunks, link)
+    assert [(r.file, r.lines) for r in refs] == [("src/a.py", [1, 1])]

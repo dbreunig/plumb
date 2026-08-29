@@ -32,6 +32,7 @@ class Decision(BaseModel):
     file_refs: list[FileRef] = Field(default_factory=list)
     related_requirement_ids: list[str] = Field(default_factory=list)
     # Provenance (stage 2). turn_range is [start, end] ordinals within session.
+    # agent is None for diff-only decisions (no transcript available).
     agent: Optional[str] = None
     session_id: Optional[str] = None
     parent_session_id: Optional[str] = None
@@ -405,9 +406,11 @@ def deduplicate_decisions(
     existing_decisions: list[Decision] | None = None,
     use_llm: bool = False,
 ) -> list[Decision]:
-    """Collapse decisions with same question and same decision text,
-    preserving the earliest chunk_index. Then use LLM semantic dedup
-    to filter out duplicates of existing decisions."""
+    """Collapse decisions with same question and same decision text; the
+    first-seen decision wins (insertion order = session discovery order, then
+    turn ordinal). The chunk_index tie-break below is inert now that the hook
+    no longer populates chunk_index. Then use LLM semantic dedup to filter out
+    duplicates of existing decisions."""
     # Exact dedup
     print(f"[dedup] Input: {len(decisions)} candidates, {len(existing_decisions or [])} existing", flush=True)
     seen: dict[tuple, Decision] = {}

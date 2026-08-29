@@ -109,7 +109,6 @@ def _extract_decisions_from_conversation(
 ) -> list[Decision]:
     """Stage 1+2: read every agent's sessions, chunk per session, run
     DecisionExtractor per chunk, and stamp provenance + deterministic file_refs."""
-    import hashlib
     from plumb.programs import configure_dspy, run_with_retries
     from plumb.programs.decision_extractor import DecisionExtractor
     from plumb.traces.hunks import staged_hunks, file_refs_for
@@ -139,12 +138,13 @@ def _extract_decisions_from_conversation(
         except Exception:
             continue
         ref = refs.get((chunk.agent, chunk.session_id))
-        digest = hashlib.sha256(chunk.text.encode("utf-8")).hexdigest()
-        # chunk.turns includes the one-turn overlap from the previous chunk;
-        # a file edited there is still relevant context for this chunk.
+        # Digest and file_refs cover only turn_start..turn_end (not the
+        # one-turn overlap the extractor sees) so both are reproducible
+        # from (source_path, turn_range) alone.
         edited = [
             p
             for t in chunk.turns
+            if chunk.turn_start <= t.ordinal <= chunk.turn_end
             for tc in t.tool_calls
             if tc.category in ("Edit", "Write")
             for p in tc.file_paths
@@ -169,7 +169,7 @@ def _extract_decisions_from_conversation(
                     parent_session_id=chunk.parent_session_id,
                     source_path=ref.path if ref else None,
                     turn_range=[chunk.turn_start, chunk.turn_end],
-                    evidence_digest=digest,
+                    evidence_digest=chunk.evidence_digest(),
                     file_refs=file_refs,
                     conversation_truncated=chunk.truncated,
                 )

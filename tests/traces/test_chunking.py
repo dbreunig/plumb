@@ -111,3 +111,25 @@ def test_read_conversation_isolates_failing_session(tmp_repo, monkeypatch):
     turns, refs = read_conversation_with_refs(tmp_repo)
     assert [t.session_id for t in turns] == ["ok"]
     assert list(refs) == [("fake", "ok")]
+
+
+def test_evidence_digest_reproducible_from_turn_range():
+    from plumb.conversation import evidence_digest_for
+    turns = [_t("user", "u0", ordinal=0), _t("assistant", "a1 overlap-me", ordinal=1),
+             _t("user", "u2", ordinal=2), _t("assistant", "a3", ordinal=3)]
+    chunks = chunk_conversation(turns)
+    assert len(chunks) == 2
+    second = chunks[1]
+    assert (second.turn_start, second.turn_end) == (2, 3)
+    # chunk.text (what the extractor sees) keeps header + overlap ...
+    assert "overlap-me" in second.text and second.text.startswith("[agent=")
+    # ... but the evidence text is only turn_start..turn_end, no header
+    assert "overlap-me" not in second.evidence_text
+    assert not second.evidence_text.startswith("[agent=")
+    assert len(second.evidence_digest()) == 64
+    assert second.evidence_digest() == evidence_digest_for(turns, 2, 3)
+    # simulate a `since` cutoff that drops the first two turns: same range, same digest
+    later = chunk_conversation(turns[2:])
+    assert len(later) == 1
+    assert (later[0].turn_start, later[0].turn_end) == (2, 3)
+    assert later[0].evidence_digest() == second.evidence_digest()
