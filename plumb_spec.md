@@ -20,9 +20,11 @@ Plumb can handle conversations that span multiple Claude Code session files by r
 The system uses a branch-sharded structure for decision logs and provides CLI commands for merging decision logs from different branches. Users can migrate existing decision logs from the old monolithic format to the new branch-sharded layout through dedicated CLI commands. The `plumb merge-decisions <branch>` command allows users to merge decisions from feature branches back to main. A find_decision_branch() function helps locate which branch file contains a specific decision ID.
 
 The core LLM integration is designed with a WholeFileSpecUpdater that takes full spec content and decisions as input, and outputs section_updates for existing sections and new_sections for brand new sections. This approach accepts rewriting whole sections instead of making surgical edits for markdown specs. An OutlineMerger component handles structural changes when new sections need to be added or content needs reordering. The system includes helper functions for DuckDB result type conversion, using _clean_duckdb_row() and _to_python_native() functions to convert DuckDB result types to Python native types for Pydantic compatibility. Comprehensive test coverage is implemented for migration and merge functionality, including edge cases and error conditions.
+
+The conversation log parser preserves full tool call information from Claude Code transcripts. Tool calls are structured with category, tool_name, file_path, and input fields using agentsview's 9-category tool taxonomy. Bash and Edit operation results are preserved in truncated form to enable deterministic file_refs population and improve decision extraction quality.
 ### Design Principles
 - **Simple over clever.** Plumb solves a bounded problem. It should be holdable in a single programmer's head.- **DSPy for LLM workflows.** All LLM-powered functions are implemented as DSPy programs, not open-ended agents. This ensures they are controllable, auditable, and reliable.
-- **Inference via Claude.** Plumb uses the Anthropic Claude SDK (via the user's existing account) as its inference provider. Claude Sonnet 4.6 serves as the default model for all programs.
+- **Inference via Claude.** Plumb uses the Anthropic Claude SDK (via the user's existing account) as its inference provider. Claude Haiku 4.5 (`claude-haiku-4-5`) serves as the default model for all programs; per-program overrides are configured in `program_models`.
 - **Non-intrusive.** Plumb operates as a git hook and CLI tool. It does not change how the user writes code.
 - **The commit is canonical.** The pre-commit hook ensures that every committed state has been reviewed and approved. A commit represents a fully reconciled snapshot of spec, tests, and code.
 - **Conversation analysis is opportunistic.** Plumb uses Claude Code session data when available. When it is not (e.g., committing from a bare terminal), Plumb falls back to diff-only analysis. Decisions still get captured; they are just derived from code changes rather than reasoning.
@@ -616,13 +618,13 @@ Append-only. Existing lines are never modified in place. Status updates are writ
 }
 ```
 
+Datetime fields (`created_at`, `synced_at`, `reviewed_at`) are stored and round-tripped as ISO-8601 strings. The decision_log.py module handles serialization and deserialization of datetime and date types to ensure proper conversion between Python datetime objects and ISO-8601 string representations for JSON compatibility.
+
 **Status values:** `pending` | `approved` | `edited` | `rejected` | `rejected_modified` | `rejected_manual`  
-**ref_status values:** `ok` | `broken`
+**ref_status values:** `ok` | `broken`  
+**made_by values:** `"user" | "agent"` — user if human stated or confirmed the decision, agent otherwise
 
 Note: `commit_sha` is null until the commit lands. It is populated by the hook on the second pass (when no pending decisions remain and the commit proceeds).
-
----
-
 ## DSPy Programs
 ### `DiffAnalyzer`
 **Input:** Raw unified diff string  **Output:** List of change summaries, each with:
@@ -635,15 +637,13 @@ Groups related changes into logical units. Does not invent meaning.
 ---
 
 ### `DecisionExtractor`
-**Input:**- `chunk`: single conversation chunk
+**Input:**
+- `chunk`: single conversation chunk
 - `diff_summary`: output of `DiffAnalyzer` (identical across all chunk calls)
 
-**Output:** List of decision objects with `question`, `decision`, `made_by`, `related_diff_summary`, `confidence`.
+**Output:** List of decision objects with `question`, `decision`, `made_by` (`"user" | "agent"`), `confidence`, `spec_relevant`.
 
-Extracts explicit and implicit decisions. Does not extract trivial decisions (variable naming, import ordering).
-
----
-
+Extracts explicit and implicit decisions from conversation chunks and code diffs. Parses and preserves full tool call data from transcripts with category, tool_name, file_path, and input fields. Uses agentsview's 9-category tool taxonomy to structure tool information. Maintains truncated results for Bash and Edit operations. Does not extract trivial decisions (variable naming, import ordering).
 ### `QuestionSynthesizer`
 **Input:** A decision object with no associated question  **Output:** A plain-English question framing the decision for a developer
 
@@ -675,10 +675,7 @@ Used by `plumb modify`. This is the one place in Plumb where an open-ended agent
 **Input:** staged diff, rejected decision, rejection reason, current spec  
 **Output:** modified file contents that satisfy the rejection while remaining consistent with the spec
 
-Called via the Anthropic API directly with a structured prompt. Plumb applies the output, runs pytest, and stages the result only if tests pass.
-
----
-
+Called via the Anthropic API directly with a structured prompt using claude-haiku-4-5 model with max_tokens set to 16000. Handles multiple content block types in response parsing. Plumb applies the output, runs pytest, and stages the result only if tests pass.
 ## Error Handling
 - All CLI commands fail gracefully with a clear error message if `config.json` is missing or malformed.- All DSPy programs retry on LLM failure (max 2 retries) then raise `PlumbInferenceError` with a human-readable message.
 - The git hook **never** exits non-zero due to an internal Plumb error. Failures print a warning to stderr and exit 0.

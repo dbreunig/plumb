@@ -28,7 +28,7 @@ following:
          "id": "dec-abc123",
          "question": "...",
          "decision": "...",
-         "made_by": "llm",
+         "made_by": "agent",
          "confidence": 0.87
        }
      ]

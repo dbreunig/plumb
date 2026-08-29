@@ -9,7 +9,7 @@
   "initialized_at": "2026-03-01T00:32:10.439519+00:00",
   "last_commit": "a81420a6eae9b3cd36e26c87b6501ab7e5e4f826",
   "last_commit_branch": "HEAD",
-  "last_extracted_at": null,
+  "last_extracted_at": "2026-08-29T19:21:27.475039+00:00",
   "program_models": {
     "decision_deduplicator": {
       "model": "groq/openai/gpt-oss-120b",

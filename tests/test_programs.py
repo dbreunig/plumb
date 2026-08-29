@@ -146,7 +146,7 @@ class TestChangeSummary:
 class TestExtractedDecision:
     def test_defaults(self):
         ed = ExtractedDecision(decision="use sync")
-        assert ed.made_by == "llm"
+        assert ed.made_by == "agent"
         assert ed.confidence == 0.5
         assert ed.spec_relevant is True
 
@@ -290,7 +290,7 @@ class TestCodeModifier:
         mock_client = MagicMock()
         mock_response = MagicMock()
         mock_response.content = [
-            MagicMock(text='```json\n{"src/a.py": "modified"}\n```')
+            MagicMock(type="text", text='```json\n{"src/a.py": "modified"}\n```')
         ]
         mock_client.messages.create.return_value = mock_response
 
@@ -307,7 +307,7 @@ class TestCodeModifier:
     def test_prompt_includes_all_inputs(self):
         mock_client = MagicMock()
         mock_response = MagicMock()
-        mock_response.content = [MagicMock(text="{}")]
+        mock_response.content = [MagicMock(type="text", text="{}")]
         mock_client.messages.create.return_value = mock_response
 
         modifier = CodeModifier(client=mock_client)

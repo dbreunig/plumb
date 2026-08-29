@@ -9,9 +9,14 @@ from pydantic import BaseModel, Field
 class ExtractedDecision(BaseModel):
     question: Optional[str] = None
     decision: str = ""
-    made_by: str = "llm"
+    made_by: str = Field(
+        default="agent",
+        description=(
+            "Who made the choice: 'user' if the human stated or confirmed it, "
+            "'agent' if the coding agent chose without explicit user direction."
+        ),
+    )
     confidence: float = 0.5
-    related_diff_summary: Optional[str] = None
     spec_relevant: bool = True
 
 
@@ -20,7 +25,7 @@ class DecisionExtractorSignature(dspy.Signature):
     Decisions are explicit or implicit choices about implementation.
     Do not extract trivial decisions (variable naming, import ordering).
     Each decision should have a question framing it, the decision made,
-    who made it (user or llm), and a confidence score.
+    who made it (user or agent), and a confidence score.
 
     DEDUPLICATION: Each decision must be unique. If the same choice appears
     multiple times in the conversation (discussed, then confirmed, then

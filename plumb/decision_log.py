@@ -224,9 +224,14 @@ def _clean_duckdb_row(raw: dict) -> dict:
 def _to_python_native(value):
     """Convert numpy/DuckDB scalar types to Python builtins."""
     import math
+    from datetime import date, datetime
 
     if value is None:
         return None
+    # read_json_auto infers ISO-8601 strings as TIMESTAMP; Decision stores
+    # them as strings, so round-trip back to ISO text.
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
     # Handle numpy types if numpy is available
     try:
         import numpy as np

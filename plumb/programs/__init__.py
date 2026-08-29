@@ -12,7 +12,7 @@ _configured = False
 
 
 def get_lm() -> dspy.LM:
-    return dspy.LM("anthropic/claude-sonnet-4-20250514", max_tokens=28000)
+    return dspy.LM("anthropic/claude-haiku-4-5", max_tokens=28000)
 
 
 def configure_dspy() -> None:

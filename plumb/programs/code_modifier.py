@@ -51,12 +51,15 @@ Return format:
 ```"""
 
         response = self.client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4096,
+            model="claude-haiku-4-5",
+            max_tokens=16000,
             messages=[{"role": "user", "content": prompt}],
         )
 
-        return self._parse_response(response.content[0].text)
+        text = next(
+            (block.text for block in response.content if block.type == "text"), ""
+        )
+        return self._parse_response(text)
 
     @staticmethod
     def _parse_response(text: str) -> dict[str, str]:

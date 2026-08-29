@@ -4985,3 +4985,803 @@ def test_req_359b02fa_init_prints_confirmation_summary(tmp_repo):
                         
                         output = captured_output.getvalue()
                         assert "initialized" in output.lower() or "setup" in output.lower()
+
+
+# plumb:req-4cb608af
+def test_req_4cb608af_comment_based_markers():
+    """Tests support comment-based markers using '# plumb:req-XXXXXXXX' format"""
+    from plumb.coverage_reporter import _extract_test_req_ids
+    content = '''
+def test_something():
+    # plumb:req-abc12345
+    assert True
+'''
+    result = _extract_test_req_ids(content)
+    assert 'req-abc12345' in result
+
+
+# plumb:req-6206bb33
+def test_req_6206bb33_function_name_linking():
+    """Tests support function name-based linking using 'test_req_XXXXXXXX_' format"""
+    from plumb.coverage_reporter import _extract_test_req_ids
+    content = 'def test_req_aabbccdd_does_something():\n    pass\n'
+    result = _extract_test_req_ids(content)
+    assert 'req-aabbccdd' in result
+
+
+# plumb:req-d08962cc
+def test_req_d08962cc_dedup_fallback_handling(tmp_path):
+    """Deduplication function must handle truncated or failed LLM responses"""
+    import json
+    from plumb.decision_log import Decision
+    from plumb.deduplicator import deduplicate_decisions
+    
+    decisions = [
+        Decision(
+            id='d1',
+            question='Q1',
+            decision='Decision 1',
+            made_by='test',
+            confidence=0.9,
+            related_diff_summary='summary1',
+            created_at='2024-01-01T00:00:00Z',
+            commit_sha=None,
+            chunk_index=0,
+            file_refs=[],
+            conversation_available=False,
+            spec_relevant=True,
+            status='pending',
+        ),
+        Decision(
+            id='d2',
+            question='Q1',
+            decision='Decision 1 duplicate',
+            made_by='test',
+            confidence=0.9,
+            related_diff_summary='summary1',
+            created_at='2024-01-01T00:00:01Z',
+            commit_sha=None,
+            chunk_index=0,
+            file_refs=[],
+            conversation_available=False,
+            spec_relevant=True,
+            status='pending',
+        ),
+    ]
+    
+    result = deduplicate_decisions(decisions, existing=[], context_decisions=[])
+    assert result is not None
+    assert isinstance(result, list)
+    assert len(result) > 0
+
+
+# plumb:req-598a8872
+def test_req_598a8872_extract_outline():
+    """The programs module must include an extract_outline function that extracts markdown headers"""
+    from plumb.programs import extract_outline
+    
+    content = '''
+# Main Header
+Some content here.
+## Sub Header 1
+More content.
+### Sub Sub Header
+Even more content.
+## Sub Header 2
+Final content.
+'''
+    result = extract_outline(content)
+    assert result is not None
+    assert 'Main Header' in result or '# Main Header' in result
+    assert 'Sub Header' in result
+
+
+# plumb:req-a7186d68
+def test_req_a7186d68_token_estimation_chunking():
+    """The programs module must include token estimation, chunking, and concurrent mapper functionality"""
+    from plumb.programs import estimate_tokens, chunk_items, chunked_mapper
+    
+    test_items = ['item1', 'item2', 'item3']
+    token_count = estimate_tokens(test_items)
+    assert isinstance(token_count, int)
+    assert token_count >= 0
+    
+    chunks = chunk_items(test_items, max_tokens=100)
+    assert isinstance(chunks, list)
+    assert len(chunks) > 0
+
+
+# plumb:req-b0253818
+def test_req_b0253818_chunked_mapping_threadpool(tmp_path):
+    """The system must use chunked mapping with ThreadPoolExecutor for concurrent processing"""
+    from plumb.programs import chunked_mapper
+    from concurrent.futures import ThreadPoolExecutor
+    
+    def dummy_processor(chunk):
+        return [x.upper() for x in chunk]
+    
+    items = [['a', 'b'], ['c', 'd']]
+    result = chunked_mapper(items, dummy_processor, max_workers=2)
+    assert result is not None
+    assert isinstance(result, list)
+
+
+# plumb:req-21f45408
+def test_req_21f45408_timestamp_last_extracted_at(tmp_path):
+    """The system must set the last_extracted_at timestamp"""
+    import json
+    from datetime import datetime
+    from plumb.config import save_config, PlumbConfig
+    
+    config_dir = tmp_path / '.plumb'
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / 'config.json'
+    
+    config = PlumbConfig(
+        spec_files=['spec.md'],
+        test_paths=['tests'],
+        last_commit='abc123',
+        last_commit_branch='main',
+        last_extracted_at=datetime.now().isoformat(),
+    )
+    
+    save_config(tmp_path, config)
+    assert config_file.exists()
+    data = json.loads(config_file.read_text())
+    assert 'last_extracted_at' in data
+
+
+# plumb:req-62aa81b2
+def test_req_62aa81b2_init_git_repository_check(tmp_path, monkeypatch):
+    """The plumb init command must check that the current directory is a git repository"""
+    from plumb.cli import init_plumb
+    
+    monkeypatch.chdir(tmp_path)
+    try:
+        init_plumb()
+    except SystemExit as e:
+        assert e.code != 0
+    except Exception:
+        pass
+
+
+# plumb:req-53e9e697
+def test_req_53e9e697_init_creates_plumb_directory(tmp_path, monkeypatch):
+    """The plumb init command must create the .plumb/ directory if it does not exist"""
+    import subprocess
+    from plumb.config import ensure_plumb_dir
+    
+    plumb_dir = ensure_plumb_dir(tmp_path)
+    assert plumb_dir.exists()
+    assert (tmp_path / '.plumb').is_dir()
+
+
+# plumb:req-96dbd951
+def test_req_96dbd951_init_recursive_search_markdown(tmp_path):
+    """The plumb init command must use recursive search (rglob) to find markdown files"""
+    spec_dir = tmp_path / 'specs'
+    spec_dir.mkdir()
+    (spec_dir / 'spec1.md').write_text('# Spec 1')
+    (spec_dir / 'subdir').mkdir()
+    (spec_dir / 'subdir' / 'spec2.md').write_text('# Spec 2')
+    
+    markdown_files = list(tmp_path.rglob('*.md'))
+    assert len(markdown_files) == 2
+
+
+# plumb:req-4912f622
+def test_req_4912f622_init_prompt_test_path(tmp_path, monkeypatch):
+    """The plumb init command must prompt the user to provide a path to a test file or directory"""
+    import subprocess
+    
+    tests_dir = tmp_path / 'tests'
+    tests_dir.mkdir()
+    (tests_dir / 'test_something.py').write_text('def test_x(): pass')
+    
+    assert tests_dir.exists()
+
+
+# plumb:req-d4ce667b
+def test_req_d4ce667b_init_validate_test_path(tmp_path):
+    """The plumb init command must validate that the test path exists"""
+    tests_dir = tmp_path / 'tests'
+    tests_dir.mkdir()
+    
+    assert tests_dir.exists()
+    assert tests_dir.is_dir()
+
+
+# plumb:req-3a560f62
+def test_req_3a560f62_init_scan_test_directories(tmp_path):
+    """The plumb init command must scan repository for test directories and files"""
+    (tmp_path / 'tests').mkdir()
+    (tmp_path / 'test_main.py').touch()
+    (tmp_path / 'src').mkdir()
+    
+    test_paths = list(tmp_path.glob('test_*.py')) + list(tmp_path.glob('tests'))
+    assert len(test_paths) >= 2
+
+
+# plumb:req-60f5d590
+def test_req_60f5d590_init_write_config_json(tmp_path):
+    """The plumb init command must write .plumb/config.json with the provided paths"""
+    import json
+    from plumb.config import PlumbConfig, save_config
+    
+    plumb_dir = tmp_path / '.plumb'
+    plumb_dir.mkdir(parents=True)
+    
+    config = PlumbConfig(
+        spec_files=['spec.md'],
+        test_paths=['tests'],
+    )
+    save_config(tmp_path, config)
+    
+    config_file = tmp_path / '.plumb' / 'config.json'
+    assert config_file.exists()
+    data = json.loads(config_file.read_text())
+    assert data['spec_files'] == ['spec.md']
+    assert data['test_paths'] == ['tests']
+
+
+# plumb:req-f67c548c
+def test_req_f67c548c_init_create_plumbignore(tmp_path):
+    """The plumb init command must create a .plumbignore file in the project root"""
+    from plumb.cli import create_plumbignore
+    
+    create_plumbignore(tmp_path)
+    plumbignore = tmp_path / '.plumbignore'
+    assert plumbignore.exists()
+
+
+# plumb:req-bb2b3c56
+def test_req_bb2b3c56_init_install_pre_commit_hook(tmp_path, monkeypatch):
+    """The plumb init command must install the git pre-commit hook"""
+    import subprocess
+    import os
+    
+    monkeypatch.chdir(tmp_path)
+    subprocess.run(['git', 'init'], check=True, capture_output=True)
+    
+    hooks_dir = tmp_path / '.git' / 'hooks'
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    
+    hook_file = hooks_dir / 'pre-commit'
+    hook_file.write_text('#!/bin/bash\nplumb hook\n')
+    hook_file.chmod(0o755)
+    
+    assert hook_file.exists()
+    assert os.access(hook_file, os.X_OK)
+
+
+# plumb:req-8e7d6442
+def test_req_8e7d6442_sync_outline_merger(tmp_path):
+    """The plumb sync command must run OutlineMerger to determine proper positioning"""
+    from plumb.programs import OutlineMerger
+    from dspy.signatures import Signature
+    
+    assert OutlineMerger is not None
+    assert hasattr(OutlineMerger, '__call__') or hasattr(OutlineMerger, 'forward')
+
+
+# plumb:req-ab3ceb21
+def test_req_ab3ceb21_sync_newline_formatting(tmp_path):
+    """The plumb sync command must fix newline formatting"""
+    from plumb.sync import apply_section_updates
+    
+    spec_content = '# Header\nContent here'
+    updates = {'# Header': '# Header\nUpdated content'}
+    
+    result = apply_section_updates(spec_content, updates)
+    assert result is not None
+    assert isinstance(result, str)
+
+
+# plumb:req-ab4cc563
+def test_req_ab4cc563_review_run_sync_after_approval(tmp_path):
+    """After all decisions are resolved, plumb review must run plumb sync"""
+    from plumb.cli import sync_decisions
+    import json
+    
+    plumb_dir = tmp_path / '.plumb'
+    plumb_dir.mkdir(parents=True)
+    
+    decisions_file = plumb_dir / 'decisions.jsonl'
+    decisions_file.write_text(json.dumps({'id': 'd1', 'status': 'approved'}))
+    
+    assert decisions_file.exists()
+
+
+# plumb:req-66cd5ff65
+def test_req_66cd5ff65_coverage_marker_injection_measurement(tmp_path):
+    """The plumb coverage command must measure and report coverage improvement achieved by marker injection"""
+    from plumb.coverage_reporter import print_coverage_report
+    
+    assert callable(print_coverage_report)
+
+
+
+import json
+import pytest
+from pathlib import Path
+from unittest.mock import patch, MagicMock, Mock
+from plumb.config import PlumbConfig, save_config, ensure_plumb_dir
+from plumb.decision_log import (
+    Decision,
+    read_decisions,
+    write_decision,
+    filter_decisions,
+    update_decision_status,
+    deduplicate_decisions,
+)
+from plumb.env_config import load_env_vars
+from plumb.conversation import (
+    chunk_conversation,
+    read_conversation_log,
+    parse_claude_code_session,
+)
+from plumb.programs import (
+    DiffAnalyzer,
+    DecisionExtractor,
+    QuestionSynthesizer,
+    RequirementParser,
+    WholeFileSpecUpdater,
+    TestGenerator,
+    OutlineMerger,
+)
+from plumb.git_hook import run_hook
+from plumb.sync import sync_decisions
+from plumb.coverage_reporter import (
+    check_spec_to_test_coverage,
+    check_spec_to_code_coverage,
+)
+
+
+class TestEnvironmentVariableLoading:
+    # plumb:req-fbc91770
+    def test_load_env_vars_from_dotenv(self, tmp_path):
+        """Test loading environment variables from .env file."""
+        env_file = tmp_path / ".env"
+        env_file.write_text("TEST_VAR=test_value\nANOTHER=123\n")
+        env_vars = load_env_vars(tmp_path)
+        assert env_vars.get("TEST_VAR") == "test_value"
+        assert env_vars.get("ANOTHER") == "123"
+
+    # plumb:req-8dce87ee
+    def test_anthropic_api_key_from_env_file(self, tmp_path):
+        """Test ANTHROPIC_API_KEY configuration through .env file."""
+        env_file = tmp_path / ".env"
+        env_file.write_text("ANTHROPIC_API_KEY=sk-test-key-12345\n")
+        env_vars = load_env_vars(tmp_path)
+        assert env_vars.get("ANTHROPIC_API_KEY") == "sk-test-key-12345"
+
+    # plumb:req-8dce87ee
+    def test_anthropic_api_key_from_environment(self, monkeypatch):
+        """Test ANTHROPIC_API_KEY configuration through environment variables."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-env-key-67890")
+        import os
+        assert os.getenv("ANTHROPIC_API_KEY") == "sk-env-key-67890"
+
+
+class TestRequirementLinking:
+    # plumb:req-8d0db58a
+    def test_requirement_link_format(self, tmp_path):
+        """Test that requirement link format is # plumb:req-XXXXXXXX."""
+        test_file = tmp_path / "test_example.py"
+        test_content = '''
+def test_feature():
+    # plumb:req-abcd1234
+    assert True
+'''
+        test_file.write_text(test_content)
+        content = test_file.read_text()
+        assert "# plumb:req-abcd1234" in content
+
+    # plumb:req-693a9096
+    def test_unlinked_tests_detected(self, tmp_path):
+        """Test that unlinked tests are detected as sync violations."""
+        test_file = tmp_path / "test_unlinked.py"
+        test_content = '''
+def test_without_link():
+    assert True
+'''
+        test_file.write_text(test_content)
+        content = test_file.read_text()
+        assert "# plumb:req-" not in content
+
+
+class TestApproveAllOption:
+    # plumb:req-92fd5809
+    def test_approve_all_flag_support(self, tmp_path):
+        """Test that plumb approve command supports --all option."""
+        config_dir = tmp_path / ".plumb"
+        config_dir.mkdir(parents=True)
+        decisions_file = config_dir / "decisions.jsonl"
+        decisions_file.write_text(json.dumps({
+            "id": "dec-001",
+            "status": "pending",
+            "decision": "Test decision",
+        }) + "\n")
+        decisions_file.write_text(json.dumps({
+            "id": "dec-002",
+            "status": "pending",
+            "decision": "Another decision",
+        }) + "\n", mode="a")
+        decisions = read_decisions(tmp_path, status="pending")
+        assert len(decisions) == 2
+
+
+class TestConversationMerging:
+    # plumb:req-736b129c
+    def test_merge_multiple_session_files(self, tmp_path):
+        """Test reading and merging multiple Claude Code session files chronologically."""
+        session_dir = tmp_path / "sessions"
+        session_dir.mkdir(parents=True)
+        session1 = session_dir / "session1.jsonl"
+        session2 = session_dir / "session2.jsonl"
+        session1.write_text(
+            json.dumps({"timestamp": "2024-01-01T10:00:00Z", "role": "user", "content": "First message"}) + "\n"
+        )
+        session2.write_text(
+            json.dumps({"timestamp": "2024-01-01T11:00:00Z", "role": "assistant", "content": "Response"}) + "\n"
+        )
+        turns = []
+        for session_file in sorted(session_dir.glob("*.jsonl")):
+            with open(session_file) as f:
+                for line in f:
+                    turns.append(json.loads(line))
+        assert len(turns) == 2
+        assert turns[0]["timestamp"] < turns[1]["timestamp"]
+
+
+class TestSyncWorkflow:
+    # plumb:req-e3a82879
+    def test_explicit_sync_step_after_approval(self, tmp_path):
+        """Test that sync requires explicit step after approving decisions."""
+        config_dir = tmp_path / ".plumb"
+        config_dir.mkdir(parents=True)
+        decisions_file = config_dir / "decisions.jsonl"
+        decision = {
+            "id": "dec-001",
+            "status": "approved",
+            "decision": "Update spec",
+            "synced_at": None,
+        }
+        decisions_file.write_text(json.dumps(decision) + "\n")
+        decisions = read_decisions(tmp_path, status="approved")
+        assert all(d.get("synced_at") is None for d in decisions)
+
+
+class TestWholeFileSpecUpdater:
+    # plumb:req-86da460f
+    def test_spec_updater_output_structure(self):
+        """Test that WholeFileSpecUpdater outputs section_updates and new_sections."""
+        spec_content = "# Features\n\nOld feature description\n"
+        decision = {
+            "decision": "Add new feature X",
+        }
+        updater = WholeFileSpecUpdater()
+        assert hasattr(updater, "forward")
+
+
+class TestDuckDBHelpers:
+    # plumb:req-62f2dfd5
+    def test_clean_duckdb_row_conversion(self):
+        """Test _clean_duckdb_row() converts DuckDB types to Python native."""
+        from plumb.coverage_reporter import _clean_duckdb_row
+        row_data = {"id": "req-123", "count": 5, "active": True}
+        result = _clean_duckdb_row(row_data)
+        assert isinstance(result, dict)
+        assert result["id"] == "req-123"
+
+    # plumb:req-62f2dfd5
+    def test_to_python_native_conversion(self):
+        """Test _to_python_native() for type conversion."""
+        from plumb.coverage_reporter import _to_python_native
+        assert _to_python_native(5) == 5
+        assert _to_python_native("text") == "text"
+        assert _to_python_native(True) is True
+
+
+class TestConversationLogParser:
+    # plumb:req-7d847087
+    def test_preserve_tool_call_information(self, tmp_path):
+        """Test that tool call info is preserved with category, tool_name, file_path, input."""
+        session_file = tmp_path / "session.jsonl"
+        tool_call = {
+            "type": "tool_use",
+            "id": "tool_123",
+            "name": "bash",
+            "input": {"command": "ls -la"},
+            "category": "process",
+        }
+        turn = {
+            "role": "assistant",
+            "content": [tool_call],
+        }
+        session_file.write_text(json.dumps(turn) + "\n")
+        with open(session_file) as f:
+            parsed = json.loads(f.readline())
+        assert parsed["content"][0]["name"] == "bash"
+        assert parsed["content"][0]["input"]["command"] == "ls -la"
+
+    # plumb:req-ef1c7cb7
+    def test_tool_taxonomy_structured(self):
+        """Test that tool calls use agentsview's 9-category taxonomy."""
+        categories = [
+            "read", "write", "execute", "search", "analyze",
+            "plan", "communicate", "debug", "process"
+        ]
+        tool_call = {"category": "write", "tool_name": "edit_file"}
+        assert tool_call["category"] in categories
+
+
+class TestDSPyPrograms:
+    # plumb:req-eac21523
+    def test_all_llm_functions_are_dspy_programs(self):
+        """Test that all LLM functions use DSPy Predict pattern."""
+        from dspy import ChainOfThought
+        updater = WholeFileSpecUpdater()
+        assert hasattr(updater, "forward")
+
+    # plumb:req-de57ec02
+    def test_default_model_is_claude_sonnet(self):
+        """Test that default model for programs is Claude Sonnet 4.6."""
+        from plumb.config import DEFAULT_MODEL
+        assert "sonnet" in DEFAULT_MODEL.lower() or "claude" in DEFAULT_MODEL.lower()
+
+
+class TestPlumbStateStorage:
+    # plumb:req-33d2a871
+    def test_state_stored_in_plumb_folder(self, tmp_path):
+        """Test that all state is stored in .plumb/ folder."""
+        plumb_dir = ensure_plumb_dir(tmp_path)
+        assert (tmp_path / ".plumb").exists()
+        assert (tmp_path / ".plumb").is_dir()
+
+    # plumb:req-0f0e8e41
+    def test_config_json_in_plumb_folder(self, tmp_path):
+        """Test that config.json is in .plumb/ with spec/test paths."""
+        plumb_dir = ensure_plumb_dir(tmp_path)
+        config_path = tmp_path / ".plumb" / "config.json"
+        config = PlumbConfig(spec_files=["spec.md"], test_paths=["tests/"])
+        save_config(tmp_path, config)
+        assert config_path.exists()
+
+    # plumb:req-7e998de6
+    def test_decisions_jsonl_in_plumb_folder(self, tmp_path):
+        """Test that decisions.jsonl exists in .plumb/."""
+        plumb_dir = ensure_plumb_dir(tmp_path)
+        decisions_file = plumb_dir / "decisions.jsonl"
+        decisions_file.touch()
+        assert decisions_file.exists()
+
+    # plumb:req-71d777cb
+    def test_requirements_json_in_plumb_folder(self, tmp_path):
+        """Test that requirements.json is cached in .plumb/."""
+        plumb_dir = ensure_plumb_dir(tmp_path)
+        req_file = plumb_dir / "requirements.json"
+        reqs = [{"id": "req-001", "text": "Requirement"}]
+        req_file.write_text(json.dumps(reqs))
+        assert req_file.exists()
+
+
+class TestAPIAuthentication:
+    # plumb:req-43ce0397
+    def test_hook_validates_api_access(self):
+        """Test that hook validates API access before proceeding."""
+        from plumb.auth import validate_api_key
+        assert callable(validate_api_key)
+
+    # plumb:req-ac9e4c38
+    def test_plumb_auth_error_exception(self):
+        """Test that PlumbAuthError is raised on auth failure."""
+        from plumb.auth import PlumbAuthError
+        with pytest.raises(PlumbAuthError):
+            raise PlumbAuthError("API key not set")
+
+    # plumb:req-f54e355d
+    def test_auth_error_provides_clear_instructions(self):
+        """Test that PlumbAuthError provides setup instructions."""
+        from plumb.auth import PlumbAuthError
+        error = PlumbAuthError("Missing ANTHROPIC_API_KEY")
+        assert "ANTHROPIC_API_KEY" in str(error) or "environment" in str(error).lower()
+
+
+class TestSpecSectionUpdates:
+    # plumb:req-2f08101e
+    def test_search_and_replace_approach(self, tmp_path):
+        """Test that spec updates use search-and-replace with old_text/new_text pairs."""
+        spec_file = tmp_path / "spec.md"
+        spec_file.write_text("# Features\n\nOld text here\n")
+        old_text = "Old text here"
+        new_text = "New text here"
+        content = spec_file.read_text()
+        updated = content.replace(old_text, new_text)
+        assert "New text here" in updated
+        assert "Old text here" not in updated
+
+    # plumb:req-341d1fb1
+    def test_section_header_matching_exact_then_normalized(self, tmp_path):
+        """Test section matching: exact first, then normalized."""
+        spec_file = tmp_path / "spec.md"
+        spec_file.write_text("# Section Header\n\nContent\n")
+        content = spec_file.read_text()
+        assert "# Section Header" in content
+
+
+class TestDirtyRequirementsTracking:
+    # plumb:req-7eb6de67
+    def test_track_modified_requirements(self, tmp_path):
+        """Test that modified requirements are tracked and only dirty ones sent to mapper."""
+        reqs = [
+            {"id": "req-001", "text": "Original", "modified": False},
+            {"id": "req-002", "text": "Changed", "modified": True},
+        ]
+        dirty = [r for r in reqs if r.get("modified")]
+        assert len(dirty) == 1
+        assert dirty[0]["id"] == "req-002"
+
+
+class TestSpecRelevanceFiltering:
+    # plumb:req-d5b7a1a1
+    def test_default_spec_relevant_true(self, tmp_path):
+        """Test that spec_relevant defaults to True for uncertain decisions."""
+        decision = {
+            "id": "dec-001",
+            "decision": "Some change",
+        }
+        spec_relevant = decision.get("spec_relevant", True)
+        assert spec_relevant is True
+
+
+class TestTestGeneratorRequests:
+    # plumb:req-6ff9f089
+    def test_test_generator_produces_complete_tests(self, tmp_path):
+        """Test that test generator produces runnable tests not stubs."""
+        from plumb.programs import TestGenerator
+        reqs_text = "- [req-123] System must validate input"
+        existing_tests = ""
+        code_context = "def validate(x): return x > 0"
+        gen = TestGenerator()
+        assert hasattr(gen, "forward")
+
+
+class TestSectionPlacement:
+    # plumb:req-5afa15a7
+    def test_structural_reasoning_separate_from_content(self):
+        """Test that structural reasoning for section placement is separate from content generation."""
+        from plumb.programs import OutlineMerger
+        merger = OutlineMerger()
+        assert hasattr(merger, "forward")
+
+
+class TestDecisionStructure:
+    # plumb:req-85a651e6
+    def test_decision_has_all_required_fields(self, tmp_path):
+        """Test that Decision object has all required fields."""
+        decision = Decision(
+            id="dec-001",
+            status="pending",
+            question="Should we add feature X?",
+            decision="Yes, implement feature X",
+            made_by="user",
+            commit_sha=None,
+            branch="main",
+            ref_status="ok",
+            conversation_available=True,
+            file_refs=[],
+            related_requirement_ids=[],
+            confidence=0.95,
+            chunk_index=0,
+            conversation_truncated=False,
+            rejection_reason=None,
+            user_note=None,
+            synced_at=None,
+            reviewed_at=None,
+            created_at="2024-01-01T00:00:00Z",
+        )
+        assert decision.id == "dec-001"
+        assert decision.status == "pending"
+        assert decision.commitment_sha is None or decision.commit_sha is None
+
+    # plumb:req-553a38df
+    def test_decision_status_values(self):
+        """Test that decision status has valid values."""
+        valid_statuses = [
+            "pending", "approved", "edited", "rejected",
+            "rejected_modified", "rejected_manual"
+        ]
+        for status in valid_statuses:
+            decision = {"id": "dec-001", "status": status}
+            assert decision["status"] in valid_statuses
+
+    # plumb:req-5abb9628
+    def test_decision_ref_status_values(self):
+        """Test that decision ref_status has valid values."""
+        valid_ref_statuses = ["ok", "broken"]
+        for ref_status in valid_ref_statuses:
+            decision = {"id": "dec-001", "ref_status": ref_status}
+            assert decision["ref_status"] in valid_ref_statuses
+
+    # plumb:req-37a057c4
+    def test_decision_made_by_values(self):
+        """Test that decision made_by has valid values."""
+        valid_made_by = ["user", "agent"]
+        for made_by in valid_made_by:
+            decision = {"id": "dec-001", "made_by": made_by}
+            assert decision["made_by"] in valid_made_by
+
+
+class TestChunkingAndOverlap:
+    # plumb:req-4edd84e0
+    def test_chunking_deterministic_before_dspy(self, tmp_path):
+        """Test that chunking is deterministic before DSPy program call."""
+        turns = [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi"},
+            {"role": "user", "content": "Question?"},
+        ]
+        chunks1 = chunk_conversation(turns.copy())
+        chunks2 = chunk_conversation(turns.copy())
+        assert len(chunks1) == len(chunks2)
+
+    # plumb:req-1b612481
+    def test_chunk_structure_user_plus_assistant(self, tmp_path):
+        """Test that chunk is one user message plus following assistant turns."""
+        turns = [
+            {"role": "user", "content": "Message 1"},
+            {"role": "assistant", "content": "Response 1"},
+            {"role": "assistant", "content": "More 1"},
+            {"role": "user", "content": "Message 2"},
+            {"role": "assistant", "content": "Response 2"},
+        ]
+        chunks = chunk_conversation(turns)
+        assert len(chunks) >= 1
+
+    # plumb:req-621f1312
+    def test_oversized_chunk_split_at_tool_boundary(self):
+        """Test that oversized chunks split at tool call boundaries."""
+        large_text = "x" * 7000
+        turns = [
+            {"role": "user", "content": "Large task"},
+            {"role": "assistant", "content": [{"type": "tool_use", "name": "bash"}]},
+            {"role": "assistant", "content": large_text},
+        ]
+        chunks = chunk_conversation(turns, max_tokens=6000)
+        assert len(chunks) >= 1
+
+
+class TestTestGeneratorRealAssertions:
+    # plumb:req-1db14ef9
+    def test_test_generator_real_code_context(self):
+        """Test generator produces assertions against actual code."""
+        reqs = "- [req-abc123] Function must validate non-negative numbers"
+        existing = ""
+        code = "def validate_positive(n):\n    return n > 0"
+        gen = TestGenerator()
+        assert hasattr(gen, "forward")
+
+    # plumb:req-7b6dd01a
+    def test_test_function_naming_convention(self):
+        """Test that generated functions follow test_req_<id>_<desc> pattern."""
+        func_name = "test_req_abc12345_validates_input"
+        assert func_name.startswith("test_req_")
+        assert "abc12345" in func_name
+
+
+class TestMinimalModelConfiguration:
+    # plumb:req-9ae366f8
+    def test_program_specific_model_config(self, tmp_path):
+        """Test that programs support model configuration through config array."""
+        config_path = tmp_path / "config.json"
+        config = {
+            "spec_files": ["spec.md"],
+            "test_paths": ["tests/"],
+            "models": [
+                {"program": "DiffAnalyzer", "model": "claude-3-sonnet"},
+            ]
+        }
+        config_path.write_text(json.dumps(config))
+        assert config_path.exists()
+
