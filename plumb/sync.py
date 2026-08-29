@@ -368,6 +368,20 @@ def sync_decisions(
                 test_code = run_with_retries(
                     gen, req_text, existing_tests[:8000], code_context[:16000]
                 )
+                # Never append code that would break collection of the whole
+                # file, import names that don't exist, or fail on first run.
+                from plumb.testgen import clean_generated_tests
+
+                test_dir = repo_root / config.test_paths[0]
+                cleaned = clean_generated_tests(
+                    test_code, repo_root, test_dir if test_dir.is_dir() else test_dir.parent
+                )
+                test_code = cleaned.code
+                if cleaned.dropped and on_progress:
+                    on_progress(
+                        f"Dropped {len(cleaned.dropped)} generated block(s) "
+                        f"(syntax, missing imports, or failing on first run)"
+                    )
                 if test_code.strip():
                     # Append to first test path, using test_generated.py
                     test_target = repo_root / config.test_paths[0]
