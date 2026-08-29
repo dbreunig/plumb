@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 class PlumbConfig(BaseModel):
     spec_paths: list[str] = Field(default_factory=list)
     test_paths: list[str] = Field(default_factory=list)
-    claude_log_path: Optional[str] = None
+    claude_log_path: Optional[str] = None  # TODO(task-9): drop config_path/claude_log_path once the hook passes refs
     initialized_at: Optional[str] = None
     last_commit: Optional[str] = None
     last_commit_branch: Optional[str] = None

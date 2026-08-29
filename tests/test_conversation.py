@@ -81,7 +81,16 @@ class TestChunkConversation:
             _t("assistant", big, 1),
         ]
         chunks = chunk_conversation(turns, max_tokens=6000)
-        assert len(chunks) >= 1  # Should split
+        assert chunks
+        for c in chunks:
+            assert estimate_tokens(c.text) <= 6000 or c.truncated
+
+    def test_oversized_single_turn_is_truncated(self):
+        big = "y " * 40000  # ~20k tokens in one user turn
+        chunks = chunk_conversation([_t("user", big, 0)], max_tokens=6000)
+        assert len(chunks) == 1
+        assert chunks[0].truncated is True
+        assert estimate_tokens(chunks[0].text) <= 6000 + 100  # header slack
 
     def test_timestamps(self):
         turns = [

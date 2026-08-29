@@ -1,6 +1,7 @@
 """Turn rendering and per-session chunking for the decision extractor."""
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 from typing import Optional
@@ -8,6 +9,8 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from plumb.traces import SessionRef, ToolCall, Turn
+
+logger = logging.getLogger(__name__)
 
 # Backwards-compatible name; a ConversationTurn *is* a Turn.
 ConversationTurn = Turn
@@ -19,6 +22,7 @@ class Chunk(BaseModel):
     session_id: str
     turn_start: int
     turn_end: int
+    parent_session_id: Optional[str] = None
     start_timestamp: Optional[str] = None
     end_timestamp: Optional[str] = None
     truncated: bool = False
@@ -26,7 +30,8 @@ class Chunk(BaseModel):
 
     @property
     def header(self) -> str:
-        return f"[agent={self.agent} session={self.session_id} turns {self.turn_start}-{self.turn_end}]"
+        parent = f" parent={self.parent_session_id}" if self.parent_session_id else ""
+        return f"[agent={self.agent} session={self.session_id}{parent} turns {self.turn_start}-{self.turn_end}]"
 
     @property
     def text(self) -> str:
@@ -50,7 +55,7 @@ def render_tool_call(tc: ToolCall) -> str:
 
 
 def render_turn(t: Turn) -> str:
-    lines = [f"[{t.role}]: {t.content}"]
+    lines = [f"[{t.role}]: {t.content}" if t.content else f"[{t.role}]"]
     lines += [render_tool_call(tc) for tc in t.tool_calls]
     return "\n".join(lines)
 
@@ -76,10 +81,20 @@ def reduce_noise(turns: list[Turn]) -> list[Turn]:
     return result
 
 
-def _split_at_tool_boundary(turns: list[Turn], max_tokens: int) -> list[list[Turn]]:
+def _split_at_tool_boundary(turns: list[Turn], max_tokens: int, cut: set[int]) -> list[list[Turn]]:
+    """Pack turns into groups of <= max_tokens.
+
+    A single turn that alone exceeds the budget is copied with its content cut
+    to max_tokens*4 characters; the copy's id() is added to `cut` so the
+    enclosing chunk can be marked truncated.
+    """
     chunks, current, current_tokens = [], [], 0
     for turn in turns:
         n = estimate_tokens(render_turn(turn))
+        if n > max_tokens:
+            turn = turn.model_copy(update={"content": turn.content[: max_tokens * 4]})
+            cut.add(id(turn))
+            n = estimate_tokens(render_turn(turn))
         if current and current_tokens + n > max_tokens:
             chunks.append(current)
             current, current_tokens = [turn], n
@@ -91,7 +106,7 @@ def _split_at_tool_boundary(turns: list[Turn], max_tokens: int) -> list[list[Tur
     return chunks
 
 
-def _chunk_session(turns: list[Turn], max_tokens: int) -> list[list[Turn]]:
+def _chunk_session(turns: list[Turn], max_tokens: int, cut: set[int]) -> list[list[Turn]]:
     groups: list[list[Turn]] = []
     current: list[Turn] = []
     for turn in turns:
@@ -107,18 +122,30 @@ def _chunk_session(turns: list[Turn], max_tokens: int) -> list[list[Turn]]:
         if sum(estimate_tokens(render_turn(t)) for t in g) <= max_tokens:
             final.append(g)
         else:
-            final.extend(_split_at_tool_boundary(g, max_tokens))
+            final.extend(_split_at_tool_boundary(g, max_tokens, cut))
     return final
 
 
-def chunk_conversation(turns: list[Turn], max_tokens: int = 6000) -> list[Chunk]:
+def parents_from_refs(refs: dict[tuple[str, str], SessionRef]) -> dict[tuple[str, str], str]:
+    """(agent, session_id) -> parent session id, for refs that have one."""
+    return {key: ref.parent_session_id for key, ref in refs.items() if ref.parent_session_id}
+
+
+def chunk_conversation(
+    turns: list[Turn],
+    max_tokens: int = 6000,
+    parents: dict[tuple[str, str], str] | None = None,
+) -> list[Chunk]:
     """Group by (agent, session_id) in first-seen order, then by user turn.
 
     One-turn overlap between consecutive chunks of the *same* session; the
     turn range excludes the overlap so provenance points at new content only.
+    `parents` maps (agent, session_id) -> parent session id for subagent
+    sessions; it is rendered into the chunk header.
     """
     if not turns:
         return []
+    parents = parents or {}
     sessions: dict[tuple[str, str], list[Turn]] = {}
     for t in turns:
         sessions.setdefault((t.agent, t.session_id), []).append(t)
@@ -126,7 +153,8 @@ def chunk_conversation(turns: list[Turn], max_tokens: int = 6000) -> list[Chunk]
     chunks: list[Chunk] = []
     for (agent, session_id), sturns in sessions.items():
         sturns = sorted(sturns, key=lambda t: t.ordinal)
-        groups = _chunk_session(sturns, max_tokens)
+        cut: set[int] = set()
+        groups = _chunk_session(sturns, max_tokens, cut)
         for i, group in enumerate(groups):
             overlap = [groups[i - 1][-1]] if i > 0 else []
             all_turns = overlap + group
@@ -134,8 +162,10 @@ def chunk_conversation(turns: list[Turn], max_tokens: int = 6000) -> list[Chunk]
             chunks.append(Chunk(
                 chunk_index=len(chunks), agent=agent, session_id=session_id,
                 turn_start=group[0].ordinal, turn_end=group[-1].ordinal,
+                parent_session_id=parents.get((agent, session_id)),
                 start_timestamp=stamps[0] if stamps else None,
                 end_timestamp=stamps[-1] if stamps else None,
+                truncated=any(id(t) in cut for t in all_turns),
                 turns=all_turns,
             ))
     return chunks
@@ -149,7 +179,8 @@ def read_conversation_with_refs(
     """Stage 1: every registered TraceSource, every session in this repo since the cutoff.
 
     Returns the turns plus the SessionRef for each (agent, session_id), which
-    the hook needs for source_path / parent_session_id provenance.
+    the hook needs for source_path / parent_session_id provenance. A source or
+    session that fails to read is logged and skipped; the rest still load.
     """
     from plumb.traces import all_sources
     from plumb.traces.repo import resolve_cutoff
@@ -158,14 +189,28 @@ def read_conversation_with_refs(
     turns: list[Turn] = []
     refs: dict[tuple[str, str], SessionRef] = {}
     for source in all_sources():
-        for ref in source.discover(repo_root, cutoff):
+        try:
+            found = source.discover(repo_root, cutoff)
+        except Exception:
+            logger.warning("Trace source %s failed to discover sessions", source.name, exc_info=True)
+            continue
+        for ref in found:
+            try:
+                parsed = source.parse(ref, cutoff)
+            except Exception:
+                logger.warning(
+                    "Skipping %s session %s (%s): failed to parse",
+                    ref.agent, ref.session_id, ref.path, exc_info=True,
+                )
+                continue
             refs[(ref.agent, ref.session_id)] = ref
-            turns.extend(source.parse(ref, cutoff))
+            turns.extend(parsed)
     return turns, refs
 
 
 def read_conversation(
     repo_root: Path,
+    # TODO(task-9): drop config_path/claude_log_path once the hook passes refs
     config_path: str | None = None,   # accepted and ignored; legacy config field
     since_commit: str | None = None,
     since_datetime: str | None = None,
