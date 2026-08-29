@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+import textwrap
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -946,6 +947,7 @@ def log_cmd(since_ref, verify):
             console.print(f"[red]Error: cannot resolve '{since_ref}': {e}[/red]")
             raise SystemExit(1)
         decisions = [d for d in decisions if d.commit_sha is None or d.commit_sha in shas]
+        console.print("[dim](uncommitted decisions are always shown)[/dim]")
     if not decisions:
         console.print("No decisions.")
         return
@@ -961,15 +963,21 @@ def log_cmd(since_ref, verify):
                     result = verify_evidence(d)
                     color = {"ok": "green", "stale": "yellow"}.get(result, "dim")
                     flag = f"  [{color}]{result}[/{color}]"
-                    if result == "stale" and d.ref_status != "stale":
+                    # Only a definitive answer moves ref_status; missing/unverifiable leave it alone.
+                    new_ref = {"stale": "stale", "ok": "ok"}.get(result)
+                    if new_ref is not None and d.ref_status != new_ref and d.ref_status in ("ok", "stale"):
                         branch = find_decision_branch(repo_root, d.id)
                         if branch is not None:
-                            update_decision_status(repo_root, d.id, branch=branch, ref_status="stale")
+                            update_decision_status(repo_root, d.id, branch=branch, ref_status=new_ref)
                 conf = f"{d.confidence:.2f}" if d.confidence is not None else "-"
                 console.print(
                     f"    {escape(d.id)}  {escape(d.status):<9} {escape(d.made_by or '-'):<6} {conf}  {sess} {rng}{flag}"
                 )
-                console.print(f"      {escape(d.decision or '')}")
+                body = textwrap.fill(
+                    d.decision or "", width=max(40, console.width - 6),
+                    initial_indent="      ", subsequent_indent="      ",
+                )
+                console.print(escape(body))
 
 
 @cli.command()
@@ -1025,6 +1033,7 @@ def status():
     decisions = read_all_decisions(repo_root)
     pending = [d for d in decisions if d.status == "pending"]
     broken = [d for d in decisions if d.ref_status == "broken"]
+    stale = [d for d in decisions if d.ref_status == "stale"]
 
     if pending:
         # Group by branch
@@ -1041,6 +1050,8 @@ def status():
 
     if broken:
         console.print(f"[red]Broken references:[/red] {len(broken)}")
+    if stale:
+        console.print(f"[yellow]Stale evidence:[/yellow] {len(stale)} (re-check with 'plumb log --verify')")
 
     console.print(f"[cyan]Last sync commit:[/cyan] {config.last_commit or 'None'}")
 

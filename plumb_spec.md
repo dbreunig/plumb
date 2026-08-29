@@ -621,7 +621,8 @@ Append-only. Existing lines are never modified in place. Status updates are writ
 Datetime fields (`created_at`, `synced_at`, `reviewed_at`) are stored and round-tripped as ISO-8601 strings. The decision_log.py module handles serialization and deserialization of datetime and date types to ensure proper conversion between Python datetime objects and ISO-8601 string representations for JSON compatibility.
 
 **Status values:** `pending` | `approved` | `edited` | `rejected` | `rejected_modified` | `rejected_manual`  
-**ref_status values:** `ok` | `broken`  
+**ref_status values:** `ok` | `broken` | `stale`  
+`stale`: the evidence digest no longer matches the transcript at `source_path` / `turn_range`; set and cleared by `plumb log --verify`.  
 **made_by values:** `"user" | "agent"` — user if human stated or confirmed the decision, agent otherwise
 
 Note: `commit_sha` is null until the commit lands. It is populated by the hook on the second pass (when no pending decisions remain and the commit proceeds).

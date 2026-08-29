@@ -50,6 +50,9 @@ class Chunk(BaseModel):
         return evidence_digest_for(self.turns, self.turn_start, self.turn_end)
 
 
+DEFAULT_MAX_TOKENS = 6000
+
+
 def estimate_tokens(text: str) -> int:
     return len(text) // 4
 
@@ -105,20 +108,37 @@ def reduce_noise(turns: list[Turn]) -> list[Turn]:
     return result
 
 
+def truncate_oversized(turn: Turn, max_tokens: int = DEFAULT_MAX_TOKENS) -> Turn:
+    """The one pre-digest truncation rule: a turn whose rendering exceeds the
+    budget is copied with its content cut to max_tokens*4 characters. Returns
+    the same object when nothing is cut, so callers can detect truncation with
+    `is not`."""
+    if estimate_tokens(render_turn(turn)) > max_tokens:
+        return turn.model_copy(update={"content": turn.content[: max_tokens * 4]})
+    return turn
+
+
+def prepare_for_digest(turns: list[Turn], max_tokens: int = DEFAULT_MAX_TOKENS) -> list[Turn]:
+    """Exactly the per-turn transforms the hook applies between parse() and
+    the evidence digest: reduce_noise, ordinal order, truncate_oversized.
+    The verifier uses this instead of re-chunking."""
+    return [truncate_oversized(t, max_tokens) for t in sorted(reduce_noise(turns), key=lambda t: t.ordinal)]
+
+
 def _split_at_tool_boundary(turns: list[Turn], max_tokens: int, cut: set[int]) -> list[list[Turn]]:
     """Pack turns into groups of <= max_tokens.
 
-    A single turn that alone exceeds the budget is copied with its content cut
-    to max_tokens*4 characters; the copy's id() is added to `cut` so the
+    A single turn that alone exceeds the budget is replaced by its
+    truncate_oversized() copy; the copy's id() is added to `cut` so the
     enclosing chunk can be marked truncated.
     """
     chunks, current, current_tokens = [], [], 0
     for turn in turns:
-        n = estimate_tokens(render_turn(turn))
-        if n > max_tokens:
-            turn = turn.model_copy(update={"content": turn.content[: max_tokens * 4]})
+        truncated = truncate_oversized(turn, max_tokens)
+        if truncated is not turn:
+            turn = truncated
             cut.add(id(turn))
-            n = estimate_tokens(render_turn(turn))
+        n = estimate_tokens(render_turn(turn))
         if current and current_tokens + n > max_tokens:
             chunks.append(current)
             current, current_tokens = [turn], n
@@ -157,7 +177,7 @@ def parents_from_refs(refs: dict[tuple[str, str], SessionRef]) -> dict[tuple[str
 
 def chunk_conversation(
     turns: list[Turn],
-    max_tokens: int = 6000,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
     parents: dict[tuple[str, str], str] | None = None,
 ) -> list[Chunk]:
     """Group by (agent, session_id) in first-seen order, then by user turn.

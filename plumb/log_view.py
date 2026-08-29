@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from pathlib import Path
 
 from plumb.decision_log import Decision
 
@@ -34,39 +35,29 @@ def _source_for(agent: str):
     return next((s for s in all_sources() if s.name == agent), None)
 
 
-def _as_hook_saw(turns, max_tokens: int = 6000):
-    """Apply exactly the transforms the hook applies between parse() and the
-    digest: reduce_noise, ordinal sort, and chunk_conversation's per-turn
-    truncation of any single turn over the token budget. No re-chunking: the
-    truncation rule is per-turn, so it can be reproduced without grouping."""
-    from plumb.conversation import estimate_tokens, reduce_noise, render_turn
-
-    out = []
-    for t in sorted(reduce_noise(turns), key=lambda t: t.ordinal):
-        if estimate_tokens(render_turn(t)) > max_tokens:
-            t = t.model_copy(update={"content": t.content[: max_tokens * 4]})
-        out.append(t)
-    return out
-
-
 def verify_evidence(d: Decision) -> str:
-    """'ok' | 'stale' | 'unverifiable'.
+    """'ok' | 'stale' | 'missing' | 'unverifiable'.
 
     Re-parses the decision's transcript with no cutoff, applies the same
-    transforms the hook applied, and recomputes the digest over
-    turn_start..turn_end. 'stale' means the transcript changed or the range is
-    gone; 'unverifiable' means we cannot even attempt it.
+    per-turn transforms the hook applied (prepare_for_digest), and recomputes
+    the digest over turn_start..turn_end. 'stale' means the transcript changed
+    or the range is gone; 'missing' means the transcript file no longer exists;
+    'unverifiable' means we cannot even attempt it (no provenance, unknown
+    agent, or the transcript failed to parse).
     """
     if not (d.agent and d.session_id and d.source_path and d.turn_range and d.evidence_digest):
         return "unverifiable"
+    if not Path(d.source_path).is_file():
+        return "missing"
     source = _source_for(d.agent)
     if source is None:
         return "unverifiable"
-    from plumb.conversation import evidence_digest_for
+    from plumb.conversation import evidence_digest_for, prepare_for_digest
     from plumb.traces import SessionRef
+    # parse() reads ref.path only; cwd is used by discover(), which we skip.
     ref = SessionRef(agent=d.agent, session_id=d.session_id, path=d.source_path, cwd="")
     try:
-        turns = _as_hook_saw(source.parse(ref, None))
+        turns = prepare_for_digest(source.parse(ref, None))
     except Exception:
         return "unverifiable"
     start, end = d.turn_range[0], d.turn_range[1]

@@ -517,12 +517,64 @@ class TestLog:
 
         result = runner.invoke(cli, ["log", "--verify"])
         assert result.exit_code == 0, result.output
-        assert "unverifiable" in result.output
+        assert "missing" in result.output            # /nope/session.jsonl does not exist
+        assert read_decisions(initialized_repo, branch="main")[1].ref_status == "ok"   # missing never persists
 
         result = runner.invoke(cli, ["log", "--since", "HEAD"])
         assert result.exit_code == 0, result.output
         assert "uncommitted" in result.output
+        assert "uncommitted decisions are always shown" in result.output
         assert "deadbeefdead" not in result.output   # fake sha is not in HEAD..HEAD
+
+    def test_log_verify_unverifiable_without_provenance(self, runner, initialized_repo, monkeypatch):
+        from plumb.decision_log import append_decisions
+        append_decisions(initialized_repo, [
+            Decision(id="dec-noprov", status="approved", decision="x", commit_sha="abc123",
+                     created_at="2026-06-02T00:00:00Z"),
+        ], branch="main")
+        monkeypatch.chdir(initialized_repo)
+        result = runner.invoke(cli, ["log", "--verify"])
+        assert result.exit_code == 0, result.output
+        assert "unverifiable" in result.output
+
+    def test_log_verify_clears_stale(self, runner, initialized_repo, monkeypatch, tmp_path):
+        from plumb.conversation import evidence_digest_for, reduce_noise
+        from plumb.decision_log import append_decisions
+        from plumb.traces import Turn
+        transcript = tmp_path / "s.jsonl"
+        transcript.write_text("")
+        turns = [Turn(agent="claude", session_id="S", ordinal=i, role="user", content=f"t{i}") for i in range(3)]
+        append_decisions(initialized_repo, [
+            Decision(id="dec-clear1", status="approved", decision="x", commit_sha="abc123", ref_status="stale",
+                     agent="claude", session_id="S", source_path=str(transcript), turn_range=[0, 2],
+                     evidence_digest=evidence_digest_for(reduce_noise(turns), 0, 2),
+                     created_at="2026-06-02T00:00:00Z"),
+        ], branch="main")
+        monkeypatch.chdir(initialized_repo)
+
+        class FakeSource:
+            name = "claude"
+            def parse(self, ref, since): return turns
+        monkeypatch.setattr("plumb.log_view._source_for", lambda agent: FakeSource())
+
+        result = runner.invoke(cli, ["log", "--verify"])
+        assert result.exit_code == 0, result.output
+        assert "ok" in result.output
+        assert read_decisions(initialized_repo, branch="main")[0].ref_status == "ok"
+
+    def test_log_verify_missing_leaves_ref_status(self, runner, initialized_repo, monkeypatch):
+        from plumb.decision_log import append_decisions
+        append_decisions(initialized_repo, [
+            Decision(id="dec-miss1", status="approved", decision="x", commit_sha="abc123", ref_status="stale",
+                     agent="claude", session_id="S", source_path="/nope/x.jsonl", turn_range=[0, 0],
+                     evidence_digest="0" * 64, created_at="2026-06-02T00:00:00Z"),
+        ], branch="main")
+        monkeypatch.chdir(initialized_repo)
+        result = runner.invoke(cli, ["log", "--verify"])
+        assert result.exit_code == 0, result.output
+        assert "missing" in result.output
+        rows = read_decisions(initialized_repo, branch="main")
+        assert len(rows) == 1 and rows[0].ref_status == "stale"   # nothing appended, nothing changed
 
     def test_log_verify_marks_stale(self, runner, initialized_repo, monkeypatch):
         from plumb.decision_log import append_decisions
@@ -538,3 +590,18 @@ class TestLog:
         assert result.exit_code == 0, result.output
         assert "stale" in result.output
         assert read_decisions(initialized_repo, branch="main")[0].ref_status == "stale"
+
+
+class TestStatusStale:
+    def test_status_counts_stale_evidence(self, runner, initialized_repo, monkeypatch):
+        from plumb.decision_log import append_decisions
+        append_decisions(initialized_repo, [
+            Decision(id="dec-st1", status="approved", decision="x", ref_status="stale"),
+            Decision(id="dec-st2", status="approved", decision="y", ref_status="stale"),
+            Decision(id="dec-ok1", status="approved", decision="z"),
+        ], branch="main")
+        monkeypatch.chdir(initialized_repo)
+        with patch("plumb.coverage_reporter.check_spec_to_test_coverage", return_value=[]), \
+             patch("plumb.coverage_reporter.check_spec_to_code_coverage", return_value=[]):
+            result = runner.invoke(cli, ["status"])
+        assert "Stale evidence" in result.output and "2" in result.output.split("Stale evidence")[1][:6]

@@ -115,3 +115,28 @@ class TestChunkConversation:
         )
         assert "[user]: hello" in chunk.text
         assert "[assistant]: world" in chunk.text
+
+
+class TestPrepareForDigest:
+    def test_truncate_oversized_returns_same_object_when_small(self):
+        from plumb.conversation import truncate_oversized
+        t = ConversationTurn(agent="claude", session_id="S", ordinal=0, role="user", content="hi")
+        assert truncate_oversized(t) is t
+
+    def test_matches_what_chunk_conversation_digests(self):
+        from plumb.conversation import (
+            DEFAULT_MAX_TOKENS, chunk_conversation, prepare_for_digest, reduce_noise, render_turn,
+        )
+        big = "x " * (DEFAULT_MAX_TOKENS * 4)  # well over the budget; not a file read
+        turns = [ConversationTurn(agent="claude", session_id="S", ordinal=2, role="user", content="bye"),
+                 ConversationTurn(agent="claude", session_id="S", ordinal=0, role="user", content="hi"),
+                 ConversationTurn(agent="claude", session_id="S", ordinal=1, role="assistant", content=big)]
+        chunk = next(c for c in chunk_conversation(reduce_noise(turns)) if c.turn_start <= 1 <= c.turn_end)
+        assert chunk.truncated
+        prepared = prepare_for_digest(turns)
+        assert [t.ordinal for t in prepared] == [0, 1, 2]
+        by_ord = {t.ordinal: t for t in chunk.turns}
+        for t in prepared:
+            if t.ordinal in by_ord:
+                assert render_turn(t) == render_turn(by_ord[t.ordinal])
+        assert len(prepared[1].content) == DEFAULT_MAX_TOKENS * 4
