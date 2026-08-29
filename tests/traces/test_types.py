@@ -26,3 +26,12 @@ def test_tracesource_is_runtime_checkable():
         def discover(self, repo_root, since): return []
         def parse(self, ref, since): return []
     assert isinstance(Fake(), TraceSource)
+
+
+def test_toolcall_file_path_and_file_paths_stay_consistent():
+    a = ToolCall(name="Edit", category="Edit", file_path="a.py")
+    assert a.file_paths == ["a.py"]
+    b = ToolCall(name="apply_patch", category="Edit", file_paths=["x.py", "y.py"])
+    assert b.file_path == "x.py"
+    c = ToolCall(name="Bash", category="Bash")
+    assert c.file_path is None and c.file_paths == []

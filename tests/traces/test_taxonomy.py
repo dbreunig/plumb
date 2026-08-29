@@ -62,3 +62,10 @@ def test_file_paths_from_multi_file_patch():
     assert file_path_from_input("apply_patch", patch) == "a.py"
     assert file_paths_from_input("Edit", {"file_path": "z.py"}) == ["z.py"]
     assert file_paths_from_input("Bash", {"command": "ls"}) == []
+
+
+def test_patch_helpers_tolerate_non_string_input():
+    for bad in ({"input": {"nested": 1}}, {"input": 5}, 5, None):
+        assert file_path_from_input("apply_patch", bad) is None
+        assert file_paths_from_input("apply_patch", bad) == []
+        assert input_summary("apply_patch", bad) == ""

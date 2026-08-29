@@ -54,8 +54,8 @@ def _as_dict(tool_input: Any) -> dict:
 
 
 def _patch_text(tool_input: Any) -> str:
-    text = tool_input if isinstance(tool_input, str) else _as_dict(tool_input).get("input", "")
-    return text or ""
+    text = tool_input if isinstance(tool_input, str) else _as_dict(tool_input).get("input")
+    return text if isinstance(text, str) else ""
 
 
 def file_path_from_input(name: str, tool_input: Any) -> Optional[str]:

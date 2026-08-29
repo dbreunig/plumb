@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional, Protocol, runtime_checkable
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SessionRef(BaseModel):
@@ -28,6 +28,14 @@ class ToolCall(BaseModel):
     input_summary: str = ""         # first ~120 chars of the salient argument
     result_summary: Optional[str] = None  # truncated result, when the agent records one
     tool_use_id: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _sync_file_paths(self) -> "ToolCall":
+        if not self.file_paths and self.file_path:
+            self.file_paths = [self.file_path]
+        elif self.file_path is None and self.file_paths:
+            self.file_path = self.file_paths[0]
+        return self
 
 
 class Turn(BaseModel):
