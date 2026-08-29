@@ -67,7 +67,8 @@ def render_tool_call(tc: ToolCall) -> str:
 
 
 def render_turn(t: Turn) -> str:
-    lines = [f"[{t.role}]: {t.content}" if t.content else f"[{t.role}]"]
+    content = t.content.strip()
+    lines = [f"[{t.role}]: {content}" if content else f"[{t.role}]"]
     lines += [render_tool_call(tc) for tc in t.tool_calls]
     return "\n".join(lines)
 

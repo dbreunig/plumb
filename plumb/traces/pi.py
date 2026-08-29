@@ -3,6 +3,9 @@
 Entries carry id/parentId; a rewind leaves abandoned branches in the file.
 The conversation is the active ancestry from the last entry to the root.
 Subagent sessions live in <project>/<session-stem>/<agent>.jsonl.
+
+`compaction` nodes stay in the chain and pre-compaction messages are kept, so
+ordinals remain stable for provenance; the compaction `summary` is never emitted as a turn.
 """
 from __future__ import annotations
 
@@ -96,6 +99,8 @@ class PiSource:
         nodes: dict[str, dict] = {}
         last_id: Optional[str] = None
         for e in iter_jsonl(path):
+            if e.get("type") == "session":
+                continue  # the header carries an id, but nothing points at it
             node_id = e.get("id")
             if isinstance(node_id, str) and node_id:
                 nodes[node_id] = e
@@ -137,11 +142,13 @@ class PiSource:
                                       file_path=file_path_from_input(name, arg),
                                       file_paths=file_paths_from_input(name, arg),
                                       input_summary=input_summary(name, arg),
+                                      # Pi ids like `write:28` recur within a session; results always
+                                      # immediately follow their call.
                                       tool_use_id=b.get("id"))
                         calls.append(tc)
                         if tc.tool_use_id:
                             by_call[tc.tool_use_id] = tc
-                text = _text(content)
+                text = _text(content).strip()
                 if text or calls:
                     turns.append(Turn(agent=ref.agent, session_id=ref.session_id, ordinal=ordinal,
                                       role="assistant", content=text, timestamp=ts, tool_calls=calls))

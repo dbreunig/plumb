@@ -133,3 +133,9 @@ def test_evidence_digest_reproducible_from_turn_range():
     assert len(later) == 1
     assert (later[0].turn_start, later[0].turn_end) == (2, 3)
     assert later[0].evidence_digest() == second.evidence_digest()
+
+
+def test_render_turn_strips_content_whitespace():
+    assert render_turn(_t("user", "  x  \n")) == "[user]: x"
+    blank = _t("assistant", "\n\n", calls=[ToolCall(name="Bash", category="Bash", input_summary="ls")])
+    assert render_turn(blank).split("\n")[0] == "[assistant]"

@@ -114,3 +114,49 @@ def test_parse_parent_id_cycle_does_not_hang(tmp_repo, tmp_path):
 def test_all_sources_includes_pi():
     from plumb.traces import all_sources
     assert [s.name for s in all_sources()] == ["claude", "codex", "pi"]
+
+
+def test_parse_strips_assistant_text(tmp_repo, tmp_path):
+    lines = [
+        _msg("u1", None, "user", [{"type": "text", "text": "hello"}]),
+        _msg("a1", "u1", "assistant", [{"type": "text", "text": "\n\nLet me look.\n\n"}]),
+    ]
+    f = _session(tmp_path, str(tmp_repo), lines=lines)
+    ref = SessionRef(agent="pi", session_id="abc", path=str(f), cwd=str(tmp_repo))
+    assert PiSource().parse(ref, None)[1].content == "Let me look."
+
+
+def test_parse_compaction_keeps_pre_compaction_turns_and_never_emits_summary(tmp_repo, tmp_path):
+    lines = [
+        _msg("u1", None, "user", [{"type": "text", "text": "first"}]),
+        _msg("a1", "u1", "assistant", [{"type": "text", "text": "one"}]),
+        _msg("u2", "a1", "user", [{"type": "text", "text": "second"}]),
+        _msg("a2", "u2", "assistant", [{"type": "text", "text": "two"}]),
+        {"type": "compaction", "id": "c1", "parentId": "a2", "timestamp": "2026-06-01T00:00:00Z",
+         "summary": "SUMMARY OF EARLIER WORK", "firstKeptEntryId": "u2"},
+        _msg("u3", "c1", "user", [{"type": "text", "text": "third"}]),
+    ]
+    f = _session(tmp_path, str(tmp_repo), lines=lines)
+    ref = SessionRef(agent="pi", session_id="abc", path=str(f), cwd=str(tmp_repo))
+    turns = PiSource().parse(ref, None)
+    assert [t.content for t in turns] == ["first", "one", "second", "two", "third"]
+    assert [t.ordinal for t in turns] == [0, 1, 2, 3, 4]
+    assert not any("SUMMARY OF EARLIER WORK" in t.content for t in turns)
+
+
+def test_discover_subagent_yielded_before_parent(tmp_repo, tmp_path, monkeypatch):
+    parent = _session(tmp_path, str(tmp_repo))
+    sub = tmp_path / "sessions" / "--enc--" / "2026-06-01T00-00-00-000Z_abc" / "worker.jsonl"
+    sub.parent.mkdir()
+    sub.write_text(json.dumps({"type": "session", "version": 3, "id": "w1", "cwd": str(tmp_repo)}) + "\n")
+    monkeypatch.setattr(PiSource, "_candidates", lambda self: iter([(sub, parent.stem), (parent, None)]))
+    refs = {r.session_id: r for r in PiSource(root=tmp_path / "sessions").discover(tmp_repo, None)}
+    assert refs["w1"].parent_session_id == "abc"
+    assert refs["abc"].parent_session_id is None
+
+
+def test_parse_header_only_file_returns_empty(tmp_repo, tmp_path):
+    f = _session(tmp_path, str(tmp_repo), lines=[])
+    ref = SessionRef(agent="pi", session_id="abc", path=str(f), cwd=str(tmp_repo))
+    assert PiSource().parse(ref, None) == []
+    assert PiSource()._active_chain(f) == []
