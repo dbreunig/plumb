@@ -461,7 +461,10 @@ def test_dedup_treats_recorded_as_existing():
     even when the capacity for unresolved decisions is exhausted."""
     from plumb.decision_log import Decision, _llm_dedup
     # 200 pending decisions fill the non-accepted capacity; the recorded one must still be sent.
-    existing = [Decision(id="dec-old", status="recorded", question="Cache?", decision="In-memory dict cache.")]
+    # Seed a recent created_at so it sits inside the accepted-decisions recency window.
+    now = datetime.now(timezone.utc).isoformat()
+    existing = [Decision(id="dec-old", status="recorded", question="Cache?",
+                         decision="In-memory dict cache.", created_at=now)]
     existing += [Decision(id=f"dec-p{i}", status="pending", question=f"Q{i}?", decision=f"D{i}") for i in range(200)]
     cand = [Decision(id="dec-new", status="pending", question="Cache?", decision="In-memory dict cache.")]
 
@@ -478,3 +481,54 @@ def test_dedup_treats_recorded_as_existing():
 
     assert result == []
     assert "In-memory dict cache." in captured["existing"]
+
+
+def test_dedup_caps_accepted_to_recency_window_plus_related():
+    """_llm_dedup sends only the newest MAX_ACCEPTED_FOR_DEDUP accepted decisions
+    (by created_at; missing created_at sorts oldest), plus any older accepted decision
+    that shares a file_ref file or a branch with a candidate."""
+    from datetime import timedelta
+    from plumb.decision_log import Decision, FileRef, MAX_ACCEPTED_FOR_DEDUP, _llm_dedup
+
+    assert MAX_ACCEPTED_FOR_DEDUP == 300
+    base = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    existing = []
+    for i in range(350):
+        d = Decision(
+            id=f"dec-a{i}", status="approved", question=f"Q{i}?",
+            decision=f"accepted-{i:03d}", branch="main",
+            created_at=(base + timedelta(minutes=i)).isoformat(),
+        )
+        existing.append(d)
+    # Old (outside the newest-300 window) but related to a candidate:
+    existing[5] = existing[5].model_copy(update={"file_refs": [FileRef(file="src/foo.py", lines=[1, 2])]})
+    existing[7] = existing[7].model_copy(update={"branch": "feat/x"})
+    # Missing created_at sorts oldest -> excluded even though it is listed last.
+    existing.append(Decision(id="dec-nots", status="approved", question="Q?", decision="accepted-nots"))
+
+    cand = [
+        Decision(id="dec-c1", status="pending", question="Foo?", decision="Foo.",
+                 branch="feat/x", file_refs=[FileRef(file="src/foo.py", lines=[3, 3])]),
+    ]
+
+    captured = {}
+
+    class FakeDeduplicator:
+        def __call__(self, candidates, existing):
+            captured["existing"] = existing
+            return [1]
+
+    with patch("plumb.programs.decision_deduplicator.DecisionDeduplicator", FakeDeduplicator), \
+         patch("plumb.programs.get_program_lm", return_value=None):
+        result = _llm_dedup(cand, existing)
+
+    assert result == cand
+    sent = captured["existing"]
+    for i in range(50, 350):
+        assert f"accepted-{i:03d}" in sent, i          # newest 300
+    assert "accepted-005" in sent                        # older, shares a file with a candidate
+    assert "accepted-007" in sent                        # older, shares the candidate's branch
+    for i in [0, 1, 6, 8, 49]:
+        assert f"accepted-{i:03d}" not in sent, i      # older and unrelated
+    assert "accepted-nots" not in sent                   # no created_at -> oldest
+    assert sent.count("[Q]") == 302
