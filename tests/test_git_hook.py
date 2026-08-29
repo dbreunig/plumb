@@ -551,3 +551,37 @@ class TestRunPostCommitStampsSha:
 
         assert read_decisions(initialized_repo, branch="feature")[0].commit_sha is None
         assert read_decisions(initialized_repo, branch="main")[0].commit_sha is None
+
+
+def test_extract_decisions_is_mode_agnostic_and_writes_nothing(initialized_repo):
+    from plumb.git_hook import extract_decisions
+    from plumb.config import load_config
+    from plumb.decision_log import Decision, read_all_decisions
+    mock = [Decision(id="dec-x", status="pending", question="Q?", decision="A.", made_by="user", confidence=0.9, branch="main")]
+    seen = {}
+    def fake_conv(repo_root, config, diff_summary, since_commit=None, since_datetime=None):
+        seen.update(since_commit=since_commit, since_datetime=since_datetime); return mock
+    with patch("plumb.programs.validate_api_access"), \
+         patch("plumb.git_hook._analyze_diff", return_value="summary") as an, \
+         patch("plumb.git_hook._extract_decisions_from_conversation", side_effect=fake_conv), \
+         patch("plumb.git_hook._synthesize_questions", side_effect=lambda ds: ds):
+        out = extract_decisions(initialized_repo, load_config(initialized_repo), diff="+x", branch="main",
+                                since_commit="abc123", since_datetime=None)
+    assert [d.id for d in out] == ["dec-x"]
+    an.assert_called_once_with("+x")
+    assert seen == {"since_commit": "abc123", "since_datetime": None}
+    assert read_all_decisions(initialized_repo) == []          # nothing written
+
+
+def test_extract_decisions_falls_back_to_diff_only(initialized_repo):
+    from plumb.git_hook import extract_decisions
+    from plumb.config import load_config
+    from plumb.decision_log import Decision
+    mock = [Decision(id="dec-d", status="pending", decision="from diff", branch="main")]
+    with patch("plumb.programs.validate_api_access"), \
+         patch("plumb.git_hook._analyze_diff", return_value="summary"), \
+         patch("plumb.git_hook._extract_decisions_from_conversation", return_value=[]), \
+         patch("plumb.git_hook._extract_decisions_from_diff", return_value=mock), \
+         patch("plumb.git_hook._synthesize_questions", side_effect=lambda ds: ds):
+        out = extract_decisions(initialized_repo, load_config(initialized_repo), diff="+x", branch="main")
+    assert [d.id for d in out] == ["dec-d"]

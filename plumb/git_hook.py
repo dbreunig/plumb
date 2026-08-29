@@ -105,18 +105,30 @@ def _analyze_diff(diff: str) -> str:
 
 
 def _extract_decisions_from_conversation(
-    repo_root: Path, config, diff_summary: str
+    repo_root: Path,
+    config,
+    diff_summary: str,
+    since_commit: str | None = None,
+    since_datetime: str | None = None,
 ) -> list[Decision]:
     """Stage 1+2: read every agent's sessions, chunk per session, run
-    DecisionExtractor per chunk, and stamp provenance + deterministic file_refs."""
+    DecisionExtractor per chunk, and stamp provenance + deterministic file_refs.
+
+    ``since_commit`` / ``since_datetime`` bound which transcript turns are read.
+    Either defaults to the config's ``last_commit`` / ``last_extracted_at`` when
+    ``None`` (review mode); record mode passes the previous commit explicitly."""
     from plumb.programs import configure_dspy, run_with_retries
     from plumb.programs.decision_extractor import DecisionExtractor
     from plumb.traces.hunks import staged_hunks, file_refs_for
 
+    if since_commit is None:
+        since_commit = config.last_commit
+    if since_datetime is None:
+        since_datetime = config.last_extracted_at
     turns, refs = read_conversation_with_refs(
         repo_root,
-        since_commit=config.last_commit,
-        since_datetime=config.last_extracted_at,
+        since_commit=since_commit,
+        since_datetime=since_datetime,
     )
     if not turns:
         return []
@@ -240,6 +252,85 @@ def _synthesize_questions(decisions: list[Decision]) -> list[Decision]:
     return result
 
 
+class _StageTimer:
+    """Context manager that appends ``(label, seconds)`` to ``timings`` on exit."""
+
+    def __init__(self, timings: list | None, label: str):
+        self.timings = timings
+        self.label = label
+
+    def __enter__(self):
+        import time
+        self.start = time.monotonic()
+        return self
+
+    def __exit__(self, *args):
+        import time
+        if self.timings is not None:
+            self.timings.append((self.label, time.monotonic() - self.start))
+
+
+def extract_decisions(
+    repo_root,
+    config,
+    diff: str,
+    branch: str,
+    since_commit: str | None = None,
+    since_datetime: str | None = None,
+    timings: list | None = None,
+) -> list[Decision]:
+    """Stages 1–2 for one diff: analyze, read transcripts since the cutoff, extract,
+    dedup against the existing log, synthesize questions. Writes nothing.
+
+    Shared by review mode (pre-commit, staged diff) and record mode (post-commit,
+    landed commit's diff). ``since_commit`` / ``since_datetime`` default to the
+    config's cutoffs when ``None``. If ``timings`` is given, ``(label, seconds)``
+    is appended per stage."""
+    repo_root = Path(repo_root)
+    repo = Repo(repo_root)
+
+    def _timed(label):
+        return _StageTimer(timings, label)
+
+    # Existing decisions (flag unreachable commit refs)
+    with _timed("Check broken refs"):
+        existing_decisions = read_all_decisions(repo_root)
+        existing_decisions = _check_broken_refs(repo, existing_decisions)
+
+    # Validate API access before any LLM work
+    with _timed("Validate API"):
+        from plumb.programs import validate_api_access
+        validate_api_access()
+
+    # Analyze diff
+    with _timed("Analyze diff"):
+        diff_summary = _analyze_diff(diff)
+
+    # Extract decisions from conversation (or diff-only fallback)
+    with _timed("Extract decisions"):
+        decisions = _extract_decisions_from_conversation(
+            repo_root,
+            config,
+            diff_summary,
+            since_commit=since_commit,
+            since_datetime=since_datetime,
+        )
+        if not decisions:
+            decisions = _extract_decisions_from_diff(diff_summary, branch)
+
+    # Merge/dedup (also filter against already-resolved decisions)
+    with _timed("Dedup"):
+        decisions = deduplicate_decisions(
+            decisions, existing_decisions=existing_decisions, use_llm=True
+        )
+
+    # Synthesize questions for questionless decisions
+    with _timed("Synthesize questions"):
+        decisions = _synthesize_questions(decisions)
+
+    return decisions
+
+
 def _format_tty_output(pending: list[Decision]) -> str:
     """Human-readable summary for TTY output."""
     lines = [f"\nPlumb found {len(pending)} pending decision(s):\n"]
@@ -294,19 +385,10 @@ def run_hook(repo_root: str | Path | None = None, dry_run: bool = False) -> int:
 
 
 def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
-    import time
-
     timings: list[tuple[str, float]] = []
 
     def _timed(label):
-        """Context manager that records elapsed time for a stage."""
-        class _Timer:
-            def __enter__(self):
-                self.start = time.monotonic()
-                return self
-            def __exit__(self, *args):
-                timings.append((label, time.monotonic() - self.start))
-        return _Timer()
+        return _StageTimer(timings, label)
 
     def _print_timings():
         total = sum(t for _, t in timings)
@@ -342,44 +424,19 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
         if _detect_amend(repo, config.last_commit):
             delete_decisions_by_commit(repo_root, config.last_commit, branch=branch)
 
-    # 4. Check broken refs
-    with _timed("Check broken refs"):
-        existing_decisions = read_all_decisions(repo_root)
-        existing_decisions = _check_broken_refs(repo, existing_decisions)
+    # 4. Analyze, extract, dedup, synthesize (shared with record mode)
+    conv_decisions = extract_decisions(
+        repo_root, config, diff, branch, timings=timings
+    )
 
-    # 5. Validate API access before any LLM work
-    with _timed("Validate API"):
-        from plumb.programs import validate_api_access
-        validate_api_access()
-
-    # 6. Analyze diff
-    with _timed("Analyze diff"):
-        diff_summary = _analyze_diff(diff)
-
-    # 7. Extract decisions from conversation (or diff-only fallback)
-    with _timed("Extract decisions"):
-        conv_decisions = _extract_decisions_from_conversation(
-            repo_root, config, diff_summary
-        )
-        if not conv_decisions:
-            conv_decisions = _extract_decisions_from_diff(diff_summary, branch)
-
-    # 8. Merge/dedup (also filter against already-resolved decisions)
-    with _timed("Dedup"):
-        conv_decisions = deduplicate_decisions(conv_decisions, existing_decisions=existing_decisions, use_llm=True)
-
-    # 9. Synthesize questions for questionless decisions
-    with _timed("Synthesize questions"):
-        conv_decisions = _synthesize_questions(conv_decisions)
-
-    # 10. Write decisions (unless dry_run)
+    # 5. Write decisions (unless dry_run)
     with _timed("Write decisions"):
         if not dry_run and conv_decisions:
             append_decisions(repo_root, conv_decisions, branch=branch)
             config.last_extracted_at = datetime.now(timezone.utc).isoformat()
             save_config(repo_root, config)
 
-    # 11. Check pending decisions
+    # 6. Check pending decisions
     with _timed("Check pending"):
         if dry_run:
             _print_timings()
