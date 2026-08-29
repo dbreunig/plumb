@@ -1,5 +1,14 @@
 import subprocess
-from plumb.traces.repo import git_common_dir, same_repo, commit_datetime
+from datetime import datetime, timezone
+
+from plumb.traces.repo import (
+    after_cutoff,
+    commit_datetime,
+    git_common_dir,
+    parse_ts,
+    resolve_cutoff,
+    same_repo,
+)
 
 
 def test_git_common_dir_resolves_subdir(tmp_repo):
@@ -34,15 +43,18 @@ def test_same_repo_false_for_missing_path(tmp_repo):
     assert not same_repo("/definitely/not/here", tmp_repo)
 
 
+def test_git_common_dir_cache_key_is_normalized(tmp_repo):
+    from plumb.traces.repo import _git_common_dir_cached
+    _git_common_dir_cached.cache_clear()
+    git_common_dir(str(tmp_repo)); git_common_dir(str(tmp_repo) + "/"); git_common_dir(tmp_repo)
+    assert _git_common_dir_cached.cache_info().misses == 1
+
+
 def test_commit_datetime(tmp_repo):
     from git import Repo
     sha = Repo(tmp_repo).head.commit.hexsha
     assert commit_datetime(tmp_repo, sha) is not None
     assert commit_datetime(tmp_repo, "0" * 40) is None
-
-
-from datetime import datetime, timezone
-from plumb.traces.repo import resolve_cutoff, parse_ts, after_cutoff
 
 
 def test_resolve_cutoff_prefers_datetime(tmp_repo):
@@ -67,6 +79,7 @@ def test_parse_ts_handles_z_and_epoch_ms():
     assert parse_ts(1786916035750).year == 2026
     assert parse_ts("garbage") is None
     assert parse_ts(None) is None
+    assert parse_ts(True) is None
 
 
 def test_after_cutoff():

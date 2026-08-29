@@ -23,7 +23,8 @@ class SessionRef(BaseModel):
 class ToolCall(BaseModel):
     name: str                       # raw tool name, e.g. "apply_patch"
     category: str                   # Read|Edit|Write|Bash|Grep|Glob|Task|Tool|Other
-    file_path: Optional[str] = None
+    file_path: Optional[str] = None  # primary (first) path; see file_paths for the rest
+    file_paths: list[str] = Field(default_factory=list)  # every path touched, in order; [0] == file_path
     input_summary: str = ""         # first ~120 chars of the salient argument
     result_summary: Optional[str] = None  # truncated result, when the agent records one
     tool_use_id: Optional[str] = None

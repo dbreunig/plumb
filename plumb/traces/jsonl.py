@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def iter_jsonl(path: Path) -> Iterator[dict]:
     try:
-        with open(path, "r", errors="replace") as f:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -19,7 +22,8 @@ def iter_jsonl(path: Path) -> Iterator[dict]:
                     continue
                 if isinstance(obj, dict):
                     yield obj
-    except OSError:
+    except OSError as e:
+        logger.debug("Skipping %s: %s", path, e)
         return
 
 

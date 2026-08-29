@@ -29,7 +29,7 @@ _CATEGORIES: dict[str, str] = {
 }
 
 _PATH_KEYS = ("file_path", "path", "filePath", "notebook_path", "target_file")
-_SUMMARY_KEYS = ("command", "cmd", "pattern", "prompt", "description", "query")
+_SUMMARY_KEYS = ("command", "cmd", "url", "skill", "pattern", "prompt", "description", "query")
 _PATCH_FILE_RE = re.compile(r"^\*\*\* (?:Update|Add|Delete) File: (.+)$", re.MULTILINE)
 
 
@@ -53,10 +53,14 @@ def _as_dict(tool_input: Any) -> dict:
     return {}
 
 
+def _patch_text(tool_input: Any) -> str:
+    text = tool_input if isinstance(tool_input, str) else _as_dict(tool_input).get("input", "")
+    return text or ""
+
+
 def file_path_from_input(name: str, tool_input: Any) -> Optional[str]:
     if name == "apply_patch":
-        text = tool_input if isinstance(tool_input, str) else _as_dict(tool_input).get("input", "")
-        m = _PATCH_FILE_RE.search(text or "")
+        m = _PATCH_FILE_RE.search(_patch_text(tool_input))
         return m.group(1).strip() if m else None
     d = _as_dict(tool_input)
     for key in _PATH_KEYS:
@@ -66,7 +70,16 @@ def file_path_from_input(name: str, tool_input: Any) -> Optional[str]:
     return None
 
 
+def file_paths_from_input(name: str, tool_input: Any) -> list[str]:
+    """Every file a call touches, in order. apply_patch may name several."""
+    if name == "apply_patch":
+        return [m.strip() for m in _PATCH_FILE_RE.findall(_patch_text(tool_input))]
+    return [p] if (p := file_path_from_input(name, tool_input)) else []
+
+
 def input_summary(name: str, tool_input: Any, limit: int = 120) -> str:
+    if name == "apply_patch":
+        return (file_path_from_input(name, tool_input) or "")[:limit]
     if isinstance(tool_input, str) and not tool_input.lstrip().startswith("{"):
         return tool_input[:limit]
     d = _as_dict(tool_input)

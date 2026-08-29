@@ -79,3 +79,10 @@ def sample_config():
         test_paths=["tests/"],
         initialized_at=datetime.now(timezone.utc).isoformat(),
     )
+
+
+@pytest.fixture(autouse=True)
+def _clear_git_common_dir_cache():
+    from plumb.traces.repo import _git_common_dir_cached
+    _git_common_dir_cached.cache_clear()
+    yield
