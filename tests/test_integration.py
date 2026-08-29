@@ -64,6 +64,7 @@ class TestFullHookFlow:
 
     def test_stage_hook_approve_commit(self, full_repo):
         repo = Repo(full_repo)
+        branch = repo.active_branch.name
 
         # Stage a new change
         auth = full_repo / "src" / "auth.py"
@@ -78,7 +79,7 @@ class TestFullHookFlow:
                 decision="Login returns True for now.",
                 made_by="llm",
                 confidence=0.8,
-                branch="master",
+                branch=branch,
                 created_at=datetime.now(timezone.utc).isoformat(),
             )
         ]
@@ -91,14 +92,14 @@ class TestFullHookFlow:
             result = run_hook(full_repo)
             assert result == 1
 
-        # Verify decisions were written
-        decisions = read_decisions(full_repo)
+        # Verify decisions were written to the current branch's shard
+        decisions = read_decisions(full_repo, branch=branch)
         pending = [d for d in decisions if d.status == "pending"]
         assert len(pending) >= 1
 
         # Approve the decision
         for d in pending:
-            update_decision_status(full_repo, d.id, status="approved",
+            update_decision_status(full_repo, d.id, branch=branch, status="approved",
                                    reviewed_at=datetime.now(timezone.utc).isoformat())
 
         # Second hook run — should allow (no pending decisions)
@@ -141,6 +142,7 @@ class TestAmendFlow:
         """When amending, old decisions for that commit should be removed."""
         repo = Repo(full_repo)
         initial_sha = str(repo.head.commit)
+        branch = repo.active_branch.name
 
         # Add a decision tied to the initial commit
         d = Decision(
@@ -149,7 +151,7 @@ class TestAmendFlow:
             commit_sha=initial_sha,
             decision="Old decision",
         )
-        append_decision(full_repo, d)
+        append_decision(full_repo, d, branch=branch)
 
         # Make a new commit
         f = full_repo / "src" / "new.py"
@@ -174,8 +176,8 @@ class TestAmendFlow:
              patch("plumb.coverage_reporter.print_coverage_report"):
             run_hook(full_repo)
 
-        # Old decision should be removed
-        decisions = read_decisions(full_repo)
+        # Old decision should be removed from the current branch's shard
+        decisions = read_decisions(full_repo, branch=branch)
         old = [d for d in decisions if d.id == "dec-amend1"]
         assert len(old) == 0
 
