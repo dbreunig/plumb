@@ -921,6 +921,57 @@ def coverage():
     print_coverage_report(repo_root)
 
 
+@cli.command(name="log")
+@click.option("--since", "since_ref", default=None, help="Only commits in <ref>..HEAD (plus uncommitted)")
+@click.option("--verify", is_flag=True, help="Re-check evidence digests against transcripts; marks stale refs")
+def log_cmd(since_ref, verify):
+    """Decisions grouped by commit, then by agent."""
+    from git import Repo
+    from rich.markup import escape
+    from plumb.log_view import UNCOMMITTED, group_decisions, verify_evidence
+
+    repo_root = find_repo_root()
+    if repo_root is None:
+        console.print("[red]Error: Not a git repository.[/red]")
+        raise SystemExit(1)
+    # read_all_decisions has no stable order (DuckDB); sort so runs are reproducible.
+    decisions = sorted(
+        (d for d in read_all_decisions(repo_root) if d.status != "ignored"),
+        key=lambda d: (d.created_at or "", d.id),
+    )
+    if since_ref:
+        try:
+            shas = {c.hexsha for c in Repo(repo_root).iter_commits(f"{since_ref}..HEAD")}
+        except Exception as e:
+            console.print(f"[red]Error: cannot resolve '{since_ref}': {e}[/red]")
+            raise SystemExit(1)
+        decisions = [d for d in decisions if d.commit_sha is None or d.commit_sha in shas]
+    if not decisions:
+        console.print("No decisions.")
+        return
+    for commit, agents in group_decisions(decisions).items():
+        console.print(f"[bold]{commit if commit == UNCOMMITTED else commit[:12]}[/bold]")
+        for agent, ds in agents.items():
+            console.print(f"  [cyan]{escape(agent)}[/cyan] ({len(ds)})")
+            for d in ds:
+                sess = f"session {escape(d.session_id[:8])}" if d.session_id else ""
+                rng = f"turns {d.turn_range[0]}-{d.turn_range[1]}" if d.turn_range else ""
+                flag = ""
+                if verify:
+                    result = verify_evidence(d)
+                    color = {"ok": "green", "stale": "yellow"}.get(result, "dim")
+                    flag = f"  [{color}]{result}[/{color}]"
+                    if result == "stale" and d.ref_status != "stale":
+                        branch = find_decision_branch(repo_root, d.id)
+                        if branch is not None:
+                            update_decision_status(repo_root, d.id, branch=branch, ref_status="stale")
+                conf = f"{d.confidence:.2f}" if d.confidence is not None else "-"
+                console.print(
+                    f"    {escape(d.id)}  {escape(d.status):<9} {escape(d.made_by or '-'):<6} {conf}  {sess} {rng}{flag}"
+                )
+                console.print(f"      {escape(d.decision or '')}")
+
+
 @cli.command()
 def status():
     """Print a summary of the project's Plumb state."""

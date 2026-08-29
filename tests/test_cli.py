@@ -491,3 +491,50 @@ class TestPromptWithSuggestions:
             _prompt_with_suggestions("Pick a spec", suggestions, default_no_suggestions=".")
             mock_prompt.assert_called_once()
             assert mock_prompt.call_args[1].get("default") == "1"
+
+
+class TestLog:
+    def test_log_groups_and_flags(self, runner, initialized_repo, monkeypatch):
+        from plumb.decision_log import append_decisions
+        append_decisions(initialized_repo, [
+            Decision(id="dec-unc1", status="pending", decision="Use [bold] brackets literally",
+                     commit_sha=None, created_at="2026-06-01T00:00:00Z"),
+            Decision(id="dec-cmt1", status="approved", decision="Prefer codex", made_by="user",
+                     commit_sha="deadbeefdeadbeefdeadbeefdeadbeefdeadbeef", agent="codex",
+                     session_id="019abcdef", source_path="/nope/session.jsonl", turn_range=[3, 7],
+                     evidence_digest="0" * 64, confidence=0.9, created_at="2026-06-02T00:00:00Z"),
+        ], branch="main")
+        monkeypatch.chdir(initialized_repo)
+
+        result = runner.invoke(cli, ["log"])
+        assert result.exit_code == 0, result.output
+        assert "uncommitted" in result.output
+        assert "codex" in result.output
+        assert "session 019abcde" in result.output
+        assert "turns 3-7" in result.output
+        assert "[bold] brackets" in result.output
+        assert "deadbeefdead" in result.output
+
+        result = runner.invoke(cli, ["log", "--verify"])
+        assert result.exit_code == 0, result.output
+        assert "unverifiable" in result.output
+
+        result = runner.invoke(cli, ["log", "--since", "HEAD"])
+        assert result.exit_code == 0, result.output
+        assert "uncommitted" in result.output
+        assert "deadbeefdead" not in result.output   # fake sha is not in HEAD..HEAD
+
+    def test_log_verify_marks_stale(self, runner, initialized_repo, monkeypatch):
+        from plumb.decision_log import append_decisions
+        append_decisions(initialized_repo, [
+            Decision(id="dec-stale1", status="approved", decision="x", commit_sha="abc123",
+                     agent="claude", session_id="S", source_path="/x.jsonl", turn_range=[0, 0],
+                     evidence_digest="0" * 64, created_at="2026-06-02T00:00:00Z"),
+        ], branch="main")
+        monkeypatch.chdir(initialized_repo)
+        monkeypatch.setattr("plumb.log_view.verify_evidence", lambda d: "stale")
+
+        result = runner.invoke(cli, ["log", "--verify"])
+        assert result.exit_code == 0, result.output
+        assert "stale" in result.output
+        assert read_decisions(initialized_repo, branch="main")[0].ref_status == "stale"
