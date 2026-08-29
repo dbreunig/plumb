@@ -273,8 +273,8 @@ def init():
         else:
             console.print("[yellow]Warning: SKILL.md source not found in package.[/yellow]")
 
-        # CLAUDE.md integration
-        status.update("[bold cyan]Updating CLAUDE.md...")
+        # CLAUDE.md / AGENTS.md integration
+        status.update("[bold cyan]Updating CLAUDE.md and AGENTS.md...")
         _update_claude_md(repo_root, cfg)
 
         # Parse spec
@@ -303,9 +303,24 @@ def _coverage_bar(covered: int, total: int, width: int = 20) -> str:
     return f"[{color}]{bar}[/{color}] {pct:.0f}%  ({covered}/{total})"
 
 
+def _write_block(path: Path, block: str) -> None:
+    """Write `block` into `path`, replacing an existing marker-delimited block,
+    appending to existing content, or creating the file."""
+    import re
+    pattern = r"<!-- plumb:start -->.*?<!-- plumb:end -->"
+    if path.exists():
+        content = path.read_text()
+        if re.search(pattern, content, re.DOTALL):
+            content = re.sub(pattern, lambda _m: block, content, flags=re.DOTALL)
+        else:
+            content = content.rstrip() + "\n\n" + block + "\n"
+        path.write_text(content)
+    else:
+        path.write_text(block + "\n")
+
+
 def _update_claude_md(repo_root: Path, cfg: PlumbConfig) -> None:
-    """Append/update Plumb block in CLAUDE.md."""
-    claude_md = repo_root / "CLAUDE.md"
+    """Append/update the Plumb instruction block in CLAUDE.md and AGENTS.md."""
     spec_list = ", ".join(cfg.spec_paths)
     test_list = ", ".join(cfg.test_paths)
 
@@ -337,18 +352,8 @@ This project uses Plumb to keep the spec, tests, and code in sync.
   Plumb will keep them updated as decisions are approved.
 <!-- plumb:end -->"""
 
-    if claude_md.exists():
-        content = claude_md.read_text()
-        # Check for existing markers
-        import re
-        pattern = r"<!-- plumb:start -->.*?<!-- plumb:end -->"
-        if re.search(pattern, content, re.DOTALL):
-            content = re.sub(pattern, block, content, flags=re.DOTALL)
-        else:
-            content = content.rstrip() + "\n\n" + block + "\n"
-        claude_md.write_text(content)
-    else:
-        claude_md.write_text(block + "\n")
+    for name in ("CLAUDE.md", "AGENTS.md"):
+        _write_block(repo_root / name, block)
 
 
 @cli.command()

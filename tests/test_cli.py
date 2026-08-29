@@ -111,6 +111,18 @@ class TestClaudeMdIntegration:
         assert "Existing content" in content
         assert "<!-- plumb:start -->" in content
 
+    def test_update_claude_md_writes_agents_md_too(self, tmp_repo):
+        (tmp_repo / "AGENTS.md").write_text("# Existing\n")
+        cfg = PlumbConfig(spec_paths=["spec.md"], test_paths=["tests/"])
+        _update_claude_md(tmp_repo, cfg)
+        for name in ("CLAUDE.md", "AGENTS.md"):
+            text = (tmp_repo / name).read_text()
+            assert "<!-- plumb:start -->" in text and "<!-- plumb:end -->" in text
+        assert (tmp_repo / "AGENTS.md").read_text().startswith("# Existing\n")
+        _update_claude_md(tmp_repo, cfg)   # idempotent
+        assert (tmp_repo / "AGENTS.md").read_text().count("plumb:start") == 1
+        assert (tmp_repo / "CLAUDE.md").read_text().count("plumb:start") == 1
+
 
 class TestHook:
     def test_hook_command(self, runner, initialized_repo):
