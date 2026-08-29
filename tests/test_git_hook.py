@@ -484,3 +484,70 @@ def test_read_conversation_no_longer_accepts_config_path(tmp_repo):
     # old config files with the key still load
     cfg = PlumbConfig(**{"spec_paths": ["s.md"], "claude_log_path": "/x"})
     assert cfg.spec_paths == ["s.md"]
+
+
+class TestRunPostCommitStampsSha:
+    def _seed(self, repo_root, dec_id, created_at):
+        append_decision(repo_root, Decision(
+            id=dec_id, status="approved", decision="x", branch="main",
+            commit_sha=None, created_at=created_at,
+        ), branch="main")
+
+    def _new_commit(self, repo_root):
+        repo = Repo(repo_root)
+        (repo_root / "f.txt").write_text("f\n")
+        repo.index.add(["f.txt"])
+        return str(repo.index.commit("second"))
+
+    def test_stamps_decisions_created_after_previous_commit(self, initialized_repo):
+        from plumb.config import load_config
+        from plumb.git_hook import run_post_commit
+        repo = Repo(initialized_repo)
+        cfg = load_config(initialized_repo)
+        cfg.last_commit = str(repo.head.commit)
+        save_config(initialized_repo, cfg)
+        self._seed(initialized_repo, "dec-new", datetime.now(timezone.utc).isoformat())
+        self._seed(initialized_repo, "dec-old", "2020-01-01T00:00:00Z")
+
+        new_sha = self._new_commit(initialized_repo)
+        run_post_commit(initialized_repo)
+
+        by_id = {d.id: d for d in read_decisions(initialized_repo, branch="main")}
+        assert by_id["dec-new"].commit_sha == new_sha
+        assert by_id["dec-old"].commit_sha is None
+        assert load_config(initialized_repo).last_commit == new_sha
+
+    def test_no_previous_commit_stamps_nothing(self, initialized_repo):
+        from plumb.config import load_config
+        from plumb.git_hook import run_post_commit
+        cfg = load_config(initialized_repo)
+        cfg.last_commit = None
+        save_config(initialized_repo, cfg)
+        self._seed(initialized_repo, "dec-new", datetime.now(timezone.utc).isoformat())
+
+        new_sha = self._new_commit(initialized_repo)
+        run_post_commit(initialized_repo)
+
+        assert read_decisions(initialized_repo, branch="main")[0].commit_sha is None
+        assert load_config(initialized_repo).last_commit == new_sha
+
+    def test_skips_other_branch_and_ignored(self, initialized_repo):
+        from plumb.config import load_config
+        from plumb.git_hook import run_post_commit
+        repo = Repo(initialized_repo)
+        cfg = load_config(initialized_repo)
+        cfg.last_commit = str(repo.head.commit)
+        save_config(initialized_repo, cfg)
+        now = datetime.now(timezone.utc).isoformat()
+        append_decision(initialized_repo, Decision(
+            id="dec-other", status="approved", decision="x", branch="feature", commit_sha=None, created_at=now,
+        ), branch="feature")
+        append_decision(initialized_repo, Decision(
+            id="dec-ign", status="ignored", decision="x", branch="main", commit_sha=None, created_at=now,
+        ), branch="main")
+
+        self._new_commit(initialized_repo)
+        run_post_commit(initialized_repo)
+
+        assert read_decisions(initialized_repo, branch="feature")[0].commit_sha is None
+        assert read_decisions(initialized_repo, branch="main")[0].commit_sha is None

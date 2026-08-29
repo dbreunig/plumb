@@ -424,9 +424,42 @@ def run_post_commit(repo_root: str | Path | None = None) -> None:
             return
 
         repo = Repo(repo_root)
-        config.last_commit = str(repo.head.commit)
-        config.last_commit_branch = _get_branch_name(repo)
+        # Resolve the previous cutoff before overwriting it: decisions created
+        # after it (by this commit's pre-commit pass) belong to the new HEAD.
+        from plumb.traces.repo import commit_datetime
+        prev_dt = commit_datetime(repo_root, config.last_commit) if config.last_commit else None
+
+        new_sha = str(repo.head.commit)
+        branch = _get_branch_name(repo)
+        config.last_commit = new_sha
+        config.last_commit_branch = branch
         config.last_extracted_at = None
         save_config(repo_root, config)
+
+        if prev_dt is not None:
+            _stamp_commit_sha(repo_root, new_sha, branch, prev_dt)
     except Exception:
         pass
+
+
+def _stamp_commit_sha(repo_root: Path, new_sha: str, branch: str, prev_dt) -> int:
+    """Set commit_sha on uncommitted decisions created since the previous
+    commit on this branch. Returns the number stamped."""
+    from plumb.decision_log import find_decision_branch, read_all_decisions, update_decision_status
+    from plumb.traces.repo import parse_ts
+
+    stamped = 0
+    for d in read_all_decisions(repo_root):
+        if d.commit_sha is not None or d.status == "ignored":
+            continue
+        if d.branch and d.branch != branch:
+            continue
+        created = parse_ts(d.created_at)
+        if created is None or created < prev_dt:
+            continue
+        shard = find_decision_branch(repo_root, d.id)
+        if shard is None:
+            continue
+        update_decision_status(repo_root, d.id, branch=shard, commit_sha=new_sha)
+        stamped += 1
+    return stamped

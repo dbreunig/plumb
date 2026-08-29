@@ -591,6 +591,33 @@ class TestLog:
         assert "stale" in result.output
         assert read_decisions(initialized_repo, branch="main")[0].ref_status == "stale"
 
+    def test_log_groups_under_sha_stamped_by_post_commit(self, runner, initialized_repo, monkeypatch):
+        from plumb.decision_log import append_decisions
+        from plumb.git_hook import run_post_commit
+        repo = Repo(initialized_repo)
+        cfg = load_config(initialized_repo)
+        cfg.last_commit = str(repo.head.commit)
+        save_config(initialized_repo, cfg)
+        append_decisions(initialized_repo, [
+            Decision(id="dec-stamp1", status="approved", decision="stamped", branch="main",
+                     commit_sha=None, created_at=datetime.now(timezone.utc).isoformat()),
+        ], branch="main")
+        (initialized_repo / "g.txt").write_text("g\n")
+        repo.index.add(["g.txt"])
+        new_sha = str(repo.index.commit("second"))
+        run_post_commit(initialized_repo)
+        monkeypatch.chdir(initialized_repo)
+
+        result = runner.invoke(cli, ["log"])
+        assert result.exit_code == 0, result.output
+        assert new_sha[:12] in result.output
+        assert "uncommitted" not in result.output
+
+        result = runner.invoke(cli, ["log", "--since", "HEAD~1"])
+        assert new_sha[:12] in result.output
+        result = runner.invoke(cli, ["log", "--since", "HEAD"])
+        assert new_sha[:12] not in result.output
+
 
 class TestStatusStale:
     def test_status_counts_stale_evidence(self, runner, initialized_repo, monkeypatch):
