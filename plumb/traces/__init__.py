@@ -65,6 +65,7 @@ def all_sources() -> list[TraceSource]:
     """Registered adapters. Add to this list; no registry until it hurts."""
     from plumb.traces.claude import ClaudeSource
     from plumb.traces.codex import CodexSource
+    from plumb.traces.copilot import CopilotSource
     from plumb.traces.pi import PiSource
 
-    return [ClaudeSource(), CodexSource(), PiSource()]
+    return [ClaudeSource(), CodexSource(), PiSource(), CopilotSource()]

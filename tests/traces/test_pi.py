@@ -113,7 +113,7 @@ def test_parse_parent_id_cycle_does_not_hang(tmp_repo, tmp_path):
 
 def test_all_sources_includes_pi():
     from plumb.traces import all_sources
-    assert [s.name for s in all_sources()] == ["claude", "codex", "pi"]
+    assert [s.name for s in all_sources()] == ["claude", "codex", "pi", "copilot"]
 
 
 def test_parse_strips_assistant_text(tmp_repo, tmp_path):

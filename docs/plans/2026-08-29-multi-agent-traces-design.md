@@ -129,6 +129,8 @@ cadence and removes the encoding dependency entirely.
 | **Pi** | `~/.pi/agent/sessions/<project>/<session>.jsonl`; subagents at `<project>/<session>/<agent>.jsonl` | `cwd` on the `{"type":"session"}` header line | `toolCall` blocks with `name`; results keyed by `message.toolCallId` | child file nested under parent's directory; header may carry `branchedFrom` |
 | **Copilot CLI** | `~/.copilot/session-state/<uuid>/events.jsonl` (or bare `<uuid>.jsonl`) | `context.cwd`, branch | tool request events with `name` | — |
 
+Copilot adapter written from agentsview's parser; verify against a real `events.jsonl` before relying on it.
+
 All four share the shape "JSONL, one record per line, `cwd` in-file", so one
 adapter interface gets validated by four real implementations before anything
 exotic.
