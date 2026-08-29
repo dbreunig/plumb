@@ -7,7 +7,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+MODES = ("review", "record")
 
 
 class PlumbConfig(BaseModel):
@@ -18,6 +20,36 @@ class PlumbConfig(BaseModel):
     last_commit_branch: Optional[str] = None
     last_extracted_at: Optional[str] = None
     program_models: dict[str, dict] = Field(default_factory=dict)
+    mode: str = "review"
+    record_threshold: Optional[float] = None
+
+    @field_validator("mode")
+    @classmethod
+    def _validate_mode(cls, v: str) -> str:
+        if v not in MODES:
+            raise ValueError(f"mode must be one of {MODES}, got {v!r}")
+        return v
+
+    @field_validator("record_threshold")
+    @classmethod
+    def _validate_record_threshold(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and not (0.0 <= v <= 1.0):
+            raise ValueError(f"record_threshold must be between 0.0 and 1.0, got {v!r}")
+        return v
+
+
+def effective_mode(cfg: PlumbConfig | None) -> tuple[str, str]:
+    """Resolve the active mode and where it came from.
+
+    Returns (mode, source) where source is "env" (PLUMB_MODE), "config",
+    or "default" (no config). An invalid or empty PLUMB_MODE is ignored.
+    """
+    env = os.environ.get("PLUMB_MODE", "").strip().lower()
+    if env in MODES:
+        return env, "env"
+    if cfg is None:
+        return "review", "default"
+    return cfg.mode, "config"
 
 
 def find_repo_root(start: str | Path | None = None) -> Path | None:

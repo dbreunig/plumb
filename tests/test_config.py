@@ -101,3 +101,39 @@ class TestLoadSaveConfig:
         cp = tmp_repo / ".plumb" / "config.json"
         data = json.loads(cp.read_text())
         assert data["spec_paths"] == ["a.md"]
+
+
+def test_mode_defaults_and_validation():
+    import pytest
+    from plumb.config import PlumbConfig, effective_mode
+    cfg = PlumbConfig()
+    assert cfg.mode == "review" and cfg.record_threshold is None
+    assert effective_mode(cfg) == ("review", "config")
+    assert effective_mode(None) == ("review", "default")
+    assert effective_mode(PlumbConfig(mode="record")) == ("record", "config")
+    with pytest.raises(ValueError):
+        PlumbConfig(mode="gate")
+    with pytest.raises(ValueError):
+        PlumbConfig(record_threshold=1.5)
+    assert PlumbConfig(record_threshold=0.7).record_threshold == 0.7
+
+
+def test_plumb_mode_env_overrides_config(monkeypatch):
+    from plumb.config import PlumbConfig, effective_mode
+    monkeypatch.setenv("PLUMB_MODE", "Record ")
+    assert effective_mode(PlumbConfig(mode="review")) == ("record", "env")
+    monkeypatch.setenv("PLUMB_MODE", "bogus")
+    assert effective_mode(PlumbConfig(mode="review")) == ("review", "config")
+    monkeypatch.setenv("PLUMB_MODE", "")
+    assert effective_mode(PlumbConfig(mode="record")) == ("record", "config")
+
+
+def test_old_config_without_mode_loads(tmp_repo):
+    import json
+    from plumb.config import PlumbConfig, save_config, load_config
+    save_config(tmp_repo, PlumbConfig(spec_paths=["s.md"]))
+    p = tmp_repo / ".plumb" / "config.json"
+    data = json.loads(p.read_text()); data.pop("mode"); data.pop("record_threshold")
+    p.write_text(json.dumps(data))
+    cfg = load_config(tmp_repo)
+    assert cfg is not None and cfg.mode == "review" and cfg.record_threshold is None
