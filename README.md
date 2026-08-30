@@ -31,7 +31,7 @@ plumb init
 
 This will:
 
-1. Ask for paths to your spec markdown and test directory
+1. Ask for paths to your spec markdown and test directory, and how Plumb should handle decisions: **review** (stop each commit until you approve, ignore, or reject; the default) or **record** (record decisions after each commit; review later with `plumb log` and `plumb search`)
 2. Create a `.plumb/` directory for state (commit this to version control)
 3. Install a git pre-commit hook
 4. Install a Claude Code skill file at `.claude/skills/plumb/SKILL.md`
@@ -60,6 +60,10 @@ From here, just work normally. Plumb activates when you commit.
 
 Same flow, but you drive it with `plumb review` instead of the skill.
 
+### Record mode
+
+If you chose **record** at `plumb init` (or ran `plumb mode record`, or set `PLUMB_MODE=record`), nothing blocks `git commit`. The post-commit hook launches a detached worker that extracts decisions for the commit that just landed and appends them to the log as `recorded`, stamped with the commit SHA. Set `record_threshold` in `.plumb/config.json` to auto-record only confident decisions; the rest are written as `pending` for batch review. `plumb status` shows the sync debt, `plumb sync` flushes recorded decisions to the spec on demand, `plumb search` answers "what did we decide about X?", and `plumb review --recorded` walks the record if you want to approve, edit, or reject entries by hand. Rejecting a recorded decision never rewrites code — it is already committed.
+
 ### Which agents Plumb reads
 
 Plumb reads transcripts from Claude Code, Codex, Pi, and Copilot CLI (the Copilot adapter is unverified against live sessions). Sessions are matched to your repo by the working directory each agent records in its transcript, so linked worktrees attribute to the main repo and no path configuration is needed. Subagent sessions are read too. Every decision records which agent, session, and turn range it came from; `plumb log` shows decisions grouped by commit and agent, and `plumb log --verify` re-checks that evidence against the transcripts on disk.
@@ -72,6 +76,8 @@ Plumb reads transcripts from Claude Code, Codex, Pi, and Copilot CLI (the Copilo
 | `plumb status` | Show spec files, requirements, pending decisions, coverage |
 | `plumb diff` | Preview what decisions Plumb would extract from staged changes |
 | `plumb review` | Interactively review pending decisions in the terminal |
+| `plumb review --recorded` | Walk auto-recorded decisions; reject records a reason without modifying code |
+| `plumb mode [review\|record]` | Show or set how Plumb handles decisions |
 | `plumb approve <id>` | Approve a decision and sync it to spec/tests |
 | `plumb approve --all` | Approve all pending decisions at once |
 | `plumb reject <id> --reason "..."` | Reject a decision |
@@ -81,6 +87,8 @@ Plumb reads transcripts from Claude Code, Codex, Pi, and Copilot CLI (the Copilo
 | `plumb parse-spec` | Re-parse spec files into requirements |
 | `plumb coverage` | Report code coverage, spec-to-test, and spec-to-code coverage |
 | `plumb log` | Show decisions grouped by commit and agent; `--since <ref>`, `--verify` |
+| `plumb search [query]` | Search the decision log; `--sort`, `--status`, `--agent`, `--branch`, `--file`, `--since`, `--json` |
+| `plumb record-extract <sha>` | Record-mode worker launched by the post-commit hook |
 
 ## Coverage
 
@@ -102,9 +110,12 @@ All Plumb state lives in `.plumb/` at the repo root:
 
 ```
 .plumb/
-├── config.json          # Spec paths, test paths, settings
+├── .gitignore           # Ignores the runtime files below
+├── config.json          # Spec paths, test paths, mode, settings
 ├── coverage.json        # Cached coverage data
-├── decisions.jsonl      # Append-only log of all decisions
+├── decisions/           # Append-only per-branch decision logs (*.jsonl)
+├── record.lock          # Record mode: worker lock (not committed)
+├── record.log           # Record mode: worker output (not committed)
 └── requirements.json    # Parsed requirements from the spec
 ```
 

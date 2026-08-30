@@ -110,6 +110,29 @@ Present these gaps clearly so the user can prioritize.
 - Do not attempt to commit if there are decisions with `status: rejected_manual`.
   The user must resolve these manually first.
 
+## Record mode
+
+Plumb has two modes. `plumb mode` prints the effective mode (`PLUMB_MODE` env
+var, then `.plumb/config.json`, default `review`). Everything above describes
+**review** mode. In **record** mode:
+
+- Nothing blocks `git commit`. The pre-commit hook is a no-op; the post-commit
+  hook launches a detached worker (`plumb record-extract <sha>`) that extracts
+  decisions for the commit that just landed and writes them as `recorded`
+  (`approved_by: "auto"`). Decisions below `record_threshold` are written as
+  ordinary `pending` and never block.
+- Do not run the approval choreography. Before ending a session, run
+  `plumb log --since <base-ref>` and mention notable recorded decisions to the
+  user.
+- Before proposing a decision that may contradict a prior one, run
+  `plumb search <terms>` and cite what you find.
+- Pending decisions are still the user's to resolve via `plumb review` — never
+  approve, reject, or edit on their behalf. `plumb review --recorded` lets the
+  user walk auto-recorded decisions; rejecting one does not modify code.
+- Run `plumb sync` when the user asks to update the spec; `plumb status` shows
+  the sync debt ("N recorded, unsynced") and "Recording in progress…" while a
+  worker holds `.plumb/record.lock`.
+
 ## Command reference
 
 | Command | When to use |
@@ -125,7 +148,11 @@ Present these gaps clearly so the user can prioritize.
 | `plumb modify <id>` | Called automatically by reject — do not call directly |
 | `plumb edit <id> "<text>"` | User amends decision text before approving |
 | `plumb review` | Interactive terminal review (not needed in Claude Code) |
+| `plumb review --recorded` | Walk auto-recorded decisions (record mode); reject records a reason, never modifies code |
 | `plumb sync` | **Run after approving decisions** — updates spec and generates tests |
 | `plumb coverage` | Report coverage across all three dimensions |
 | `plumb log [--since <ref>] [--verify]` | Show decisions grouped by commit and agent; `--verify` re-checks evidence against transcripts |
 | `plumb parse-spec` | Re-parse spec after manual edits |
+| `plumb mode [review\|record]` | Show or set the mode; setting it reinstalls hooks and rewrites the CLAUDE.md/AGENTS.md block |
+| `plumb search [QUERY] [--sort relevance\|date\|confidence] [--status S]* [--agent A]* [--branch B] [--file PATH] [--made-by user\|agent] [--since DATE\|REF] [--limit N] [--json]` | Search the decision log across branches; use before proposing a decision that may contradict a prior one |
+| `plumb record-extract <sha> [--branch <b>]` | Record-mode worker, launched by the post-commit hook — do not call manually |

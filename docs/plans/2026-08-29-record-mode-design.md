@@ -1,7 +1,7 @@
 # Record Mode and `plumb search`
 
 **Date:** 2026-08-29 (revised after the multi-agent traces work landed)
-**Status:** Proposed
+**Status:** Implemented on `feat/record-mode`
 **Companion:** [Multi-agent traces](2026-08-29-multi-agent-traces-design.md) —
 implemented; owns stages 1–2 (find + normalize, extract + enrich). This doc
 owns stage 3 (resolve + store) and the read side.
@@ -207,3 +207,24 @@ plumb search [QUERY...] [--sort relevance|date|confidence]
    block; spec + README.
 
 Steps 1–4 make record mode work; 5 makes it useful; 6 finishes the surface.
+
+## Delivered vs. design
+
+What landed differs from the text above in these places:
+
+- The post-commit hook passes `--branch <branch>` to the worker explicitly, and
+  the worker skips a commit that is no longer reachable from any local or
+  remote ref (it was amended or reset away while waiting for the lock).
+- Amend deletion requires the old commit to be on *no* ref, not just
+  `HEAD~1 == last_commit`; a same-parent sibling whose predecessor still lives
+  on a branch is not an amend.
+- A root commit uses the Unix epoch as its transcript cutoff (there is no parent
+  commit to date from).
+- `ensure_plumb_dir` writes `.plumb/.gitignore` for `record.lock` and
+  `record.log`, so the runtime files are never committed.
+- BM25 idf is computed over the full filtered corpus; sort and `--limit` are
+  pushed into SQL rather than applied to the ranked list in Python.
+- The default `plumb search` status filter hides `rejected*` as well as
+  `ignored`.
+- `load_config` is lenient about a bad `mode` / `record_threshold` (warn and
+  fall back to the default) instead of treating Plumb as uninitialized.

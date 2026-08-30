@@ -683,3 +683,9 @@ Commit: `docs: record mode and plumb search`
 - Auto-reject/auto-modify in record mode; DuckDB `fts`; a search index.
 - Migrating this repo's 470 legacy `commit_sha: null` decisions.
 - Re-enabling this repo's pre-commit hook (user's call; `plumb mode` will reinstall hooks in other repos).
+
+Follow-ups noted during implementation (not part of this plan):
+
+- `read_all_decisions`: select explicit columns instead of `*`, and stop dropping malformed rows silently (surface them instead).
+- Amend of an already-pushed commit: the old commit stays on the remote ref, so its decisions are kept; decide whether to clean them up once the remote is force-updated.
+- Non-LLM dedup ignores existing decisions (Jaccard runs within-batch only); consider comparing against the log too.

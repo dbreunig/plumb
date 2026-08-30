@@ -904,3 +904,54 @@ class TestReviewRecorded:
         assert r.exit_code == 0, r.output
         assert "1 pending decision(s)" in r.output
         assert "dec-rec1" not in r.output and "dec-rec2" not in r.output
+
+
+class TestModeAwareInstructionBlock:
+    def _cfg(self, mode):
+        from plumb.config import PlumbConfig
+        return PlumbConfig(spec_paths=["spec.md"], test_paths=["tests/"], mode=mode)
+
+    def test_record_block_drops_approval_choreography(self, tmp_repo):
+        from plumb.cli import _update_claude_md
+        _update_claude_md(tmp_repo, self._cfg("record"))
+        for name in ("CLAUDE.md", "AGENTS.md"):
+            text = (tmp_repo / name).read_text()
+            assert "<!-- plumb:start -->" in text and "<!-- plumb:end -->" in text
+            assert "plumb search" in text
+            assert "record" in text
+            assert "plumb log --since" in text
+            assert "AskUserQuestion" not in text
+            assert "- **Spec:** spec.md" in text and "- **Tests:** tests/" in text
+
+    def test_review_block_unchanged(self, tmp_repo):
+        from plumb.cli import _update_claude_md
+        _update_claude_md(tmp_repo, self._cfg("review"))
+        for name in ("CLAUDE.md", "AGENTS.md"):
+            text = (tmp_repo / name).read_text()
+            assert "AskUserQuestion" in text
+            assert "plumb search" not in text
+
+    def test_env_override_selects_block(self, tmp_repo, monkeypatch):
+        from plumb.cli import _update_claude_md
+        monkeypatch.setenv("PLUMB_MODE", "record")
+        _update_claude_md(tmp_repo, self._cfg("review"))
+        assert "plumb search" in (tmp_repo / "CLAUDE.md").read_text()
+
+    def test_mode_command_rewrites_block(self, initialized_repo, monkeypatch):
+        from plumb.cli import _update_claude_md
+        from plumb.config import load_config
+        monkeypatch.chdir(initialized_repo)
+        _update_claude_md(initialized_repo, load_config(initialized_repo))
+        before = (initialized_repo / "CLAUDE.md").read_text()
+        assert "AskUserQuestion" in before
+        r = CliRunner().invoke(cli, ["mode", "record"])
+        assert r.exit_code == 0, r.output
+        for name in ("CLAUDE.md", "AGENTS.md"):
+            text = (initialized_repo / name).read_text()
+            assert text.count("<!-- plumb:start -->") == 1
+            assert "plumb search" in text and "AskUserQuestion" not in text
+        r = CliRunner().invoke(cli, ["mode", "review"])
+        assert r.exit_code == 0, r.output
+        text = (initialized_repo / "CLAUDE.md").read_text()
+        assert text.count("<!-- plumb:start -->") == 1
+        assert "AskUserQuestion" in text and "plumb search" not in text

@@ -535,3 +535,28 @@ def test_dedup_caps_accepted_to_recency_window_plus_related():
         assert f"accepted-{i:03d}" not in sent, i      # older and unrelated
     assert "accepted-nots" not in sent                   # no created_at -> oldest
     assert sent.count("[Q]") == 301
+
+
+class TestDuckdbRowConversionPerf:
+    def test_clean_duckdb_row_is_fast(self):
+        import time
+        from plumb.decision_log import _clean_duckdb_row, _to_python_native
+        import plumb.decision_log as dl
+
+        # The helpers used to re-import math/numpy on every call (~0.5 ms/row);
+        # both now live at module scope.
+        import math
+        assert dl.math is math
+        assert dl.np is None or dl.np.__name__ == "numpy"
+        row = {
+            "id": "dec-x", "status": "recorded", "decision": "d" * 80, "question": "q" * 40,
+            "confidence": 0.9, "file_refs": [{"file": "a.py", "lines": [1, 2]}],
+            "turn_range": [1, 2], "related_requirement_ids": ["req-1", "req-2"],
+            "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc), "synced_at": None,
+        }
+        t0 = time.perf_counter()
+        for _ in range(5000):
+            _clean_duckdb_row(dict(row))
+        elapsed = time.perf_counter() - t0
+        assert elapsed < 1.0, f"5000 rows took {elapsed:.2f}s"
+        assert _to_python_native(row["created_at"]) == "2026-01-01T00:00:00+00:00"

@@ -351,11 +351,15 @@ def _write_block(path: Path, block: str) -> None:
 
 
 def _update_claude_md(repo_root: Path, cfg: PlumbConfig) -> None:
-    """Append/update the Plumb instruction block in CLAUDE.md and AGENTS.md."""
+    """Append/update the Plumb instruction block in CLAUDE.md and AGENTS.md.
+
+    The block follows the effective mode: review mode carries the approval
+    choreography; record mode drops it in favour of `plumb log` / `plumb search`.
+    """
     spec_list = ", ".join(cfg.spec_paths)
     test_list = ", ".join(cfg.test_paths)
 
-    block = f"""<!-- plumb:start -->
+    header = f"""<!-- plumb:start -->
 ## Plumb (Spec/Test/Code Sync)
 
 This project uses Plumb to keep the spec, tests, and code in sync.
@@ -365,7 +369,23 @@ This project uses Plumb to keep the spec, tests, and code in sync.
 - **Decision log:** `.plumb/decisions/`
 
 ### When working in this project:
+"""
 
+    record_block = header + """
+- Plumb is in **record** mode: decisions are recorded automatically after each
+  commit; nothing blocks `git commit`.
+- Before ending a session, run `plumb log --since <base-ref>` and mention
+  notable recorded decisions to the user.
+- Before proposing a decision that may contradict a prior one, run
+  `plumb search <terms>`.
+- Pending decisions (below the record threshold) are the user's to resolve via
+  `plumb review` — never approve, reject, or edit on their behalf.
+- Run `plumb sync` when the user asks to update the spec; `plumb status` shows
+  the sync debt.
+- Never edit files in `.plumb/decisions/` directly.
+<!-- plumb:end -->"""
+
+    review_block = header + """
 - Run `plumb status` before beginning work to understand current alignment.
 - Run `plumb diff` before committing to preview what Plumb will capture.
 - When `git commit` is intercepted by Plumb, **use `AskUserQuestion`** to present
@@ -383,6 +403,7 @@ This project uses Plumb to keep the spec, tests, and code in sync.
   Plumb will keep them updated as decisions are approved.
 <!-- plumb:end -->"""
 
+    block = record_block if effective_mode(cfg)[0] == "record" else review_block
     for name in ("CLAUDE.md", "AGENTS.md"):
         _write_block(repo_root / name, block)
 
@@ -406,7 +427,8 @@ def mode(new_mode):
     cfg.mode = new_mode
     save_config(repo_root, cfg)
     _install_hooks(repo_root)
-    console.print(f"[green]Mode set to {new_mode}. Hooks reinstalled.[/green]")
+    _update_claude_md(repo_root, cfg)
+    console.print(f"[green]Mode set to {new_mode}. Hooks reinstalled; CLAUDE.md/AGENTS.md block updated.[/green]")
     env_mode, src = effective_mode(cfg)
     if src == "env":
         console.print(

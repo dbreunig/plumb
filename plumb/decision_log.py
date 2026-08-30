@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re as _re
 import tempfile
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+try:  # numpy is optional; DuckDB returns numpy scalars only when it is installed
+    import numpy as np
+except ImportError:  # pragma: no cover - exercised only without numpy
+    np = None
 
 
 class FileRef(BaseModel):
@@ -200,8 +206,6 @@ def read_all_decisions(repo_root: str | Path) -> list[Decision]:
 
 def _clean_duckdb_row(raw: dict) -> dict:
     """Convert DuckDB result row values to Python-native types for Pydantic."""
-    import math
-
     cleaned = {}
     for key, value in raw.items():
         if key == "rowid":
@@ -236,9 +240,6 @@ def _clean_duckdb_row(raw: dict) -> dict:
 
 def _to_python_native(value):
     """Convert numpy/DuckDB scalar types to Python builtins."""
-    import math
-    from datetime import date, datetime
-
     if value is None:
         return None
     # read_json_auto infers ISO-8601 strings as TIMESTAMP; Decision stores
@@ -246,19 +247,16 @@ def _to_python_native(value):
     if isinstance(value, (datetime, date)):
         return value.isoformat()
     # Handle numpy types if numpy is available
-    try:
-        import numpy as np
-        if isinstance(value, (np.integer,)):
+    if np is not None:
+        if isinstance(value, np.integer):
             return int(value)
-        if isinstance(value, (np.floating,)):
+        if isinstance(value, np.floating):
             f = float(value)
             return None if math.isnan(f) else f
-        if isinstance(value, (np.bool_,)):
+        if isinstance(value, np.bool_):
             return bool(value)
         if isinstance(value, np.ndarray):
             return value.tolist()
-    except ImportError:
-        pass
     # Handle DuckDB list types
     if hasattr(value, "tolist"):
         return value.tolist()

@@ -26,7 +26,7 @@ The conversation log parser preserves full tool call information from every supp
 - **Simple over clever.** Plumb solves a bounded problem. It should be holdable in a single programmer's head.- **DSPy for LLM workflows.** All LLM-powered functions are implemented as DSPy programs, not open-ended agents. This ensures they are controllable, auditable, and reliable.
 - **Inference via Claude.** Plumb uses the Anthropic Claude SDK (via the user's existing account) as its inference provider. Claude Haiku 4.5 (`claude-haiku-4-5`) serves as the default model for all programs; per-program overrides are configured in `program_models`.
 - **Non-intrusive.** Plumb operates as a git hook and CLI tool. It does not change how the user writes code.
-- **The commit is canonical.** The pre-commit hook ensures that every committed state has been reviewed and approved. A commit represents a fully reconciled snapshot of spec, tests, and code.
+- **The commit is canonical.** In review mode the pre-commit hook ensures that every committed state has been reviewed and approved. A commit represents a fully reconciled snapshot of spec, tests, and code. In record mode the commit is still the unit of capture — decisions are extracted per landed commit and stamped with its SHA — but the gate is removed.
 - **Conversation analysis is opportunistic.** Plumb uses agent transcript data (Claude Code, Codex, Pi, Copilot CLI) when available. When it is not (e.g., committing from a bare terminal with no matching session), Plumb falls back to diff-only analysis. Decisions still get captured; they are just derived from code changes rather than reasoning.
 - **Multi-stage deduplication.** The system prevents duplicate decisions through a multi-stage pipeline using exact matching, Jaccard similarity, and LLM semantic analysis to catch different types of duplicates.
 - **Decision filtering.** Only prescriptive choices that affect system design, behavior, architecture, or data models are captured as decisions. Process observations, tooling choices, and diagnostic findings are filtered out.
@@ -113,16 +113,27 @@ The programs module includes token estimation, chunking, and concurrent mapper f
 Plumb stores all state in a `.plumb/` folder at the root of the user's repository. This folder should be committed to version control.
 ```
 .plumb/
-├── config.json             # Spec paths, test paths, settings
-├── decisions.jsonl         # Append-only log of all decisions
+├── .gitignore              # Ignores record.lock and record.log (runtime files)
+├── config.json             # Spec paths, test paths, mode, settings
+├── decisions/              # Append-only per-branch decision logs (<branch>.jsonl)
+├── record.lock             # Record mode: advisory lock held by the extraction worker
+├── record.log              # Record mode: worker stdout/stderr
 └── requirements.json       # Cached parsed requirements from the spec
 ```
+
+`ensure_plumb_dir()` creates `.plumb/.gitignore` (listing `record.lock` and `record.log`) whenever it creates the directory; users track the `.gitignore` and never the runtime files.
 
 The system shall track which requirements have been modified and only send dirty (changed) requirements to the mapper for processing, rather than sending all requirements.
 
 ---
 ## Core Workflow
-Plumb intercepts commits via a **git pre-commit hook**. This is the central design decision: the commit is the gate, and nothing is committed until decisions have been reviewed.
+Plumb has two modes, selected per project:
+
+- **`review`** (default) — Plumb intercepts commits via a **git pre-commit hook**. The commit is the gate, and nothing is committed until decisions have been reviewed. Paths 1 and 2 below describe this mode.
+- **`record`** — the pre-commit hook does nothing; the post-commit hook extracts decisions for the commit that just landed, outside the commit path, and writes them as `recorded`. Nothing blocks `git commit`. Path 3 below describes this mode.
+
+The effective mode is resolved in this order: the `PLUMB_MODE` environment variable (`review` or `record`; invalid or empty values are ignored) → `mode` in `.plumb/config.json` → `review`. `plumb init` asks which mode to use; `plumb mode` shows or changes it.
+
 There are two paths through review, both of which use the same underlying CLI commands and data structures:
 
 ### Path 1: Committing inside Claude Code (Conversational Review)
@@ -169,6 +180,18 @@ The user commits directly from a terminal, outside of Claude Code. The pre-commi
 6. The user re-runs `git commit`. Hook fires again, finds no pending decisions, exits zero. Commit lands.
 
 Both paths use the same hook, the same decision log, the same per-decision commands, and the same sync logic. The only difference is who drives the review loop: Claude Code's skill or the interactive `plumb review` CLI. Agents other than Claude Code do not get the conversational review loop; their sessions are still read for decisions, and the human reviews with `plumb review`. The system uses exact deduplication and LLM-based semantic deduplication with groq/openai/gpt-oss-120b configured for both decision_deduplicator and question_synthesizer (8192 max_tokens). Source summaries are structured as per-file mappings to enable granular tracking. All documentation files including SKILL files and CLAUDE.md must be kept consistent with the same sync workflow requirements.
+### Path 3: Record mode (no gate)
+When the effective mode is `record`:
+
+1. The pre-commit hook (`plumb hook`) exits 0 immediately without analysis. `plumb diff` / `plumb hook --dry-run` still preview the staged changes in either mode.
+2. The post-commit hook (`plumb post-commit`) records the new HEAD as `last_commit` as usual, then **spawns a detached worker** — `plumb record-extract <sha> --branch <branch>` — with `start_new_session`, stdin from `/dev/null`, and stdout/stderr appended to `.plumb/record.log`. The commit returns immediately; the LLM never runs inside `git commit`. The branch is passed explicitly because the user may switch branches before the worker runs.
+3. The worker takes an advisory `fcntl` lock on `.plumb/record.lock`, so two commits in quick succession extract sequentially and append safely. While the lock is held, `plumb status` prints `Recording in progress…`.
+4. The worker runs the shared extraction pipeline (`extract_decisions()` — the same diff analysis, transcript read, per-session chunking, extraction, dedup, and question synthesis the pre-commit path uses) against the **commit's own diff** (`git show <sha>`, never the index, filtered by managed paths and `.plumbignore`) and the transcript window since the parent commit. For a root commit there is no parent, so the transcript cutoff is the Unix epoch (read everything).
+5. **Threshold split.** Each extracted decision is written with `commit_sha=<sha>` and `branch` set directly. When `record_threshold` is `null`, or the decision's `confidence >= record_threshold`, it is written with `status="recorded"` and `approved_by="auto"`; otherwise it is written as ordinary `pending` (`approved_by` null) and never blocks anything — it shows in `plumb status` for batch review.
+6. **Skips.** The worker writes nothing (and does not call the LLM) when the commit touches only ignored or Plumb-managed files, when it has no patch (e.g. a merge), or when the commit is no longer reachable from any local or remote branch or `HEAD` (it was amended or reset away while the worker waited for the lock).
+7. **Amends.** Before `last_commit` is overwritten, the post-commit hook compares the new commit with `last_commit`: if they share a first parent, differ, and the old commit is no longer on any ref, the old commit's decisions (`commit_sha == last_commit`) are deleted from the branch shard. A same-parent sibling whose predecessor still lives on some branch is not treated as an amend. The worker applies the same check when it runs.
+8. Recorded decisions accumulate unsynced. `plumb status` shows the debt (`Sync debt: N recorded, unsynced`); `plumb sync` flushes them on demand. Record mode never auto-rejects or auto-edits.
+
 ## CLI Commands
 All commands are invoked as `plumb <command>`.
 ---
@@ -181,6 +204,14 @@ Initializes Plumb in the current git repository.
 3. Prompts the user (interactively) to:
    - Provide a path to a spec file or directory of spec markdown files. Validates that the path exists and contains `.md` files. Uses recursive search (rglob) to find markdown files within directories and suggests discovered spec files.
    - Provide a path to a test file or test directory. Validates that the path exists. Scans repository for test directories and files to provide suggestions.
+   - Choose how Plumb handles decisions. The prompt reads:
+     ```
+     How should Plumb handle decisions?
+       review  — stop each commit until you approve/ignore/reject (default)
+       record  — record decisions after each commit; review later with plumb log/search
+     Mode (review, record) [review]:
+     ```
+     The answer is stored as `mode`; an empty answer means `review`.
 4. Validates pytest test collection:
    - Checks that pytest is installed
    - Verifies test files exist at the specified path
@@ -193,7 +224,7 @@ Initializes Plumb in the current git repository.
 6. Creates a `.plumbignore` file in the project root if it does not exist.
 7. Installs the git pre-commit hook by writing a script to `.git/hooks/pre-commit` that calls `plumb hook`. Sets the script as executable.
 8. Installs the Claude Code skill locally by copying `plumb/skill/SKILL.md` to `.claude/skills/plumb/SKILL.md` in the project root. Creates `.claude/skills/plumb/` directories if they do not exist. This is a project-local installation only — Plumb never writes to the user's global `~/.claude/` directory.
-9. Appends a Plumb status block to `CLAUDE.md` at the project root (creating `CLAUDE.md` if it does not exist). See **CLAUDE.md Integration**.
+9. Appends a Plumb status block to `CLAUDE.md` and `AGENTS.md` at the project root (creating them if they do not exist). The block depends on the effective mode. See **CLAUDE.md Integration**.
 10. Runs `plumb parse-spec` to do an initial parse of the spec into requirements.
 11. Prints a confirmation summary to the terminal, including confirmation that the skill was installed at `.claude/skills/plumb/SKILL.md`.
 
@@ -205,13 +236,27 @@ Initializes Plumb in the current git repository.
   "initialized_at": "<ISO timestamp>",
   "last_commit": null,
   "last_commit_branch": null,
-  "last_extracted_at": null
+  "last_extracted_at": null,
+  "mode": "review",
+  "record_threshold": null
 }
 ```
+
+- `mode`: `"review"` | `"record"`. Validated on load.
+- `record_threshold`: `null` or a float in `0.0–1.0`. In record mode, decisions with `confidence >= record_threshold` are auto-recorded; the rest are written as `pending`. `null` records everything.
+- `load_config` is lenient: an invalid `mode` or `record_threshold` in `config.json` falls back to the default with a warning rather than disabling Plumb.
+
+### `plumb mode [review|record]`
+Shows or sets the mode.
+**Behavior:**
+1. With no argument, prints the effective mode and its source, e.g. `record  (from env)` or `review  (from config)`.
+2. With an argument, writes `mode` to `config.json`, reinstalls the git hooks, rewrites the CLAUDE.md/AGENTS.md instruction block to match, and prints a confirmation. If `PLUMB_MODE` is set to a different value it warns that the environment variable overrides the saved mode in the current environment.
+3. Exits non-zero for an unknown mode or when Plumb is not initialized.
+
 ### `plumb hook`
 Called automatically by the git pre-commit hook. Not intended to be called directly by users, but must work if called manually.
 **Behavior:**
-1. Reads `.plumb/config.json`. If not found, exits 0 silently (Plumb not initialized, do not block commit).
+1. Reads `.plumb/config.json`. If not found, exits 0 silently (Plumb not initialized, do not block commit). If the effective mode is `record` and this is not a dry run, exits 0 immediately — extraction happens post-commit (see **Path 3**).
 2. Gets the current staged diff via `git diff --cached`.
 3. Gets the current branch name.
 4. **Detects amends:** Compare the HEAD commit's parent SHA to `last_commit`. If equal, delete decisions in `decisions.jsonl` where `commit_sha == last_commit` before re-running analysis.
@@ -269,8 +314,8 @@ Previews what Plumb will capture from currently staged changes. Read-only.
 ### `plumb review`
 Interactive review of pending decisions. Intended for terminal (TTY) use.
 **Behavior:**
-1. Reads `.plumb/decisions.jsonl`, filters for `status == "pending"`.
-2. Accepts an optional `--branch <name>` flag to filter by branch.
+1. Reads the decision log across all branch shards, filters for `status == "pending"`.
+2. Accepts an optional `--branch <name>` flag to filter by branch, and a `--recorded` flag (see below).
 3. When multiple session files exist, uses the most recent session file by modification time or matches the current session ID for session selection.
 4. If no pending decisions exist, prints "No pending decisions." and exits 0.
 5. For each pending decision, displays:
@@ -285,7 +330,11 @@ Interactive review of pending decisions. Intended for terminal (TTY) use.
    - `[r]eject` (prompts for reason; optionally runs `plumb modify <id>` automatically)
    - `[e]dit` (user provides replacement decision text)
    - `[s]kip` (remains pending)
-7. After all decisions are resolved, runs `plumb sync` for all approved/edited decisions.
+7. After all decisions are resolved, prints a reminder to run `plumb sync` for all approved/edited decisions.
+
+Approve and edit set `approved_by: "user"` and `reviewed_at`; reject records the reason and, in the pending walk, runs `plumb modify <id>` automatically.
+
+**`plumb review --recorded`:** walks decisions with `status == "recorded"` (the header reads "N recorded decision(s)"; with none, "No recorded decisions."). The same approve / ignore / reject / edit prompt applies. Approve upgrades the decision to `approved` with `approved_by: "user"`; edit amends the text, marks it `edited`, and clears `synced_at` so it re-syncs; reject marks it `rejected` with the reason and prints `Code already committed; rejection recorded, no automatic modification.` — it **never** runs `plumb modify`, because the code is already committed and rewriting it is a separate, explicit act. Ignore is unchanged.
 
 **Decision Classification:**
 - Defaults `spec_relevant` field to `True` to ensure decisions pass through for user review when LLM classification is uncertain.
@@ -344,7 +393,7 @@ Modifies the staged code to satisfy a rejected decision. This is the automatic c
 Updates the spec and tests to reflect all approved and edited decisions. Can be run manually or is called automatically by `plumb approve` and `plumb edit`.
 **Behavior:**
 1. Adds early exit check to avoid expensive operations when no unsynced decisions exist.
-2. Reads decisions from `decisions.jsonl` with status `approved` or `edited` that have not yet been synced (no `synced_at` timestamp).
+2. Reads decisions from the decision log with status `approved`, `edited`, or `recorded` that have not yet been synced (no `synced_at` timestamp).
 3. For each spec file:
    - Runs **WholeFileSpecUpdater**: processes all decisions affecting the spec file together and returns section_updates for existing sections and new_sections for brand new sections
    - If new_sections is non-empty, runs **OutlineMerger** to determine proper positioning of new sections within the spec structure
@@ -403,11 +452,30 @@ Shows the decision log grouped by commit, then by agent. Read-only unless `--ver
 3. Groups by `commit_sha` (uncommitted first, then commits newest first), then by `agent` (`unknown` when null, e.g. diff-only decisions), and prints each decision's id, status, `made_by`, confidence, session id, and turn range.
 4. `--verify` re-reads each decision's transcript at `source_path` with the same adapter and no cutoff, applies the per-turn transforms the hook applied (`prepare_for_digest`), recomputes the sha256 digest over `turn_range`, and reports one of: `ok`, `stale` (digest mismatch or the range is gone), `missing` (transcript file no longer exists), or `unverifiable` (no provenance, unknown agent, or parse failure). Only `ok` and `stale` are written back to `ref_status`; `missing` and `unverifiable` leave it alone, and a `broken` ref is never overwritten.
 
+### `plumb search`
+```
+plumb search [QUERY...] [--sort relevance|date|confidence]
+             [--status S]* [--agent NAME]* [--branch NAME] [--file PATH]
+             [--made-by user|agent] [--since DATE|REF] [--limit N] [--json]
+```
+Searches the decision log across every branch and prints a flat list — the counterpart to `plumb log`'s grouped view. Read-only.
+**Behavior:**
+1. **Enumeration** is one DuckDB query over `.plumb/decisions/*.jsonl` with explicit column types and latest-line-wins dedup (the query `read_all_decisions` uses). Every filter is a SQL `WHERE` clause: `--status` and `--agent` are repeatable; `--file` matches `file_refs[*].file`; `--since` accepts an ISO date or a git ref (resolved to that commit's datetime). Sorting and `--limit` (default 50; `0` = all) are applied in SQL.
+2. **Default status filter:** with no `--status`, `ignored` and every `rejected*` status are hidden.
+3. **Relevance** is BM25 over `question + decision + user_note`, computed in process. DuckDB's `fts` extension would do this in SQL but is a network download the Python wheel does not bundle, so v1 does not depend on it; the ranking is isolated behind `rank(rows, query)`. Inverse document frequency is computed over the full (filtered) corpus, then the SQL-side limit is applied to the ranked ids.
+4. **Default sort** is `relevance` when a query is given and `date` (newest first) otherwise. `--sort relevance` without a query falls back to `date`. `--sort confidence` orders by `confidence` descending, nulls last.
+5. Output rows show id, status, agent, `made_by`, confidence, date, short commit, session/turn range when present, the decision text, and matched file refs. `--json` emits the full `Decision` records.
+
+### `plumb record-extract <sha> [--branch <name>] [--wait]`
+The record-mode worker; launched by the post-commit hook and not intended to be called by users, but must work if called manually (e.g. to backfill a commit). Takes the `.plumb/record.lock` advisory lock, then runs the extraction described under **Path 3** for `<sha>`, writing to the `--branch` shard (default: the checked-out branch). Prints `Recorded N decision(s), M pending for <sha>`. `--wait` is accepted for compatibility; the command always runs inline once it holds the lock. Exits non-zero outside a git repository or when Plumb is not initialized.
+
 ### `plumb status`
 Prints a human-readable summary:
+- `Mode: <mode> (from env|config|default)`; in record mode, `Recording in progress…` while a worker holds `.plumb/record.lock`
 - Tracked spec files and total requirements
 - Number of tests
 - Pending decisions, with branch breakdown if spanning multiple branches
+- `Sync debt: N recorded, unsynced (run 'plumb sync')` when recorded decisions have no `synced_at` (omitted when there are none)
 - Decisions with broken git references
 - Last sync commit
 - Coverage summary (all three dimensions)
@@ -537,12 +605,20 @@ Present these gaps clearly so the user can prioritize.
 | `plumb coverage` | Run coverage across all three dimensions |
 | `plumb parse-spec` | Re-parse spec after manual edits |
 | `plumb log [--since <ref>] [--verify]` | Show decisions grouped by commit and agent; `--verify` re-checks evidence against transcripts |
+| `plumb mode [review\|record]` | Show or set the mode; setting it reinstalls hooks and rewrites the CLAUDE.md/AGENTS.md block |
+| `plumb search [QUERY] [--sort …] [--status …] [--agent …] [--file …] [--since …] [--json]` | Search the decision log across branches; use before proposing a decision that may contradict a prior one |
+| `plumb record-extract <sha> [--branch <b>]` | Record-mode worker, launched by the post-commit hook — do not call manually |
+| `plumb review --recorded` | Walk auto-recorded decisions; reject records a reason, never modifies code |
+
+The skill also carries a "Record mode" section mirroring the record-mode CLAUDE.md block: nothing blocks `git commit`; run `plumb log --since <base-ref>` before ending a session; run `plumb search <terms>` before proposing a contradicting decision; pending decisions remain the user's to resolve; `plumb sync` on request.
 
 The conversation log reader must work seamlessly across different repositories without requiring additional user setup or configuration overhead.
 
 ---
 ## CLAUDE.md Integration
-`plumb init` appends the following block to `CLAUDE.md` and to `AGENTS.md` (read by Codex, Pi, Copilot, and other agents). Each file is created if absent. The block is delimited by comment markers so future Plumb commands can update it without affecting surrounding content.
+`plumb init` appends a block to `CLAUDE.md` and to `AGENTS.md` (read by Codex, Pi, Copilot, and other agents). Each file is created if absent. The block is delimited by comment markers so future Plumb commands can update it without affecting surrounding content. The block is **mode-aware**: `_update_claude_md()` selects it by the effective mode, and `plumb mode <x>` rewrites it after saving so the block always matches. Both variants share the same markers and the same Spec / Tests / Decision log header lines.
+
+**Review mode** block (approval choreography via `AskUserQuestion`):
 ```markdown
 <!-- plumb:start -->
 ## Plumb (Spec/Test/Code Sync)
@@ -563,6 +639,30 @@ This project uses Plumb to keep the spec, tests, and code in sync.
 - Never edit `.plumb/decisions.jsonl` directly.
 - Treat the spec markdown files as the source of truth for intended behavior.
   Plumb will keep them updated as decisions are approved.
+<!-- plumb:end -->
+```
+
+**Record mode** block (same header; no approval choreography):
+```markdown
+<!-- plumb:start -->
+## Plumb (Spec/Test/Code Sync)
+This project uses Plumb to keep the spec, tests, and code in sync.
+- **Spec:** <spec_paths from config>
+- **Tests:** <test_paths from config>
+- **Decision log:** `.plumb/decisions/`
+
+### When working in this project:
+- Plumb is in **record** mode: decisions are recorded automatically after each
+  commit; nothing blocks `git commit`.
+- Before ending a session, run `plumb log --since <base-ref>` and mention
+  notable recorded decisions to the user.
+- Before proposing a decision that may contradict a prior one, run
+  `plumb search <terms>`.
+- Pending decisions (below the record threshold) are the user's to resolve via
+  `plumb review` — never approve, reject, or edit on their behalf.
+- Run `plumb sync` when the user asks to update the spec; `plumb status` shows
+  the sync debt.
+- Never edit files in `.plumb/decisions/` directly.
 <!-- plumb:end -->
 ```
 
@@ -648,7 +748,9 @@ Deterministic, no model calls. Both cover only `turn_start..turn_end`, never the
 
 ## Git Edge Case Handling
 ### Amends
-The pre-commit hook fires on amends. To prevent duplicates: compare HEAD's parent SHA to `last_commit`. If equal, delete decisions where `commit_sha == last_commit` before re-running analysis.
+In review mode the pre-commit hook fires on amends. To prevent duplicates: compare HEAD's parent SHA to `last_commit`. If equal, delete decisions where `commit_sha == last_commit` before re-running analysis.
+
+In record mode the check runs post-commit against a commit that actually exists: if the new commit and `last_commit` share a first parent, differ, and the old commit is on no local or remote ref, the old commit's decisions are deleted before the worker re-extracts (see **Path 3**).
 ### Rebases
 On every hook run, check all stored SHAs against git history. Unreachable SHAs are flagged `"ref_status": "broken"`. Plumb does not attempt to re-map decisions to new SHAs. The user must review and re-resolve broken-reference decisions manually.
 ---
@@ -659,6 +761,7 @@ Append-only. Existing lines are never modified in place. Status updates are writ
 {
   "id": "dec-<uuid4>",
   "status": "pending",
+  "approved_by": null,
   "question": "Should authentication tokens expire after inactivity or only on logout?",
   "decision": "Tokens expire after 30 minutes of inactivity.",
   "made_by": "user",
@@ -690,12 +793,14 @@ Append-only. Existing lines are never modified in place. Status updates are writ
 Datetime fields (`created_at`, `synced_at`, `reviewed_at`) are stored and round-tripped as ISO-8601 strings. The decision_log.py module handles serialization and deserialization of datetime and date types to ensure proper conversion between Python datetime objects and ISO-8601 string representations for JSON compatibility.
 
 **Provenance fields:** `agent` (`"claude" | "codex" | "pi" | "copilot"`, null for diff-only decisions), `session_id`, `parent_session_id` (set for subagent sessions), `source_path` (transcript file), `turn_range` (`[start, end]` ordinals within that session), `evidence_digest` (sha256 of the rendered turns in `turn_range`; see **Enrichment and Provenance**). `chunk_index` is **deprecated**: it is kept in the schema for old rows but the hook no longer populates it.  
-**Status values:** `pending` | `approved` | `edited` | `rejected` | `rejected_modified` | `rejected_manual`  
+**Status values:** `pending` | `approved` | `edited` | `recorded` | `rejected` | `rejected_modified` | `rejected_manual`  
+`recorded`: written by record mode with the commit SHA set directly; syncs like `approved` and counts as an existing decision for dedup.  
+**approved_by values:** `"user" | "auto"` — `user` when a human approved or edited the decision (`plumb approve`, `plumb edit`, `plumb review`); `auto` when record mode recorded it. Set once and preserved across later status changes so provenance survives when a recorded decision is upgraded; null while pending.  
 **ref_status values:** `ok` | `broken` | `stale`  
 `stale`: the evidence digest no longer matches the transcript at `source_path` / `turn_range`; set and cleared by `plumb log --verify`.  
 **made_by values:** `"user" | "agent"` — user if human stated or confirmed the decision, agent otherwise
 
-Note: `commit_sha` is null until the commit lands. The post-commit hook stamps it: every decision on the current branch with a null `commit_sha` and a `created_at` after the previous `last_commit`'s commit time is updated with the new HEAD SHA (ignored decisions are skipped). `plumb log` groups on this field.
+Note: in review mode `commit_sha` is null until the commit lands; record mode sets it directly because the commit already exists. The post-commit hook stamps it: every decision on the current branch with a null `commit_sha` and a `created_at` after the previous `last_commit`'s commit time is updated with the new HEAD SHA (ignored decisions are skipped). `plumb log` groups on this field.
 ## DSPy Programs
 ### `DiffAnalyzer`
 **Input:** Raw unified diff string  **Output:** List of change summaries, each with:
@@ -789,6 +894,9 @@ pytest, 80% coverage minimum for v0.1.0.
 | **Broken Reference** | A decision whose `commit_sha` is no longer reachable in git history |
 | **Conversational Review** | The review loop driven by the Claude Code skill, using per-decision commands |
 | **Interactive Review** | The review loop driven by `plumb review` in a terminal |
+| **Review mode** | The default mode: the pre-commit hook gates each commit on decision review |
+| **Record mode** | Decisions are extracted after each commit by a detached worker and written as `recorded`; nothing blocks the commit |
+| **Sync debt** | Recorded decisions that have not yet been flushed to the spec by `plumb sync` |
 | **Programs Module** | A dedicated module containing LLM programs, separate from core library functionality |
 | **Plumb** | This library |
 | **Ignore Module** | A dedicated module (ignore.py) that handles file exclusion functionality |
