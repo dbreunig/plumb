@@ -378,6 +378,7 @@ This project uses Plumb to keep the spec, tests, and code in sync.
   notable recorded decisions to the user.
 - Before proposing a decision that may contradict a prior one, run
   `plumb search <terms>`.
+- The user can audit auto-recorded decisions with `plumb review --recorded`.
 - Pending decisions (below the record threshold) are the user's to resolve via
   `plumb review` — never approve, reject, or edit on their behalf.
 - Run `plumb sync` when the user asks to update the spec; `plumb status` shows
