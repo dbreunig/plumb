@@ -228,7 +228,7 @@ def world(tmp_path_factory):
 
 def test_phase1_init(world):
     repo = world["repo"]
-    p = run([PLUMB, "init"], repo, input="spec.md\ntests/\nrecord\n", timeout=300)
+    p = run([PLUMB, "init"], repo, input="spec.md\ntests/\nrecord\n\n", timeout=300)
 
     cfg = json.loads((repo / ".plumb" / "config.json").read_text())
     assert cfg["mode"] == "record" and cfg["record_threshold"] is None

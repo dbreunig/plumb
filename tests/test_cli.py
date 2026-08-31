@@ -23,7 +23,8 @@ class TestInit:
     def test_not_git_repo(self, runner, tmp_path):
         # plumb:req-fedab03e
         # plumb:req-dc5b8f48
-        with patch("plumb.cli.find_repo_root", return_value=None):
+        with patch("plumb.cli.find_repo_root", return_value=None), \
+             patch("plumb.cli.validate_api_access"):
             result = runner.invoke(cli, ["init"])
             assert result.exit_code != 0
 
@@ -35,8 +36,9 @@ class TestInit:
         (tmp_repo / "tests").mkdir(exist_ok=True)
 
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
-             patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n\n")
             assert result.exit_code == 0
             assert "initialized" in result.output.lower()
 
@@ -58,8 +60,9 @@ class TestInitPlumbignore:
         (tmp_repo / "tests").mkdir(exist_ok=True)
 
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
-             patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n\n")
             assert result.exit_code == 0
 
         plumbignore = tmp_repo / ".plumbignore"
@@ -77,8 +80,9 @@ class TestInitPlumbignore:
         (tmp_repo / ".plumbignore").write_text(custom)
 
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
-             patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n\n")
             assert result.exit_code == 0
 
         assert (tmp_repo / ".plumbignore").read_text() == custom
@@ -309,9 +313,10 @@ class TestInitPytestDetection:
         (tmp_repo / "tests").mkdir(exist_ok=True)
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]), \
-             patch("plumb.cli.importlib.util") as mock_importlib:
+             patch("plumb.cli.importlib.util") as mock_importlib, \
+             patch("plumb.cli.validate_api_access"):
             mock_importlib.find_spec.return_value = None
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n\n")
             assert result.exit_code == 0
             assert "pytest was not detected" in result.output
             assert "pip install pytest" in result.output
@@ -320,9 +325,10 @@ class TestInitPytestDetection:
         (tmp_repo / "spec.md").write_text("# Spec\n")
         (tmp_repo / "tests").mkdir(exist_ok=True)
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
-             patch("plumb.sync.parse_spec_files", return_value=[]):
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.validate_api_access"):
             # Don't mock find_spec — pytest IS installed in test env
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n\n")
             assert result.exit_code == 0
             assert "pytest was not detected" not in result.output
 
@@ -333,8 +339,9 @@ class TestInitPytestDetection:
         (tests_dir / "test_foo.py").write_text("def test_foo(): pass\n")
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]), \
-             patch("plumb.cli.subprocess.run", return_value=MagicMock(returncode=0)):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
+             patch("plumb.cli.subprocess.run", return_value=MagicMock(returncode=0)), \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n\n")
             assert result.exit_code == 0
 
     def test_collect_only_fails_aborts_init(self, runner, tmp_repo):
@@ -345,8 +352,9 @@ class TestInitPytestDetection:
         mock_result = MagicMock(returncode=1, stdout="ERRORS!\n", stderr="ImportError\n")
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]), \
-             patch("plumb.cli.subprocess.run", return_value=mock_result):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
+             patch("plumb.cli.subprocess.run", return_value=mock_result), \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n\n")
             assert result.exit_code != 0
             assert "pytest failed to collect tests" in result.output
             assert not (tmp_repo / ".plumb" / "config.json").exists()
@@ -356,8 +364,9 @@ class TestInitPytestDetection:
         (tmp_repo / "tests").mkdir(exist_ok=True)
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]), \
-             patch("plumb.cli.subprocess.run") as mock_run:
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
+             patch("plumb.cli.subprocess.run") as mock_run, \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n\n")
             assert result.exit_code == 0
             mock_run.assert_not_called()
 
@@ -369,9 +378,10 @@ class TestInitPytestDetection:
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]), \
              patch("plumb.cli.importlib.util") as mock_importlib, \
-             patch("plumb.cli.subprocess.run") as mock_run:
+             patch("plumb.cli.subprocess.run") as mock_run, \
+             patch("plumb.cli.validate_api_access"):
             mock_importlib.find_spec.return_value = None
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n\n")
             assert result.exit_code == 0
             mock_run.assert_not_called()
 
@@ -382,8 +392,9 @@ class TestInitPytestDetection:
         (tests_dir / "test_foo.py").write_text("def test_foo(): pass\n")
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.sync.parse_spec_files", return_value=[]), \
-             patch("plumb.cli.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="pytest", timeout=30)):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
+             patch("plumb.cli.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="pytest", timeout=30)), \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n\n")
             assert result.exit_code == 0
             assert "timed out" in result.output
 
@@ -395,8 +406,9 @@ class TestInitValidation:
         (tmp_repo / "tests").mkdir(exist_ok=True)
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
              patch("plumb.cli._find_spec_suggestions", return_value=[]), \
-             patch("plumb.cli._find_test_suggestions", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.txt\ntests/\n\n")
+             patch("plumb.cli._find_test_suggestions", return_value=[]), \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="spec.txt\ntests/\n\n\n")
             assert result.exit_code != 0
             assert "not a markdown file" in result.output.lower()
 
@@ -405,8 +417,9 @@ class TestInitValidation:
         (tmp_repo / "my_spec.md").write_text("# Spec\n")
         (tmp_repo / "tests").mkdir(exist_ok=True)
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
-             patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="1\ntests/\n\n")
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="1\ntests/\n\n\n")
             assert result.exit_code == 0
             assert "my_spec.md" in result.output
 
@@ -417,8 +430,9 @@ class TestInitValidation:
         tests_dir.mkdir()
         (tests_dir / "test_foo.py").write_text("def test_foo(): pass\n")
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
-             patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\n1\n\n")
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="spec.md\n1\n\n\n")
             assert result.exit_code == 0
             assert "tests/" in result.output
 
@@ -685,8 +699,9 @@ class TestInitMode:
         (tmp_repo / "spec.md").write_text("# Spec\n")
         (tmp_repo / "tests").mkdir(exist_ok=True)
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
-             patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\nrecord\n")
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\nrecord\n\n")
             assert result.exit_code == 0, result.output
             assert "How should Plumb handle decisions" in result.output
             assert "review  — stop each commit until you approve/ignore/reject (default)" in result.output
@@ -699,8 +714,9 @@ class TestInitMode:
         (tmp_repo / "spec.md").write_text("# Spec\n")
         (tmp_repo / "tests").mkdir(exist_ok=True)
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
-             patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n\n")
             assert result.exit_code == 0, result.output
         assert load_config(tmp_repo).mode == "review"
 
@@ -1012,3 +1028,54 @@ class TestImportHygiene:
             if "dspy" in line or "litellm" in line
         ]
         assert not heavy, "importing plumb.cli pulled in:\n" + "\n".join(heavy)
+
+
+class TestInitModel:
+    def test_init_confirms_default_model(self, runner, tmp_repo):
+        from plumb.config import load_config, DEFAULT_MODEL
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        (tmp_repo / "tests").mkdir(exist_ok=True)
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.validate_api_access") as va:
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n\n")
+            assert result.exit_code == 0, result.output
+            assert "Use this model?" in result.output
+        va.assert_called_once_with(tmp_repo, model=DEFAULT_MODEL)
+        assert load_config(tmp_repo).model == DEFAULT_MODEL
+
+    def test_init_walkthrough_picks_provider(self, runner, tmp_repo):
+        from plumb.config import load_config
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        (tmp_repo / "tests").mkdir(exist_ok=True)
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.validate_api_access") as va:
+            result = runner.invoke(
+                cli, ["init"], input="spec.md\ntests/\n\nn\ngroq\n\n",
+            )
+            assert result.exit_code == 0, result.output
+        va.assert_called_once_with(tmp_repo, model="groq/llama-3.3-70b-versatile")
+        assert load_config(tmp_repo).model == "groq/llama-3.3-70b-versatile"
+
+    def test_init_auth_failure_exits_and_rerun_recovers(self, runner, tmp_repo):
+        from plumb import PlumbAuthError
+        (tmp_repo / "spec.md").write_text("# Spec\n")
+        (tmp_repo / "tests").mkdir(exist_ok=True)
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.validate_api_access", side_effect=PlumbAuthError("GROQ_API_KEY is not set")):
+            result = runner.invoke(
+                cli, ["init"], input="spec.md\ntests/\n\nn\ngroq\n\n",
+            )
+            assert result.exit_code == 1
+            assert "GROQ_API_KEY" in result.output
+        # The config was saved before verification, so a re-run recovers
+        # through the clone-setup path.
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.cli.validate_api_access") as va, \
+             patch("plumb.coverage_reporter.print_coverage_report"):
+            result = runner.invoke(cli, ["init"])
+            assert result.exit_code == 0, result.output
+            assert "already initialized" in result.output.lower()
+        va.assert_called_once()

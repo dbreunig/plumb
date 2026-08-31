@@ -43,6 +43,17 @@ def validate_api_access(repo_root=None, model=None):
     return _validate(repo_root=repo_root, model=model)
 
 
+# Suggested litellm model strings per provider for the init walkthrough.
+PROVIDER_SUGGESTIONS = {
+    "anthropic": "anthropic/claude-haiku-4-5",
+    "openai": "openai/gpt-4.1-mini",
+    "groq": "groq/llama-3.3-70b-versatile",
+    "gemini": "gemini/gemini-2.0-flash",
+    "ollama": "ollama/llama3.1",
+    "other": None,
+}
+
+
 def _quiet_broken_pipe() -> None:
     """stdout's reader went away (e.g. `plumb search | head`): stop printing
     and exit cleanly instead of tracing back."""
@@ -159,9 +170,6 @@ def _init_clone_setup(repo_root: Path, cfg: PlumbConfig) -> None:
 
         # Verify API access
         status.update("[bold cyan]Verifying API access...")
-        from plumb.programs import validate_api_access
-        from plumb import PlumbAuthError
-
         try:
             validate_api_access(repo_root)
         except PlumbAuthError as e:
@@ -239,6 +247,22 @@ def init():
         show_choices=True,
     )
 
+    # Inference model
+    model_input = DEFAULT_MODEL
+    if not click.confirm(
+        f"Plumb will use {DEFAULT_MODEL} for analysis. Use this model?",
+        default=True,
+    ):
+        provider = click.prompt(
+            "Provider",
+            type=click.Choice(["anthropic", "openai", "groq", "gemini", "ollama", "other"]),
+        )
+        suggestion = PROVIDER_SUGGESTIONS[provider]
+        if suggestion:
+            model_input = click.prompt("Model", default=suggestion)
+        else:
+            model_input = click.prompt("Model")
+
     # Pytest compatibility check
     pytest_installed = importlib.util.find_spec("pytest") is not None
     if not pytest_installed:
@@ -288,6 +312,7 @@ def init():
             test_paths=[test_input],
             initialized_at=datetime.now(timezone.utc).isoformat(),
             mode=mode_input,
+            model=model_input,
         )
         save_config(repo_root, cfg)
 
@@ -324,6 +349,17 @@ def init():
         except Exception as e:
             console.print(f"[yellow]Warning: Could not parse spec: {e}[/yellow]")
 
+        # Verify API access for the chosen model
+        status.update("[bold cyan]Verifying API access...")
+        try:
+            validate_api_access(repo_root, model=model_input)
+        except PlumbAuthError as e:
+            console.print(f"\n[red]API verification failed:[/red] {e}\n")
+            console.print("[yellow]To fix this:[/yellow]")
+            console.print("  1. Set the credential named above in a .env file at the repo root, or export it")
+            console.print("  2. Run 'plumb init' again\n")
+            raise SystemExit(1)
+
     console.print(f"\n[green]Plumb initialized successfully![/green]")
     console.print(f"  Config: .plumb/config.json")
     console.print(f"  Hooks: .git/hooks/pre-commit, post-commit")
@@ -332,6 +368,7 @@ def init():
     console.print(f"  Spec: {spec_input}")
     console.print(f"  Tests: {test_input}")
     console.print(f"  Mode: {mode_input}")
+    console.print(f"  Model: {model_input}")
 
 
 def _coverage_bar(covered: int, total: int, width: int = 20) -> str:

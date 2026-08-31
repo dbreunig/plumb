@@ -215,8 +215,9 @@ class TestCLIEndToEnd:
         repo.index.commit("init")
 
         with patch("plumb.cli.find_repo_root", return_value=tmp_path), \
-             patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n")
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="spec.md\ntests/\n\n\n")
             assert result.exit_code == 0
 
         with patch("plumb.cli.find_repo_root", return_value=tmp_path):

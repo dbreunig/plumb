@@ -22,14 +22,16 @@ def runner():
 
 class TestInitExtended:
     def test_spec_path_not_exist(self, runner, tmp_repo):
-        with patch("plumb.cli.find_repo_root", return_value=tmp_repo):
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.cli.validate_api_access"):
             result = runner.invoke(cli, ["init"], input="nonexistent.md\n")
             assert result.exit_code != 0
 
     def test_spec_dir_no_md_files(self, runner, tmp_repo):
         empty_dir = tmp_repo / "docs"
         empty_dir.mkdir()
-        with patch("plumb.cli.find_repo_root", return_value=tmp_repo):
+        with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
+             patch("plumb.cli.validate_api_access"):
             result = runner.invoke(cli, ["init"], input="docs\n")
             assert result.exit_code != 0
 
@@ -37,8 +39,9 @@ class TestInitExtended:
         spec = tmp_repo / "spec.md"
         spec.write_text("# Spec\n")
         with patch("plumb.cli.find_repo_root", return_value=tmp_repo), \
-             patch("plumb.sync.parse_spec_files", return_value=[]):
-            result = runner.invoke(cli, ["init"], input="spec.md\nnew_tests/\n\n")
+             patch("plumb.sync.parse_spec_files", return_value=[]), \
+             patch("plumb.cli.validate_api_access"):
+            result = runner.invoke(cli, ["init"], input="spec.md\nnew_tests/\n\n\n")
             assert result.exit_code == 0
             assert (tmp_repo / "new_tests").exists()
 
