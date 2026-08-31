@@ -14,7 +14,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from plumb import PlumbAuthError
 from plumb.config import (
+    DEFAULT_MODEL,
     MODES,
     PlumbConfig,
     effective_mode,
@@ -23,6 +25,7 @@ from plumb.config import (
     load_config,
     save_config,
 )
+from plumb.programs import validate_api_access
 from plumb.ignore import DEFAULT_PLUMBIGNORE
 from plumb.decision_log import (
     Decision,
@@ -435,6 +438,37 @@ def mode(new_mode):
             f"[yellow](PLUMB_MODE={os.environ['PLUMB_MODE'].strip()} overrides this "
             "in the current environment)[/yellow]"
         )
+
+
+@cli.command()
+@click.argument("new_model", required=False)
+def model(new_model):
+    """Show or set the inference model (a litellm model string)."""
+    repo_root = find_repo_root()
+    if repo_root is None:
+        console.print("[red]Error: Not a git repository.[/red]")
+        raise SystemExit(1)
+    cfg = load_config(repo_root)
+    if cfg is None:
+        console.print("[yellow]Plumb not initialized. Run 'plumb init'.[/yellow]")
+        raise SystemExit(1)
+    if new_model is None:
+        source = "config" if cfg.model != DEFAULT_MODEL else "default"
+        console.print(f"{cfg.model}  (from {source})")
+        for program, entry in cfg.program_models.items():
+            override = entry.get("model") if isinstance(entry, dict) else None
+            if override:
+                console.print(f"  {program}: {override}")
+        return
+    console.print(f"Testing {new_model}...")
+    try:
+        validate_api_access(repo_root, model=new_model)
+    except PlumbAuthError as e:
+        console.print(f"[red]{e}[/red]")
+        raise SystemExit(1)
+    cfg.model = new_model
+    save_config(repo_root, cfg)
+    console.print(f"[green]Model set to {new_model}.[/green]")
 
 
 @cli.command()

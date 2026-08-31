@@ -955,3 +955,42 @@ class TestModeAwareInstructionBlock:
         text = (initialized_repo / "CLAUDE.md").read_text()
         assert text.count("<!-- plumb:start -->") == 1
         assert "AskUserQuestion" in text and "plumb search" not in text
+
+
+class TestModelCommand:
+    def test_model_command_prints_and_sets(self, initialized_repo, monkeypatch):
+        from click.testing import CliRunner
+        from plumb.cli import cli
+        from plumb.config import load_config
+        monkeypatch.chdir(initialized_repo)
+        r = CliRunner().invoke(cli, ["model"])
+        assert r.exit_code == 0 and "anthropic/claude-haiku-4-5" in r.output and "default" in r.output
+        with patch("plumb.cli.validate_api_access") as va:
+            r = CliRunner().invoke(cli, ["model", "groq/llama-3.3-70b-versatile"])
+        assert r.exit_code == 0, r.output
+        va.assert_called_once()
+        assert load_config(initialized_repo).model == "groq/llama-3.3-70b-versatile"
+        r = CliRunner().invoke(cli, ["model"])
+        assert "groq/llama-3.3-70b-versatile" in r.output and "config" in r.output
+
+    def test_model_command_does_not_save_on_failed_check(self, initialized_repo, monkeypatch):
+        from click.testing import CliRunner
+        from plumb.cli import cli
+        from plumb.config import load_config, DEFAULT_MODEL
+        from plumb import PlumbAuthError
+        monkeypatch.chdir(initialized_repo)
+        with patch("plumb.cli.validate_api_access", side_effect=PlumbAuthError("GROQ_API_KEY is not set")):
+            r = CliRunner().invoke(cli, ["model", "groq/llama-3.3-70b-versatile"])
+        assert r.exit_code == 1 and "GROQ_API_KEY" in r.output
+        assert load_config(initialized_repo).model == DEFAULT_MODEL
+
+    def test_model_command_shows_program_overrides(self, initialized_repo, monkeypatch):
+        from click.testing import CliRunner
+        from plumb.cli import cli
+        from plumb.config import load_config, save_config
+        monkeypatch.chdir(initialized_repo)
+        cfg = load_config(initialized_repo)
+        cfg.program_models = {"decision_deduplicator": {"model": "groq/x", "max_tokens": 8192}}
+        save_config(initialized_repo, cfg)
+        r = CliRunner().invoke(cli, ["model"])
+        assert "decision_deduplicator" in r.output and "groq/x" in r.output
