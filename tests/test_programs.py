@@ -359,3 +359,22 @@ class TestGetProgramLm:
         with patch("plumb.config.find_repo_root", return_value=None):
             result = get_program_lm("decision_deduplicator")
             assert result is None
+
+
+class TestGetLm:
+    def test_get_lm_uses_configured_model(self, tmp_repo):
+        from plumb.programs import get_lm
+        save_config(tmp_repo, PlumbConfig(model="openai/gpt-4.1-mini"))
+        lm = get_lm(repo_root=tmp_repo)
+        assert lm.model == "openai/gpt-4.1-mini"
+
+    def test_get_lm_falls_back_to_default_without_config(self, tmp_path, monkeypatch):
+        from plumb.config import DEFAULT_MODEL
+        from plumb.programs import get_lm
+        monkeypatch.chdir(tmp_path)          # not a repo, no config
+        assert get_lm().model == DEFAULT_MODEL
+
+    def test_get_lm_falls_back_to_default_when_repo_has_no_config(self, tmp_repo):
+        from plumb.config import DEFAULT_MODEL
+        from plumb.programs import get_lm
+        assert get_lm(repo_root=tmp_repo).model == DEFAULT_MODEL

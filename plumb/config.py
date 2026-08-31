@@ -12,11 +12,15 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 
 MODES = ("review", "record")
 
+# Default inference model: a litellm model string.
+DEFAULT_MODEL = "anthropic/claude-haiku-4-5"
+
 # Fields whose invalid values in config.json fall back to defaults with a warning
 # rather than disabling Plumb.
 _LENIENT_FIELDS = {
     "mode": "|".join(MODES),
     "record_threshold": "0.0–1.0",
+    "model": "a litellm model string, e.g. anthropic/claude-haiku-4-5",
 }
 
 
@@ -30,6 +34,14 @@ class PlumbConfig(BaseModel):
     program_models: dict[str, dict] = Field(default_factory=dict)
     mode: str = "review"
     record_threshold: Optional[float] = None
+    model: str = DEFAULT_MODEL
+
+    @field_validator("model")
+    @classmethod
+    def _validate_model(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError(f"model must be a non-empty litellm model string, got {v!r}")
+        return v
 
     @field_validator("mode")
     @classmethod

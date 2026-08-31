@@ -167,3 +167,32 @@ def test_ensure_plumb_dir_ignores_record_runtime_files(tmp_path):
     gi.write_text("custom\n")
     ensure_plumb_dir(tmp_path)  # idempotent: never clobbers an existing file
     assert gi.read_text() == "custom\n"
+
+
+def test_model_field_defaults_and_roundtrip(tmp_repo):
+    from plumb.config import DEFAULT_MODEL, PlumbConfig, save_config, load_config
+    assert DEFAULT_MODEL == "anthropic/claude-haiku-4-5"
+    assert PlumbConfig().model == DEFAULT_MODEL
+    save_config(tmp_repo, PlumbConfig(model="groq/llama-3.3-70b-versatile"))
+    assert load_config(tmp_repo).model == "groq/llama-3.3-70b-versatile"
+    # old configs without the field load with the default
+    p = tmp_repo / ".plumb" / "config.json"
+    data = json.loads(p.read_text())
+    data.pop("model")
+    p.write_text(json.dumps(data))
+    assert load_config(tmp_repo).model == DEFAULT_MODEL
+
+
+def test_invalid_model_in_file_falls_back_with_warning(tmp_repo, capsys):
+    """A hand-edited empty model warns and falls back instead of disabling Plumb."""
+    from plumb.config import DEFAULT_MODEL, PlumbConfig, save_config, load_config
+    save_config(tmp_repo, PlumbConfig(spec_paths=["s.md"], last_commit="abc"))
+    p = tmp_repo / ".plumb" / "config.json"
+    data = json.loads(p.read_text())
+    data["model"] = "   "
+    p.write_text(json.dumps(data))
+    cfg = load_config(tmp_repo)
+    assert cfg is not None and cfg.model == DEFAULT_MODEL
+    assert cfg.last_commit == "abc"                     # nothing else lost
+    err = capsys.readouterr().err
+    assert "model" in err and "litellm model string" in err

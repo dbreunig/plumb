@@ -11,20 +11,33 @@ from plumb import PlumbAuthError, PlumbInferenceError
 _configured = False
 
 
-def get_lm() -> dspy.LM:
-    return dspy.LM("anthropic/claude-haiku-4-5", max_tokens=28000)
+def get_lm(repo_root: str | Path | None = None) -> dspy.LM:
+    """Build the default LM from the configured model (a litellm model string).
+
+    Resolves the repo root when not given; a missing or unloadable config
+    falls back to DEFAULT_MODEL."""
+    from plumb.config import DEFAULT_MODEL, find_repo_root, load_config
+
+    model = DEFAULT_MODEL
+    if repo_root is None:
+        repo_root = find_repo_root()
+    if repo_root is not None:
+        cfg = load_config(repo_root)
+        if cfg is not None and cfg.model:
+            model = cfg.model
+    return dspy.LM(model, max_tokens=28000)
 
 
-def configure_dspy() -> None:
+def configure_dspy(repo_root: str | Path | None = None) -> None:
     """Lazy DSPy configuration. No-op if already configured.
-    Never call at import time — ANTHROPIC_API_KEY absence would break
+    Never call at import time — a missing API key would break
     non-LLM commands like plumb status."""
     global _configured
     if _configured:
         return
     from dotenv import load_dotenv
     load_dotenv(override=False)
-    lm = get_lm()
+    lm = get_lm(repo_root)
     dspy.configure(lm=lm, adapter=XMLAdapter())
     _configured = True
 

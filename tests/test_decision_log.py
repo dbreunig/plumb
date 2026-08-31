@@ -619,3 +619,28 @@ def test_llm_dedup_veto_considers_other_candidates():
          patch("plumb.programs.get_program_lm", return_value=None):
         result = _llm_dedup(cand, [])
     assert [d.id for d in result] == ["dec-1"]
+
+
+def test_llm_dedup_fallback_uses_get_lm():
+    """The dedup fallback LM comes from get_lm(), not a hardcoded model id."""
+    import inspect
+    from plumb.decision_log import Decision, _llm_dedup
+
+    seen = {}
+
+    def fake_get_lm(repo_root=None):
+        seen["called"] = True
+        return MagicMock()
+
+    class FakeDeduplicator:
+        def __call__(self, candidates, existing):
+            return []
+
+    with patch("plumb.programs.get_lm", side_effect=fake_get_lm), \
+         patch("plumb.programs.get_program_lm", return_value=None), \
+         patch("plumb.programs.decision_deduplicator.DecisionDeduplicator", FakeDeduplicator):
+        result = _llm_dedup([Decision(id="dec-1", decision="x")], [])
+
+    assert seen.get("called")
+    assert [d.id for d in result] == ["dec-1"]
+    assert "anthropic/claude-haiku" not in inspect.getsource(_llm_dedup)
