@@ -29,3 +29,6 @@ packages = ["plumb"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "e2e: end-to-end tests that call the real LLM and git hooks; run with PLUMB_E2E=1",
+]
