@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import dspy
@@ -11,21 +10,25 @@ from plumb import PlumbAuthError, PlumbInferenceError
 _configured = False
 
 
-def get_lm(repo_root: str | Path | None = None) -> dspy.LM:
-    """Build the default LM from the configured model (a litellm model string).
+def resolve_model(repo_root: str | Path | None = None) -> str:
+    """The configured inference model (a litellm model string).
 
     Resolves the repo root when not given; a missing or unloadable config
     falls back to DEFAULT_MODEL."""
     from plumb.config import DEFAULT_MODEL, find_repo_root, load_config
 
-    model = DEFAULT_MODEL
     if repo_root is None:
         repo_root = find_repo_root()
     if repo_root is not None:
         cfg = load_config(repo_root)
         if cfg is not None and cfg.model:
-            model = cfg.model
-    return dspy.LM(model, max_tokens=28000)
+            return cfg.model
+    return DEFAULT_MODEL
+
+
+def get_lm(repo_root: str | Path | None = None) -> dspy.LM:
+    """Build the default LM from the configured model (a litellm model string)."""
+    return dspy.LM(resolve_model(repo_root), max_tokens=28000)
 
 
 def configure_dspy(repo_root: str | Path | None = None) -> None:
@@ -42,22 +45,40 @@ def configure_dspy(repo_root: str | Path | None = None) -> None:
     _configured = True
 
 
-def validate_api_access() -> None:
-    """Check that ANTHROPIC_API_KEY is set and works. Loads .env first, then
-    falls back to exported environment variables. Performs a smoke test to
-    verify the key is valid. Raises PlumbAuthError if not found or invalid."""
+def validate_api_access(
+    repo_root: str | Path | None = None, model: str | None = None,
+) -> None:
+    """Check that the configured model's provider credentials are set and work.
+
+    Loads .env first, then falls back to exported environment variables. Asks
+    litellm which env vars the model's provider needs and names the exact
+    missing one(s), then performs a smoke test to verify the credentials are
+    valid. Raises PlumbAuthError if missing or invalid."""
     from dotenv import load_dotenv
 
     load_dotenv(override=False)
-    if not os.environ.get("ANTHROPIC_API_KEY"):
+
+    explicit_model = model is not None
+    if model is None:
+        model = resolve_model(repo_root)
+
+    import litellm  # lazy: importing litellm is slow
+
+    env_check = litellm.validate_environment(model)
+    if not env_check.get("keys_in_environment"):
+        missing = env_check.get("missing_keys") or []
+        if missing:
+            names = ", ".join(missing)
+            verb = "are" if len(missing) > 1 else "is"
+        else:
+            names, verb = "A required environment variable", "is"
         raise PlumbAuthError(
-            "ANTHROPIC_API_KEY is not set. "
-            "Plumb requires a valid Anthropic API key to analyze commits.\n"
-            "Set it in a .env file or export it: export ANTHROPIC_API_KEY=your-key-here"
+            f"{names} {verb} not set. Plumb is configured to use {model}. "
+            f"Set it in a .env file at the repo root or export it."
         )
 
-    # Smoke test: verify the key actually works
-    lm = get_lm()
+    # Smoke test: verify the credentials actually work
+    lm = dspy.LM(model, max_tokens=28000) if explicit_model else get_lm(repo_root)
     try:
         response = lm("Reply with only the word: hello")
         if not response:
@@ -66,7 +87,7 @@ def validate_api_access() -> None:
         err_str = str(e).lower()
         if "auth" in err_str or "api key" in err_str or "401" in err_str:
             raise PlumbAuthError(
-                f"ANTHROPIC_API_KEY is invalid or rejected: {e}"
+                f"API key for {model} is invalid or rejected: {e}"
             ) from e
         raise PlumbAuthError(
             f"Failed to verify API access: {e}"

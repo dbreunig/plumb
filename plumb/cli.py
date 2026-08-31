@@ -153,13 +153,12 @@ def _init_clone_setup(repo_root: Path, cfg: PlumbConfig) -> None:
         from plumb import PlumbAuthError
 
         try:
-            validate_api_access()
+            validate_api_access(repo_root)
         except PlumbAuthError as e:
             console.print(f"\n[red]API verification failed:[/red] {e}\n")
             console.print("[yellow]To fix this:[/yellow]")
-            console.print("  1. Create a .env file in the repo root")
-            console.print("  2. Add your API key: ANTHROPIC_API_KEY=sk-ant-...")
-            console.print("  3. Run 'plumb init' again\n")
+            console.print("  1. Set the API key named above in a .env file at the repo root, or export it")
+            console.print("  2. Run 'plumb init' again\n")
             raise SystemExit(1)
 
     console.print("[green]Git hooks installed.[/green]")

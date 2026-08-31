@@ -38,57 +38,113 @@ from plumb.programs.test_generator import TestGeneratorSignature, TestGenerator
 from plumb.programs.code_modifier import CodeModifier
 
 
+_ENV_OK = {"keys_in_environment": True, "missing_keys": []}
+
+
 class TestValidateApiAccess:
-    def test_raises_when_key_missing(self):
+    def test_raises_when_key_missing(self, tmp_path, monkeypatch):
         # plumb:req-60f97012
         # plumb:req-ab686eaa
         # plumb:req-222ddbbd
+        monkeypatch.chdir(tmp_path)  # not a repo: the default model applies
         with patch("dotenv.load_dotenv"), \
-             patch.dict("os.environ", {}, clear=True):
-            import os
-            os.environ.pop("ANTHROPIC_API_KEY", None)
+             patch("litellm.validate_environment",
+                   return_value={"keys_in_environment": False,
+                                 "missing_keys": ["ANTHROPIC_API_KEY"]}) as ve:
+            with pytest.raises(PlumbAuthError, match="ANTHROPIC_API_KEY is not set"):
+                validate_api_access()
+        ve.assert_called_once_with("anthropic/claude-haiku-4-5")
+
+    def test_raises_when_key_empty(self, tmp_path, monkeypatch):
+        """An empty key counts as missing (litellm reports it in missing_keys)."""
+        monkeypatch.chdir(tmp_path)
+        with patch("dotenv.load_dotenv"), \
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": ""}), \
+             patch("litellm.validate_environment",
+                   return_value={"keys_in_environment": False,
+                                 "missing_keys": ["ANTHROPIC_API_KEY"]}):
             with pytest.raises(PlumbAuthError, match="ANTHROPIC_API_KEY is not set"):
                 validate_api_access()
 
-    def test_raises_when_key_empty(self):
-        with patch("dotenv.load_dotenv"), \
-             patch.dict("os.environ", {"ANTHROPIC_API_KEY": ""}):
-            with pytest.raises(PlumbAuthError, match="ANTHROPIC_API_KEY is not set"):
-                validate_api_access()
-
-    def test_passes_when_key_set_and_api_works(self):
+    def test_passes_when_key_set_and_api_works(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         mock_lm = MagicMock(return_value="hello")
         with patch("dotenv.load_dotenv"), \
-             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}), \
+             patch("litellm.validate_environment", return_value=_ENV_OK), \
              patch("plumb.programs.get_lm", return_value=mock_lm):
             validate_api_access()  # should not raise
             mock_lm.assert_called_once()
 
-    def test_raises_when_api_returns_empty(self):
+    def test_raises_when_api_returns_empty(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         mock_lm = MagicMock(return_value="")
         with patch("dotenv.load_dotenv"), \
-             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}), \
+             patch("litellm.validate_environment", return_value=_ENV_OK), \
              patch("plumb.programs.get_lm", return_value=mock_lm):
             with pytest.raises(PlumbAuthError, match="empty response"):
                 validate_api_access()
 
-    def test_raises_when_api_auth_fails(self):
+    def test_raises_when_api_auth_fails(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         mock_lm = MagicMock(side_effect=Exception("AuthenticationError: invalid api key"))
         with patch("dotenv.load_dotenv"), \
-             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}), \
+             patch("litellm.validate_environment", return_value=_ENV_OK), \
              patch("plumb.programs.get_lm", return_value=mock_lm):
             with pytest.raises(PlumbAuthError, match="invalid or rejected"):
                 validate_api_access()
 
-    def test_loads_dotenv_file(self):
+    def test_loads_dotenv_file(self, tmp_path, monkeypatch):
         # plumb:req-98d8bd75
         """Verify load_dotenv is called so .env files are picked up."""
+        monkeypatch.chdir(tmp_path)
         mock_lm = MagicMock(return_value="hello")
         with patch("dotenv.load_dotenv") as mock_load, \
-             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "sk-ant-test"}), \
+             patch("litellm.validate_environment", return_value=_ENV_OK), \
              patch("plumb.programs.get_lm", return_value=mock_lm):
             validate_api_access()
             mock_load.assert_called_once_with(override=False)
+
+    def test_names_missing_provider_key(self, tmp_repo, monkeypatch):
+        """The error names the exact missing env var and the configured model."""
+        save_config(tmp_repo, PlumbConfig(model="groq/llama-3.3-70b-versatile"))
+        monkeypatch.delenv("GROQ_API_KEY", raising=False)
+        with patch("dotenv.load_dotenv"), \
+             patch("litellm.validate_environment",
+                   return_value={"keys_in_environment": False,
+                                 "missing_keys": ["GROQ_API_KEY"]}) as ve:
+            with pytest.raises(PlumbAuthError, match="GROQ_API_KEY") as excinfo:
+                validate_api_access(repo_root=tmp_repo)
+        ve.assert_called_once_with("groq/llama-3.3-70b-versatile")
+        assert "groq/llama-3.3-70b-versatile" in str(excinfo.value)
+
+    def test_smoke_tests_when_keys_present(self, tmp_repo):
+        mock_lm = MagicMock(return_value="hello")
+        with patch("dotenv.load_dotenv"), \
+             patch("litellm.validate_environment", return_value=_ENV_OK), \
+             patch("plumb.programs.get_lm", return_value=mock_lm) as gl:
+            validate_api_access(repo_root=tmp_repo)
+        mock_lm.assert_called_once()
+        gl.assert_called_once_with(tmp_repo)
+
+    def test_ollama_missing_api_base_raises(self, tmp_repo):
+        """litellm requires OLLAMA_API_BASE for ollama models; its absence is named."""
+        with patch("dotenv.load_dotenv"), \
+             patch("litellm.validate_environment",
+                   return_value={"keys_in_environment": False,
+                                 "missing_keys": ["OLLAMA_API_BASE"]}) as ve:
+            with pytest.raises(PlumbAuthError, match="OLLAMA_API_BASE"):
+                validate_api_access(repo_root=tmp_repo, model="ollama/llama3.1")
+        ve.assert_called_once_with("ollama/llama3.1")
+
+    def test_model_arg_builds_lm_for_smoke_test(self, tmp_repo):
+        """An explicit model arg is smoke tested directly, not via the config."""
+        mock_lm = MagicMock(return_value="hello")
+        with patch("dotenv.load_dotenv"), \
+             patch("litellm.validate_environment", return_value=_ENV_OK), \
+             patch("plumb.programs.dspy.LM", return_value=mock_lm) as lm_cls:
+            validate_api_access(repo_root=tmp_repo, model="ollama/llama3.1")
+        lm_cls.assert_called_once_with("ollama/llama3.1", max_tokens=28000)
+        mock_lm.assert_called_once()
 
 
 class TestRunWithRetries:
