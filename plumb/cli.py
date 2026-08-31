@@ -157,7 +157,7 @@ def _init_clone_setup(repo_root: Path, cfg: PlumbConfig) -> None:
         except PlumbAuthError as e:
             console.print(f"\n[red]API verification failed:[/red] {e}\n")
             console.print("[yellow]To fix this:[/yellow]")
-            console.print("  1. Set the API key named above in a .env file at the repo root, or export it")
+            console.print("  1. Set the credential named above in a .env file at the repo root, or export it")
             console.print("  2. Run 'plumb init' again\n")
             raise SystemExit(1)
 

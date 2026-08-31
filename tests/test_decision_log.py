@@ -644,3 +644,15 @@ def test_llm_dedup_fallback_uses_get_lm():
     assert seen.get("called")
     assert [d.id for d in result] == ["dec-1"]
     assert "anthropic/claude-haiku" not in inspect.getsource(_llm_dedup)
+
+
+def test_read_all_decisions_order_is_deterministic(tmp_path):
+    """DuckDB dedup must return decisions in a stable order (append order),
+    or scripted walks like plumb review become nondeterministic."""
+    from plumb.decision_log import Decision, append_decisions, read_all_decisions
+    ds = [Decision(id=f"dec-o{i}", decision=f"d{i}") for i in range(3)]
+    append_decisions(tmp_path, ds, branch="main")
+    orders = {
+        tuple(d.id for d in read_all_decisions(tmp_path)) for _ in range(20)
+    }
+    assert orders == {("dec-o0", "dec-o1", "dec-o2")}

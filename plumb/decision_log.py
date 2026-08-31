@@ -184,6 +184,7 @@ def read_all_decisions(repo_root: str | Path) -> list[Decision]:
                 FROM raw
             )
             SELECT * EXCLUDE (_line_num, _rn) FROM deduped WHERE _rn = 1
+            ORDER BY _line_num
         """
         rel = conn.execute(query)
         columns = [desc[0] for desc in rel.description]

@@ -117,6 +117,18 @@ class TestValidateApiAccess:
         ve.assert_called_once_with("groq/llama-3.3-70b-versatile")
         assert "groq/llama-3.3-70b-versatile" in str(excinfo.value)
 
+    def test_names_multiple_missing_keys_with_plural(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        with patch("dotenv.load_dotenv"), \
+             patch("litellm.validate_environment",
+                   return_value={"keys_in_environment": False,
+                                 "missing_keys": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]}):
+            with pytest.raises(PlumbAuthError) as excinfo:
+                validate_api_access()
+        msg = str(excinfo.value)
+        assert "AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY are not set" in msg
+        assert "Set them in a .env file" in msg
+
     def test_smoke_tests_when_keys_present(self, tmp_repo):
         mock_lm = MagicMock(return_value="hello")
         with patch("dotenv.load_dotenv"), \

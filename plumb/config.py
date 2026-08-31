@@ -23,6 +23,11 @@ _LENIENT_FIELDS = {
     "model": "a litellm model string, e.g. anthropic/claude-haiku-4-5",
 }
 
+# Lenient-fallback warnings already printed this process, keyed on
+# (config path, details): plumb status loads the config several times and
+# should warn once, not once per load.
+_warned: set[tuple[str, str]] = set()
+
 
 class PlumbConfig(BaseModel):
     spec_paths: list[str] = Field(default_factory=list)
@@ -120,10 +125,13 @@ def load_config(repo_root: str | Path) -> PlumbConfig | None:
             f"{field}={data.get(field)!r} (accepted: {_LENIENT_FIELDS[field]})"
             for field in sorted(bad)
         )
-        print(
-            f"plumb: warning: ignoring invalid value(s) in {cp}: {details}; using defaults.",
-            file=sys.stderr,
-        )
+        warn_key = (str(cp), details)
+        if warn_key not in _warned:
+            _warned.add(warn_key)
+            print(
+                f"plumb: warning: ignoring invalid value(s) in {cp}: {details}; using defaults.",
+                file=sys.stderr,
+            )
         for field in bad:
             data.pop(field, None)
         try:

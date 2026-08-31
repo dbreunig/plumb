@@ -196,3 +196,19 @@ def test_invalid_model_in_file_falls_back_with_warning(tmp_repo, capsys):
     assert cfg.last_commit == "abc"                     # nothing else lost
     err = capsys.readouterr().err
     assert "model" in err and "litellm model string" in err
+
+
+def test_lenient_warning_printed_once_per_process(tmp_repo, capsys):
+    """Repeated load_config calls warn once, not once per call (plumb status
+    loads the config three times)."""
+    from plumb.config import PlumbConfig, save_config, load_config
+    save_config(tmp_repo, PlumbConfig(spec_paths=["s.md"]))
+    p = tmp_repo / ".plumb" / "config.json"
+    data = json.loads(p.read_text())
+    data["model"] = ""
+    p.write_text(json.dumps(data))
+    for _ in range(3):
+        cfg = load_config(tmp_repo)
+        assert cfg is not None
+    err = capsys.readouterr().err
+    assert err.count("plumb: warning") == 1

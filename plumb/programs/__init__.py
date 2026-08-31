@@ -9,6 +9,8 @@ from plumb import PlumbAuthError, PlumbInferenceError
 
 _configured = False
 
+DEFAULT_MAX_TOKENS = 28000
+
 
 def resolve_model(repo_root: str | Path | None = None) -> str:
     """The configured inference model (a litellm model string).
@@ -28,7 +30,7 @@ def resolve_model(repo_root: str | Path | None = None) -> str:
 
 def get_lm(repo_root: str | Path | None = None) -> dspy.LM:
     """Build the default LM from the configured model (a litellm model string)."""
-    return dspy.LM(resolve_model(repo_root), max_tokens=28000)
+    return dspy.LM(resolve_model(repo_root), max_tokens=DEFAULT_MAX_TOKENS)
 
 
 def configure_dspy(repo_root: str | Path | None = None) -> None:
@@ -69,16 +71,17 @@ def validate_api_access(
         missing = env_check.get("missing_keys") or []
         if missing:
             names = ", ".join(missing)
-            verb = "are" if len(missing) > 1 else "is"
+            plural = len(missing) > 1
         else:
-            names, verb = "A required environment variable", "is"
+            names, plural = "A required environment variable", False
+        verb, obj = ("are", "them") if plural else ("is", "it")
         raise PlumbAuthError(
             f"{names} {verb} not set. Plumb is configured to use {model}. "
-            f"Set it in a .env file at the repo root or export it."
+            f"Set {obj} in a .env file at the repo root or export {obj}."
         )
 
     # Smoke test: verify the credentials actually work
-    lm = dspy.LM(model, max_tokens=28000) if explicit_model else get_lm(repo_root)
+    lm = dspy.LM(model, max_tokens=DEFAULT_MAX_TOKENS) if explicit_model else get_lm(repo_root)
     try:
         response = lm("Reply with only the word: hello")
         if not response:
@@ -87,7 +90,7 @@ def validate_api_access(
         err_str = str(e).lower()
         if "auth" in err_str or "api key" in err_str or "401" in err_str:
             raise PlumbAuthError(
-                f"API key for {model} is invalid or rejected: {e}"
+                f"API credential for {model} is invalid or rejected: {e}"
             ) from e
         raise PlumbAuthError(
             f"Failed to verify API access: {e}"
