@@ -25,7 +25,6 @@ from plumb.config import (
     load_config,
     save_config,
 )
-from plumb.programs import validate_api_access
 from plumb.ignore import DEFAULT_PLUMBIGNORE
 from plumb.decision_log import (
     Decision,
@@ -35,6 +34,13 @@ from plumb.decision_log import (
     filter_decisions,
     find_decision_branch,
 )
+
+
+def validate_api_access(repo_root=None, model=None):
+    """Lazy indirection: importing plumb.programs pulls in dspy (~0.7s),
+    which non-LLM commands must not pay at startup."""
+    from plumb.programs import validate_api_access as _validate
+    return _validate(repo_root=repo_root, model=model)
 
 def _quiet_broken_pipe() -> None:
     """stdout's reader went away (e.g. `plumb search | head`): stop printing

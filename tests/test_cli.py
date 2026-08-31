@@ -994,3 +994,21 @@ class TestModelCommand:
         save_config(initialized_repo, cfg)
         r = CliRunner().invoke(cli, ["model"])
         assert "decision_deduplicator" in r.output and "groq/x" in r.output
+
+
+class TestImportHygiene:
+    def test_cli_import_stays_off_the_dspy_path(self):
+        """Non-LLM commands like plumb status must not pay the dspy/litellm
+        import cost at startup."""
+        import sys
+        result = subprocess.run(
+            [sys.executable, "-X", "importtime", "-c", "import plumb.cli"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        heavy = [
+            line for line in result.stderr.splitlines()
+            if "dspy" in line or "litellm" in line
+        ]
+        assert not heavy, "importing plumb.cli pulled in:\n" + "\n".join(heavy)
