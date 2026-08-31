@@ -6,9 +6,9 @@
 
 `plumb` keeps your spec, tests, and code in sync during AI-assisted development.
 
-When you work with a coding agent (Claude Code, Codex, Pi, Copilot CLI), decisions get made — a caching strategy is chosen, an API contract changes, a behavior is refined. These decisions live in conversation history and staged diffs, but they never make it back to the spec or tests. Over time, the spec drifts from reality, tests cover the wrong behavior, and the codebase becomes its own undocumented source of truth.
+When you work with a coding agent (Claude Code, Codex, Pi, Copilot CLI), decisions get made. A caching strategy is chosen. An API contract changes. A behavior is refined. These decisions live in conversation history and staged diffs, but they never make it back to the spec or tests. Over time the spec drifts from reality, the tests cover the wrong behavior, and the codebase becomes its own undocumented source of truth.
 
-Plumb fixes this by intercepting `git commit` via a pre-commit hook. It analyzes your staged changes and your agents' transcripts, extracts the decisions that were made, and gates the commit on your review. Approved decisions are automatically synced back to the spec and tests. Rejected decisions trigger code modifications to undo them. The result: every committed state has a spec and test suite that could reconstruct the program.
+Plumb reads your staged changes and your agents' transcripts, extracts the decisions that were made, and writes them to an append-only log. It runs in one of two modes. In review mode, Plumb stops each commit until you approve, ignore, or reject each decision. In record mode, nothing blocks the commit, and Plumb records the decisions right after it lands. In both modes, `plumb sync` folds the accepted decisions back into the spec and tests, so every committed state has a spec and test suite that could reconstruct the program.
 
 ## Install
 
@@ -22,24 +22,54 @@ or
 uv add plumb-dev
 ```
 
-## Quick Start
+## Quick start
+
+### Initialize
+
+Plumb uses Claude for analysis, so it needs an API key. Put one in your
+environment or in a `.env` file at the repo root.
+
+```
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Then run init inside your project:
 
 ```
 cd your-project
 plumb init
 ```
 
-This will:
+Init asks where your spec markdown lives, where your tests live, and which
+mode Plumb should run in.
 
-1. Ask for paths to your spec markdown and test directory, and how Plumb should handle decisions: **review** (stop each commit until you approve, ignore, or reject; the default) or **record** (record decisions after each commit; review later with `plumb log` and `plumb search`)
-2. Create a `.plumb/` directory for state (commit this to version control)
-3. Install a git pre-commit hook
-4. Install a Claude Code skill file at `.claude/skills/plumb/SKILL.md`
-5. Add a Plumb block to `CLAUDE.md` and `AGENTS.md`
-6. Create a `.plumbignore` file for excluding irrelevant files from analysis
-7. Parse your spec into requirements
+### The two modes
 
-From here, just work normally. Plumb activates when you commit.
+Review mode stops each commit until you approve, ignore, or reject the
+decisions Plumb found. Use it when you want to check every decision before
+it lands, e.g., on a codebase where the spec is the contract.
+
+Record mode never blocks a commit. After each commit, a background worker
+extracts the decisions and appends them to the log with the commit SHA.
+Use it when agents commit often or work unattended, and review the log
+later with `plumb log`, `plumb search`, and `plumb review --recorded`.
+
+Review is the default. You can switch at any time with `plumb mode record`
+or `plumb mode review`.
+
+### What init sets up
+
+1. A `.plumb/` directory for state. Commit it to version control.
+2. A pre-commit hook and a post-commit hook.
+3. A Plumb block in `CLAUDE.md` and `AGENTS.md`, and a Claude Code skill
+   at `.claude/skills/plumb/SKILL.md`.
+4. A `.plumbignore` file that keeps irrelevant files out of analysis.
+5. Your spec, parsed into requirements in `.plumb/requirements.json`.
+
+From here, work normally and commit. In review mode the commit stops for
+your review, and `plumb sync` folds approved decisions into the spec and
+tests. In record mode the commit lands immediately, and you sync when you
+choose.
 
 ## How It Works
 
@@ -60,9 +90,15 @@ From here, just work normally. Plumb activates when you commit.
 
 Same flow, but you drive it with `plumb review` instead of the skill.
 
-### Record mode
+### Record mode details
 
-If you chose **record** at `plumb init` (or ran `plumb mode record`, or set `PLUMB_MODE=record`), nothing blocks `git commit`. The post-commit hook launches a detached worker that extracts decisions for the commit that just landed and appends them to the log as `recorded`, stamped with the commit SHA. Set `record_threshold` in `.plumb/config.json` to auto-record only confident decisions; the rest are written as `pending` for batch review. `plumb status` shows the sync debt, `plumb sync` flushes recorded decisions to the spec on demand, `plumb search` answers "what did we decide about X?", and `plumb review --recorded` walks the record if you want to approve, edit, or reject entries by hand. Rejecting a recorded decision never rewrites code — it is already committed.
+Set `record_threshold` in `.plumb/config.json` to auto-record only confident
+decisions. Decisions below the threshold are written as `pending`, and you
+review them in a batch whenever you like. `plumb status` shows how many
+recorded decisions have not been synced yet. Agents can also force a mode
+for one run with the `PLUMB_MODE` environment variable, without touching the
+committed config. Rejecting a recorded decision never rewrites code, because
+the code is already committed.
 
 ### Which agents Plumb reads
 
@@ -127,7 +163,7 @@ Commit this directory to version control.
 - A git repository
 - An `ANTHROPIC_API_KEY` environment variable or `.env` file (for LLM-powered analysis)
 
-Note: `plumb init`, `plumb status`, and `plumb review` work without an API key. The key is only needed when the hook analyzes diffs or when syncing decisions to spec/tests.
+Note: `plumb init` needs the key, because it verifies API access and parses your spec. The hooks and `plumb sync` need it too. `plumb status`, `plumb log`, and `plumb search` work without it. `plumb review` works without it until you reject a decision in review mode, which runs the code modifier.
 
 ## License
 
