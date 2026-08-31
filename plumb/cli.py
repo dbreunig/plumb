@@ -176,7 +176,8 @@ def _init_clone_setup(repo_root: Path, cfg: PlumbConfig) -> None:
             console.print(f"\n[red]API verification failed:[/red] {e}\n")
             console.print("[yellow]To fix this:[/yellow]")
             console.print("  1. Set the credential named above in a .env file at the repo root, or export it")
-            console.print("  2. Run 'plumb init' again\n")
+            console.print("  2. To use a different model instead, run 'plumb model <litellm-string>'")
+            console.print("  3. Run 'plumb init' again\n")
             raise SystemExit(1)
 
     console.print("[green]Git hooks installed.[/green]")
@@ -357,7 +358,8 @@ def init():
             console.print(f"\n[red]API verification failed:[/red] {e}\n")
             console.print("[yellow]To fix this:[/yellow]")
             console.print("  1. Set the credential named above in a .env file at the repo root, or export it")
-            console.print("  2. Run 'plumb init' again\n")
+            console.print("  2. To use a different model instead, run 'plumb model <litellm-string>'")
+            console.print("  3. Run 'plumb init' again\n")
             raise SystemExit(1)
 
     console.print(f"\n[green]Plumb initialized successfully![/green]")
