@@ -24,7 +24,7 @@ The core LLM integration is designed with a WholeFileSpecUpdater that takes full
 The conversation log parser preserves full tool call information from every supported agent's transcripts. Tool calls are normalized to a `ToolCall` record with `name`, `category`, `file_path`/`file_paths`, `input_summary`, and `result_summary` using a nine-category tool taxonomy. Tool results are preserved in truncated form when the agent records them, to enable deterministic `file_refs` population and improve decision extraction quality.
 ### Design Principles
 - **Simple over clever.** Plumb solves a bounded problem. It should be holdable in a single programmer's head.- **DSPy for LLM workflows.** All LLM-powered functions are implemented as DSPy programs, not open-ended agents. This ensures they are controllable, auditable, and reliable.
-- **Inference via Claude.** Plumb uses the Anthropic Claude SDK (via the user's existing account) as its inference provider. Claude Haiku 4.5 (`claude-haiku-4-5`) serves as the default model for all programs; per-program overrides are configured in `program_models`.
+- **Inference through litellm model strings.** Plumb addresses models with litellm strings, so any provider litellm supports can serve inference. Anthropic's Claude Haiku 4.5 (`anthropic/claude-haiku-4-5`) is the default model for all programs. The `model` config field sets the model, and per-program overrides are configured in `program_models`.
 - **Non-intrusive.** Plumb operates as a git hook and CLI tool. It does not change how the user writes code.
 - **The commit is canonical.** In review mode the pre-commit hook ensures that every committed state has been reviewed and approved. A commit represents a fully reconciled snapshot of spec, tests, and code. In record mode the commit is still the unit of capture — decisions are extracted per landed commit and stamped with its SHA — but the gate is removed.
 - **Conversation analysis is opportunistic.** Plumb uses agent transcript data (Claude Code, Codex, Pi, Copilot CLI) when available. When it is not (e.g., committing from a bare terminal with no matching session), Plumb falls back to diff-only analysis. Decisions still get captured; they are just derived from code changes rather than reasoning.
@@ -64,7 +64,7 @@ The deduplication function must include fallback handling for truncated or faile
 
 The LLM deduplicator returns the indices of candidates to **remove** (duplicate or countermanded), so an empty or missing answer degrades to keeping everything. An LLM-proposed removal must additionally be corroborated by lexical overlap (token Jaccard ≥ 0.3) with some existing decision or another candidate; an uncorroborated removal is vetoed and the candidate kept, because silently dropping a genuinely new decision is worse than keeping a near-duplicate.
 ### Dependencies
-- `dspy` — LLM workflow programs and framework for implementing LLM-based components- `anthropic` — Claude SDK for inference
+- `dspy` — LLM workflow programs and framework for implementing LLM-based components- `litellm` — provider-neutral inference calls
 - `pytest` — test runner
 - `pytest-cov` — coverage reporting
 - `gitpython` — git history and diff access
@@ -214,6 +214,7 @@ Initializes Plumb in the current git repository.
      Mode (review, record) [review]:
      ```
      The answer is stored as `mode`; an empty answer means `review`.
+   - Confirm the inference model. The prompt reads `Plumb will use anthropic/claude-haiku-4-5 for analysis. Use this model? [Y/n]` and an empty answer accepts the default. On `n`, init asks for a provider (anthropic, openai, groq, gemini, ollama, other), suggests a litellm model string for that provider, and lets the user edit or accept it. The answer is stored as `model`.
 4. Validates pytest test collection:
    - Checks that pytest is installed
    - Verifies test files exist at the specified path
@@ -222,13 +223,14 @@ Initializes Plumb in the current git repository.
    - Skips collection validation for empty test directories to avoid false positives
    - On collection failure, displays both stdout and stderr to help user debug and fails fast with SystemExit(1)
    - Treats infrastructure issues like TimeoutExpired and FileNotFoundError as warnings, not blocking errors
-5. Writes `.plumb/config.json` with the provided paths.
+5. Writes `.plumb/config.json` with the provided paths, mode, and model.
 6. Creates a `.plumbignore` file in the project root if it does not exist.
 7. Installs the git pre-commit hook by writing a script to `.git/hooks/pre-commit` that calls `plumb hook`. Sets the script as executable.
 8. Installs the Claude Code skill locally by copying `plumb/skill/SKILL.md` to `.claude/skills/plumb/SKILL.md` in the project root. Creates `.claude/skills/plumb/` directories if they do not exist. This is a project-local installation only — Plumb never writes to the user's global `~/.claude/` directory.
 9. Appends a Plumb status block to `CLAUDE.md` and `AGENTS.md` at the project root (creating them if they do not exist). The block depends on the effective mode. See **CLAUDE.md Integration**.
 10. Runs `plumb parse-spec` to do an initial parse of the spec into requirements.
-11. Prints a confirmation summary to the terminal, including confirmation that the skill was installed at `.claude/skills/plumb/SKILL.md`.
+11. Verifies API access for the chosen model with `validate_api_access`. On failure it prints the missing credential and exits 1; running `plumb init` again completes the setup through the clone path.
+12. Prints a confirmation summary to the terminal, including confirmation that the skill was installed at `.claude/skills/plumb/SKILL.md`.
 
 **Config schema (`.plumb/config.json`):**
 ```json
@@ -240,13 +242,15 @@ Initializes Plumb in the current git repository.
   "last_commit_branch": null,
   "last_extracted_at": null,
   "mode": "review",
-  "record_threshold": null
+  "record_threshold": null,
+  "model": "anthropic/claude-haiku-4-5"
 }
 ```
 
 - `mode`: `"review"` | `"record"`. Validated on load.
 - `record_threshold`: `null` or a float in `0.0–1.0`. In record mode, decisions with `confidence >= record_threshold` are auto-recorded; the rest are written as `pending`. `null` records everything.
-- `load_config` is lenient: an invalid `mode` or `record_threshold` in `config.json` falls back to the default with a warning rather than disabling Plumb.
+- `model`: a litellm model string. Defaults to `anthropic/claude-haiku-4-5`. `plumb model` tests a new value before saving it.
+- `load_config` is lenient: an invalid `mode`, `record_threshold`, or `model` in `config.json` falls back to the default with a warning rather than disabling Plumb.
 
 ### `plumb mode [review|record]`
 Shows or sets the mode.
@@ -254,6 +258,14 @@ Shows or sets the mode.
 1. With no argument, prints the effective mode and its source, e.g. `record  (from env)` or `review  (from config)`.
 2. With an argument, writes `mode` to `config.json`, reinstalls the git hooks, rewrites the CLAUDE.md/AGENTS.md instruction block to match, and prints a confirmation. If `PLUMB_MODE` is set to a different value it warns that the environment variable overrides the saved mode in the current environment.
 3. Exits non-zero for an unknown mode or when Plumb is not initialized.
+
+### `plumb model [<litellm-string>]`
+Shows or sets the inference model.
+**Behavior:**
+1. With no argument, prints the model and its source, e.g. `anthropic/claude-haiku-4-5  (from default)` or `groq/llama-3.3-70b-versatile  (from config)`, plus one line per `program_models` override.
+2. With an argument, prints `Testing <model>...`, checks the provider credentials and runs a smoke test through `validate_api_access`, and saves the model to `config.json` only on success.
+3. On a failed check it prints the error, exits 1, and leaves the config unchanged.
+4. Exits non-zero when Plumb is not initialized.
 
 ### `plumb hook`
 Called automatically by the git pre-commit hook. Not intended to be called directly by users, but must work if called manually.
@@ -608,6 +620,7 @@ Present these gaps clearly so the user can prioritize.
 | `plumb parse-spec` | Re-parse spec after manual edits |
 | `plumb log [--since <ref>] [--verify]` | Show decisions grouped by commit and agent; `--verify` re-checks evidence against transcripts |
 | `plumb mode [review\|record]` | Show or set the mode; setting it reinstalls hooks and rewrites the CLAUDE.md/AGENTS.md block |
+| `plumb model [<litellm-string>]` | Show the inference model, or test and set a new one |
 | `plumb search [QUERY] [--sort …] [--status …] [--agent …] [--file …] [--since …] [--json]` | Search the decision log across branches; use before proposing a decision that may contradict a prior one |
 | `plumb record-extract <sha> [--branch <b>]` | Record-mode worker, launched by the post-commit hook — do not call manually |
 | `plumb review --recorded` | Walk auto-recorded decisions; reject records a reason, never modifies code |
@@ -848,12 +861,12 @@ Rules: one function per requirement, descriptive names (`test_<req_id>_<descript
 
 ---
 
-### `CodeModifier` (Claude API — not DSPy)
+### `CodeModifier` (litellm — not DSPy)
 Used by `plumb modify`. This is the one place in Plumb where an open-ended agent call is used rather than a DSPy program, because code modification is inherently open-ended.
 **Input:** staged diff, rejected decision, rejection reason, current spec  
 **Output:** modified file contents that satisfy the rejection while remaining consistent with the spec
 
-Called via the Anthropic API directly with a structured prompt using claude-haiku-4-5 model with max_tokens set to 16000. Handles multiple content block types in response parsing. Plumb applies the output, runs pytest, and stages the result only if tests pass.
+Called through `litellm.completion` with a structured prompt. The model comes from `program_models["code_modifier"]` when configured and otherwise from the config `model`, with max_tokens set to 16000. Parses the message content of the first choice. Plumb applies the output, runs pytest, and stages the result only if tests pass.
 ## Error Handling
 - All CLI commands fail gracefully with a clear error message if `config.json` is missing or malformed.- All DSPy programs retry on LLM failure (max 2 retries) then raise `PlumbInferenceError` with a human-readable message.
 - The git hook **never** exits non-zero due to an internal Plumb error. Failures print a warning to stderr and exit 0.

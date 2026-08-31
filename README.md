@@ -26,8 +26,10 @@ uv add plumb-dev
 
 ### Initialize
 
-Plumb uses Claude for analysis, so it needs an API key. Put one in your
-environment or in a `.env` file at the repo root.
+Plumb defaults to Anthropic's Haiku model, so it needs an `ANTHROPIC_API_KEY`.
+Put one in your environment or in a `.env` file at the repo root. If you
+configure a different provider with `plumb model`, set that provider's key
+instead.
 
 ```
 export ANTHROPIC_API_KEY=sk-ant-...
@@ -40,8 +42,8 @@ cd your-project
 plumb init
 ```
 
-Init asks where your spec markdown lives, where your tests live, and which
-mode Plumb should run in.
+Init asks where your spec markdown lives, where your tests live, which
+mode Plumb should run in, and which model it should use.
 
 ### The two modes
 
@@ -129,6 +131,7 @@ Plumb reads transcripts from Claude Code, Codex, Pi, and Copilot CLI (the Copilo
 | `plumb review` | Interactively review pending decisions in the terminal |
 | `plumb review --recorded` | Walk auto-recorded decisions; reject records a reason without modifying code |
 | `plumb mode [review\|record]` | Show or set how Plumb handles decisions |
+| `plumb model [<litellm-string>]` | Show the inference model, or test and set a new one |
 | `plumb approve <id>` | Approve a decision and sync it to spec/tests |
 | `plumb approve --all` | Approve all pending decisions at once |
 | `plumb reject <id> --reason "..."` | Reject a decision |
@@ -176,7 +179,7 @@ Commit this directory to version control.
 
 - Python 3.10+
 - A git repository
-- An `ANTHROPIC_API_KEY` environment variable or `.env` file (for LLM-powered analysis)
+- An API key for your inference provider, in the environment or a `.env` file. The default model is Anthropic's, so this is `ANTHROPIC_API_KEY` unless you pick another provider with `plumb model`.
 
 Note: `plumb init` needs the key, because it verifies API access and parses your spec. The hooks and `plumb sync` need it too. `plumb status`, `plumb log`, and `plumb search` work without it. `plumb review` works without it until you reject a decision in review mode, which runs the code modifier.
 

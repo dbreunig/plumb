@@ -154,5 +154,6 @@ var, then `.plumb/config.json`, default `review`). Everything above describes
 | `plumb log [--since <ref>] [--verify]` | Show decisions grouped by commit and agent; `--verify` re-checks evidence against transcripts |
 | `plumb parse-spec` | Re-parse spec after manual edits |
 | `plumb mode [review\|record]` | Show or set the mode; setting it reinstalls hooks and rewrites the CLAUDE.md/AGENTS.md block |
+| `plumb model [<litellm-string>]` | Show the inference model, or test and set a new one |
 | `plumb search [QUERY] [--sort relevance\|date\|confidence] [--status S]* [--agent A]* [--branch B] [--file PATH] [--made-by user\|agent] [--since DATE\|REF] [--limit N] [--json]` | Search the decision log across branches; use before proposing a decision that may contradict a prior one |
 | `plumb record-extract <sha> [--branch <b>]` | Record-mode worker, launched by the post-commit hook — do not call manually |

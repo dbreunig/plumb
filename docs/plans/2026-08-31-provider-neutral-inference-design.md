@@ -1,7 +1,7 @@
 # Provider-neutral inference
 
 **Date:** 2026-08-31
-**Status:** Proposed
+**Status:** Implemented
 
 ## Problem
 

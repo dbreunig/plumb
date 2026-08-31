@@ -940,14 +940,11 @@ def test_req_25437efe_litellm_inference():
     assert DEFAULT_MODEL and "/" in DEFAULT_MODEL
 
 
-def test_req_c48b8e7c_claude_sonnet_default_model():
+def test_req_c48b8e7c_haiku_default_model():
     # plumb:req-c48b8e7c
-    from plumb.config import PlumbConfig
-    
-    # Verify default model configuration
-    config = PlumbConfig(spec_files=[], test_paths=[])
-    # Default model should be Claude Sonnet 4.6 equivalent
-    assert True  # Model configuration verification
+    from plumb.config import DEFAULT_MODEL
+
+    assert DEFAULT_MODEL == "anthropic/claude-haiku-4-5"
 
 
 def test_req_972948b5_commit_represents_reconciled_snapshot():
