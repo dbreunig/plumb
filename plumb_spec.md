@@ -61,6 +61,8 @@ LLM-based deduplication must utilize Claude Haiku 4.5 as the designated model.
 The `deduplicate_decisions()` function must accept a `use_llm` parameter that defaults to False to ensure backward compatibility while enabling optional LLM-based deduplication.
 
 The deduplication function must include fallback handling for truncated or failed LLM responses by returning all candidates when the LLM returns None or produces truncated output.
+
+The LLM deduplicator returns the indices of candidates to **remove** (duplicate or countermanded), so an empty or missing answer degrades to keeping everything. An LLM-proposed removal must additionally be corroborated by lexical overlap (token Jaccard ≥ 0.3) with some existing decision or another candidate; an uncorroborated removal is vetoed and the candidate kept, because silently dropping a genuinely new decision is worse than keeping a near-duplicate.
 ### Dependencies
 - `dspy` — LLM workflow programs and framework for implementing LLM-based components- `anthropic` — Claude SDK for inference
 - `pytest` — test runner

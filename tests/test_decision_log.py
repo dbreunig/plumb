@@ -473,7 +473,7 @@ def test_dedup_treats_recorded_as_existing():
     class FakeDeduplicator:
         def __call__(self, candidates, existing):
             captured["existing"] = existing
-            return []
+            return [1]      # remove the (duplicate) candidate
 
     with patch("plumb.programs.decision_deduplicator.DecisionDeduplicator", FakeDeduplicator), \
          patch("plumb.programs.get_program_lm", return_value=None):
@@ -519,7 +519,7 @@ def test_dedup_caps_accepted_to_recency_window_plus_related():
     class FakeDeduplicator:
         def __call__(self, candidates, existing):
             captured["existing"] = existing
-            return [1]
+            return []      # nothing to remove
 
     with patch("plumb.programs.decision_deduplicator.DecisionDeduplicator", FakeDeduplicator), \
          patch("plumb.programs.get_program_lm", return_value=None):
@@ -560,3 +560,62 @@ class TestDuckdbRowConversionPerf:
         elapsed = time.perf_counter() - t0
         assert elapsed < 1.0, f"5000 rows took {elapsed:.2f}s"
         assert _to_python_native(row["created_at"]) == "2026-01-01T00:00:00+00:00"
+
+
+def test_llm_dedup_vetoes_uncorroborated_removals():
+    """An LLM-proposed removal with no lexical overlap against existing decisions
+    or other candidates is vetoed: record mode must not silently lose decisions."""
+    from plumb.decision_log import Decision, _llm_dedup
+    existing = [Decision(id="dec-e", status="recorded", question="Burst?",
+                         decision="Add a burst allowance so short spikes are tolerated.",
+                         created_at=datetime.now(timezone.utc).isoformat())]
+    cand = [Decision(id="dec-c", status="pending", question="Expose quota?",
+                     decision="Provide remaining() returning unused call count.")]
+
+    class FakeDeduplicator:
+        def __call__(self, candidates, existing):
+            return [1]      # LLM wrongly marks the only candidate as a duplicate
+
+    with patch("plumb.programs.decision_deduplicator.DecisionDeduplicator", FakeDeduplicator), \
+         patch("plumb.programs.get_program_lm", return_value=None):
+        result = _llm_dedup(cand, existing)
+    assert result == cand   # veto: no lexical evidence for the removal
+
+
+def test_llm_dedup_allows_corroborated_removals():
+    """A removal backed by strong lexical overlap (a real paraphrase/duplicate) stands."""
+    from plumb.decision_log import Decision, _llm_dedup
+    existing = [Decision(id="dec-e", status="approved", question="Cache strategy?",
+                         decision="Use an in-memory dict cache with TTL.",
+                         created_at=datetime.now(timezone.utc).isoformat())]
+    cand = [Decision(id="dec-c", status="pending", question="Cache strategy?",
+                     decision="Use an in-memory dict cache with a TTL.")]
+
+    class FakeDeduplicator:
+        def __call__(self, candidates, existing):
+            return [1]
+
+    with patch("plumb.programs.decision_deduplicator.DecisionDeduplicator", FakeDeduplicator), \
+         patch("plumb.programs.get_program_lm", return_value=None):
+        result = _llm_dedup(cand, existing)
+    assert result == []
+
+
+def test_llm_dedup_veto_considers_other_candidates():
+    """Intra-candidate duplicates corroborate each other even with no existing match."""
+    from plumb.decision_log import Decision, _llm_dedup
+    cand = [
+        Decision(id="dec-1", status="pending", question="Retry policy?",
+                 decision="Retry failed calls three times with backoff."),
+        Decision(id="dec-2", status="pending", question="Retry policy?",
+                 decision="Failed calls retry three times using backoff."),
+    ]
+
+    class FakeDeduplicator:
+        def __call__(self, candidates, existing):
+            return [2]
+
+    with patch("plumb.programs.decision_deduplicator.DecisionDeduplicator", FakeDeduplicator), \
+         patch("plumb.programs.get_program_lm", return_value=None):
+        result = _llm_dedup(cand, [])
+    assert [d.id for d in result] == ["dec-1"]

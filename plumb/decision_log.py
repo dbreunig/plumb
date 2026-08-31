@@ -439,6 +439,16 @@ def deduplicate_decisions(
     return result
 
 
+def _dedup_tokens(d: Decision) -> set[str]:
+    return set(_re.findall(r"[a-z0-9]+", f"{d.question or ''} {d.decision or ''}".lower()))
+
+
+def _jaccard(a: set[str], b: set[str]) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
 def _format_decision_line(index: int, d: Decision) -> str:
     q = d.question or ""
     dec = d.decision or ""
@@ -447,6 +457,8 @@ def _format_decision_line(index: int, d: Decision) -> str:
 
 # Accepted decisions sent to LLM dedup as "existing": the newest this many by
 # created_at, plus any older one sharing a file_ref file with a candidate.
+# Minimum token-Jaccard overlap for an LLM-proposed dedup removal to stand.
+DEDUP_EVIDENCE_THRESHOLD = 0.3
 MAX_ACCEPTED_FOR_DEDUP = 300
 
 _ACCEPTED_STATUSES = ("approved", "edited", "synced", "recorded")
@@ -520,23 +532,39 @@ def _llm_dedup(
     lm = override_lm or dspy.LM("anthropic/claude-haiku-4-5-20251001", max_tokens=32000)
     deduplicator = DecisionDeduplicator()
     with dspy.context(lm=lm):
-        unique_indices = deduplicator(
+        duplicate_indices = deduplicator(
             candidates=candidates_str, existing=existing_str
         )
 
-    print(f"[dedup:llm] LLM returned unique_indices: {unique_indices}", flush=True)
+    print(f"[dedup:llm] LLM returned duplicate_indices: {duplicate_indices}", flush=True)
 
-    # Handle truncated/failed LLM response - keep all candidates as fallback
-    if unique_indices is None:
+    # Handle truncated/failed LLM response - keep all candidates as fallback.
+    # The contract is inverted on purpose: the model names what to REMOVE, so
+    # an empty or missing answer degrades to keeping everything rather than
+    # silently dropping every candidate.
+    if duplicate_indices is None:
         print("[dedup:llm] WARNING: LLM returned None (possibly truncated), keeping all candidates", flush=True)
         return candidates
 
-    # Convert 1-based indices to 0-based, filter to valid range
-    valid = []
-    for idx in unique_indices:
-        zero_based = idx - 1
-        if 0 <= zero_based < len(candidates):
-            valid.append(zero_based)
-    kept = [candidates[i] for i in valid]
-    print(f"[dedup:llm] Keeping {len(kept)}/{len(candidates)} candidates (indices {valid})", flush=True)
+    removed = {idx - 1 for idx in duplicate_indices if 0 <= idx - 1 < len(candidates)}
+
+    # Evidence veto: a removal must be corroborated by lexical overlap with
+    # some existing decision or another candidate. LLM deduplicators have been
+    # observed to mark genuinely new decisions (a new method, parameter, or
+    # behavior in the same feature area) as duplicates; in record mode that is
+    # silent data loss, so an uncorroborated removal is kept instead.
+    others = [_dedup_tokens(d) for d in recent_existing]
+    cand_tokens = [_dedup_tokens(c) for c in candidates]
+    vetoed = set()
+    for i in sorted(removed):
+        pool = others + [t for j, t in enumerate(cand_tokens) if j != i]
+        best = max((_jaccard(cand_tokens[i], t) for t in pool), default=0.0)
+        if best < DEDUP_EVIDENCE_THRESHOLD:
+            vetoed.add(i)
+            print(f"[dedup:llm] VETO: keeping candidate {i + 1} (best overlap {best:.2f} "
+                  f"< {DEDUP_EVIDENCE_THRESHOLD}; an uncorroborated removal would silently lose it)", flush=True)
+    removed -= vetoed
+
+    kept = [c for i, c in enumerate(candidates) if i not in removed]
+    print(f"[dedup:llm] Removing {len(removed)}/{len(candidates)} candidates (indices {sorted(removed)})", flush=True)
     return kept

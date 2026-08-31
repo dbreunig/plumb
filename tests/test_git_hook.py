@@ -625,3 +625,25 @@ def test_extract_decisions_passes_hunks_through(initialized_repo):
          patch("plumb.git_hook._synthesize_questions", side_effect=lambda ds: ds):
         extract_decisions(initialized_repo, load_config(initialized_repo), diff="+x", branch="main", hunks=hunks)
     assert conv.call_args.kwargs["hunks"] is hunks
+
+
+def test_diff_only_fallback_carries_hunk_file_refs(initialized_repo):
+    from plumb.git_hook import extract_decisions
+    from plumb.config import load_config
+    from plumb.programs.decision_extractor import ExtractedDecision
+
+    extracted = [ExtractedDecision(question="Q?", decision="from diff", made_by="agent", confidence=0.7)]
+    with patch("plumb.programs.validate_api_access"), \
+         patch("plumb.git_hook._analyze_diff", return_value="summary"), \
+         patch("plumb.git_hook._extract_decisions_from_conversation", return_value=[]), \
+         patch("plumb.programs.run_with_retries", return_value=extracted), \
+         patch("plumb.git_hook._synthesize_questions", side_effect=lambda ds: ds):
+        out = extract_decisions(
+            initialized_repo, load_config(initialized_repo), diff="+x", branch="main",
+            hunks={"src/a.py": [[3, 5]], "src/b.py": [[1, 1]]},
+        )
+    assert len(out) == 1
+    d = out[0]
+    assert d.conversation_available is False
+    assert sorted((r.file, tuple(r.lines)) for r in d.file_refs) == [
+        ("src/a.py", (3, 5)), ("src/b.py", (1, 1))]

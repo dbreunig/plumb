@@ -262,7 +262,7 @@ class TestDecisionDeduplicatorSignature:
         sig = DecisionDeduplicatorSignature
         assert "candidates" in sig.input_fields
         assert "existing" in sig.input_fields
-        assert "unique_indices" in sig.output_fields
+        assert "duplicate_indices" in sig.output_fields
 
 
 class TestDecisionDeduplicatorModule:

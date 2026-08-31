@@ -199,11 +199,27 @@ def _extract_decisions_from_conversation(
     return all_decisions
 
 
-def _extract_decisions_from_diff(diff_summary: str, branch: str) -> list[Decision]:
-    """Fallback: extract decisions from diff summary alone."""
+def _extract_decisions_from_diff(
+    diff_summary: str,
+    branch: str,
+    hunks: dict[str, list[list[int]]] | None = None,
+    repo_root: str | Path | None = None,
+) -> list[Decision]:
+    """Fallback: extract decisions from diff summary alone.
+
+    With no transcript there are no tool calls to intersect with the staged
+    hunks, so every diff-only decision carries the whole diff's file refs —
+    coarse, but it keeps `plumb search --file` and sync's code context working.
+    """
     from plumb.programs import configure_dspy, run_with_retries
     from plumb.programs.decision_extractor import DecisionExtractor
+    from plumb.traces.hunks import file_refs_for
 
+    file_refs = (
+        file_refs_for(list(hunks), hunks, repo_root)
+        if hunks and repo_root is not None
+        else []
+    )
     configure_dspy()
     extractor = DecisionExtractor()
     now = datetime.now(timezone.utc).isoformat()
@@ -232,6 +248,7 @@ def _extract_decisions_from_diff(diff_summary: str, branch: str) -> list[Decisio
                 confidence=ed.confidence,
                 conversation_available=False,
                 created_at=now,
+                file_refs=file_refs,
             )
         )
     return decisions
@@ -326,7 +343,13 @@ def extract_decisions(
             hunks=hunks,
         )
         if not decisions:
-            decisions = _extract_decisions_from_diff(diff_summary, branch)
+            if hunks is None:
+                from plumb.traces.hunks import staged_hunks
+
+                hunks = staged_hunks(Repo(repo_root))
+            decisions = _extract_decisions_from_diff(
+                diff_summary, branch, hunks=hunks, repo_root=repo_root
+            )
 
     # Merge/dedup (also filter against already-resolved decisions)
     with _timed("Dedup"):
