@@ -2,13 +2,20 @@
 Tests validate Signature fields, Pydantic model schemas, and mock forward() calls."""
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import dspy
 import pytest
 
 from plumb.programs import run_with_retries, configure_dspy, validate_api_access, get_program_lm
-from plumb.config import PlumbConfig, save_config, ensure_plumb_dir
+from plumb.config import (
+    DEFAULT_MODEL,
+    PlumbConfig,
+    ensure_plumb_dir,
+    load_config,
+    save_config,
+)
 from plumb import PlumbAuthError, PlumbInferenceError
 from plumb.programs.diff_analyzer import (
     ChangeSummary,
@@ -354,43 +361,96 @@ class TestCodeModifier:
         result = CodeModifier._parse_response("no json here")
         assert result == {}
 
-    def test_modify_calls_api(self):
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.content = [
-            MagicMock(type="text", text='```json\n{"src/a.py": "modified"}\n```')
-        ]
-        mock_client.messages.create.return_value = mock_response
+    @staticmethod
+    def _completion_response(text):
+        """A litellm-shaped completion response."""
+        response = MagicMock()
+        response.choices = [MagicMock()]
+        response.choices[0].message.content = text
+        return response
 
-        modifier = CodeModifier(client=mock_client)
-        result = modifier.modify(
-            staged_diff="diff content",
-            decision="Use async",
-            rejection_reason="Too complex",
-            spec_content="# Spec",
-        )
+    def test_modify_calls_api(self, tmp_path):
+        with patch("litellm.completion") as mock_completion:
+            mock_completion.return_value = self._completion_response(
+                '```json\n{"src/a.py": "modified"}\n```'
+            )
+            modifier = CodeModifier(repo_root=tmp_path)
+            result = modifier.modify(
+                staged_diff="diff content",
+                decision="Use async",
+                rejection_reason="Too complex",
+                spec_content="# Spec",
+            )
         assert result == {"src/a.py": "modified"}
-        mock_client.messages.create.assert_called_once()
+        mock_completion.assert_called_once()
 
-    def test_prompt_includes_all_inputs(self):
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.content = [MagicMock(type="text", text="{}")]
-        mock_client.messages.create.return_value = mock_response
-
-        modifier = CodeModifier(client=mock_client)
+    def test_prompt_includes_all_inputs(self, tmp_path):
+        fake = MagicMock(return_value=self._completion_response("{}"))
+        modifier = CodeModifier(repo_root=tmp_path, completion_fn=fake)
         modifier.modify(
             staged_diff="my diff",
             decision="decision text",
             rejection_reason="reason text",
             spec_content="spec text",
         )
-        call_args = mock_client.messages.create.call_args
-        prompt = call_args[1]["messages"][0]["content"]
+        prompt = fake.call_args.kwargs["messages"][0]["content"]
         assert "my diff" in prompt
         assert "decision text" in prompt
         assert "reason text" in prompt
         assert "spec text" in prompt
+
+    def test_modify_defaults_to_default_model(self, tmp_path):
+        """No .plumb config at all: falls back to DEFAULT_MODEL, max_tokens 16000."""
+        fake = MagicMock(return_value=self._completion_response("{}"))
+        CodeModifier(repo_root=tmp_path, completion_fn=fake).modify(
+            staged_diff="d", decision="x", rejection_reason="r", spec_content="s",
+        )
+        kwargs = fake.call_args.kwargs
+        assert kwargs["model"] == DEFAULT_MODEL
+        assert kwargs["max_tokens"] == 16000
+
+    def test_modify_defaults_to_config_model(self, initialized_repo):
+        """No per-program override: uses the config-wide model."""
+        cfg = load_config(initialized_repo)
+        cfg.model = "groq/llama-3.3-70b-versatile"
+        save_config(initialized_repo, cfg)
+        fake = MagicMock(return_value=self._completion_response("{}"))
+        CodeModifier(repo_root=initialized_repo, completion_fn=fake).modify(
+            staged_diff="d", decision="x", rejection_reason="r", spec_content="s",
+        )
+        kwargs = fake.call_args.kwargs
+        assert kwargs["model"] == "groq/llama-3.3-70b-versatile"
+        assert kwargs["max_tokens"] == 16000
+
+    def test_modify_uses_program_model_override(self, initialized_repo):
+        """program_models["code_modifier"] wins; max_tokens defaults to 16000."""
+        cfg = load_config(initialized_repo)
+        cfg.program_models = {"code_modifier": {"model": "openai/gpt-4.1-mini"}}
+        save_config(initialized_repo, cfg)
+        fake = MagicMock(return_value=self._completion_response("{}"))
+        CodeModifier(repo_root=initialized_repo, completion_fn=fake).modify(
+            staged_diff="d", decision="x", rejection_reason="r", spec_content="s",
+        )
+        kwargs = fake.call_args.kwargs
+        assert kwargs["model"] == "openai/gpt-4.1-mini"
+        assert kwargs["max_tokens"] == 16000
+
+    def test_modify_honors_override_max_tokens(self, initialized_repo):
+        cfg = load_config(initialized_repo)
+        cfg.program_models = {
+            "code_modifier": {"model": "openai/gpt-4.1-mini", "max_tokens": 4096},
+        }
+        save_config(initialized_repo, cfg)
+        fake = MagicMock(return_value=self._completion_response("{}"))
+        CodeModifier(repo_root=initialized_repo, completion_fn=fake).modify(
+            staged_diff="d", decision="x", rejection_reason="r", spec_content="s",
+        )
+        assert fake.call_args.kwargs["max_tokens"] == 4096
+
+    def test_no_anthropic_import(self):
+        import plumb.programs.code_modifier as cm
+        source = Path(cm.__file__).read_text()
+        assert "import anthropic" not in source
 
 
 class TestGetProgramLm:

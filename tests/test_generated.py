@@ -930,13 +930,14 @@ def test_req_43da8ed8_llm_functions_as_dspy_programs():
     assert hasattr(extractor, "forward") or hasattr(extractor, "__call__")
 
 
-def test_req_25437efe_anthropic_claude_sdk():
+def test_req_25437efe_litellm_inference():
     # plumb:req-25437efe
     try:
-        import anthropic
-        assert True  # Claude SDK is available
+        import litellm  # noqa: F401
     except ImportError:
-        assert False, "Anthropic Claude SDK must be available"
+        assert False, "litellm must be available for inference"
+    from plumb.config import DEFAULT_MODEL
+    assert DEFAULT_MODEL and "/" in DEFAULT_MODEL
 
 
 def test_req_c48b8e7c_claude_sonnet_default_model():

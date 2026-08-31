@@ -10,7 +10,6 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "dspy",
-    "anthropic",
     "pytest",
     "pytest-cov",
     "gitpython",

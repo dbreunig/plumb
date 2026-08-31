@@ -616,7 +616,7 @@ def _run_modify(repo_root: Path, decision_id: str) -> None:
     decision_branch = find_decision_branch(repo_root, decision_id)
 
     try:
-        modifier = CodeModifier()
+        modifier = CodeModifier(repo_root=repo_root)
         modifications = modifier.modify(
             staged_diff=staged_diff,
             decision=target.decision or "",
