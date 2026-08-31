@@ -24,8 +24,7 @@ class CodeModifier:
     def _resolve_model(self) -> tuple[str, int]:
         """The (model, max_tokens) to use: the program_models["code_modifier"]
         override if configured, else the config-wide model."""
-        from plumb.config import find_repo_root, load_config
-        from plumb.programs import resolve_model
+        from plumb.config import DEFAULT_MODEL, find_repo_root, load_config
 
         repo_root = self.repo_root if self.repo_root is not None else find_repo_root()
         if repo_root is not None:
@@ -34,7 +33,8 @@ class CodeModifier:
                 entry = cfg.program_models.get("code_modifier") or {}
                 if entry.get("model"):
                     return entry["model"], entry.get("max_tokens", 16000)
-        return resolve_model(repo_root), 16000
+                return cfg.model, 16000
+        return DEFAULT_MODEL, 16000
 
     def modify(
         self,
@@ -83,6 +83,8 @@ Return format:
             messages=[{"role": "user", "content": prompt}],
         )
 
+        if not response.choices:
+            raise ValueError("model returned no choices")
         text = response.choices[0].message.content or ""
         return self._parse_response(text)
 

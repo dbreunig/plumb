@@ -42,6 +42,7 @@ def validate_api_access(repo_root=None, model=None):
     from plumb.programs import validate_api_access as _validate
     return _validate(repo_root=repo_root, model=model)
 
+
 def _quiet_broken_pipe() -> None:
     """stdout's reader went away (e.g. `plumb search | head`): stop printing
     and exit cleanly instead of tracing back."""

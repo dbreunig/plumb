@@ -447,6 +447,16 @@ class TestCodeModifier:
         )
         assert fake.call_args.kwargs["max_tokens"] == 4096
 
+    def test_modify_raises_on_empty_choices(self, tmp_path):
+        response = MagicMock()
+        response.choices = []
+        fake = MagicMock(return_value=response)
+        modifier = CodeModifier(repo_root=tmp_path, completion_fn=fake)
+        with pytest.raises(ValueError, match="no choices"):
+            modifier.modify(
+                staged_diff="d", decision="x", rejection_reason="r", spec_content="s",
+            )
+
     def test_no_anthropic_import(self):
         import plumb.programs.code_modifier as cm
         source = Path(cm.__file__).read_text()
