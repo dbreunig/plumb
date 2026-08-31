@@ -45,11 +45,11 @@ mode Plumb should run in.
 
 ### The two modes
 
-Review mode stops each commit until you approve, ignore, or reject the
+**Review mode** stops each commit until you approve, ignore, or reject the
 decisions Plumb found. Use it when you want to check every decision before
 it lands, e.g., on a codebase where the spec is the contract.
 
-Record mode never blocks a commit. After each commit, a background worker
+**Record mode** never blocks a commit. After each commit, a background worker
 extracts the decisions and appends them to the log with the commit SHA.
 Use it when agents commit often or work unattended, and review the log
 later with `plumb log`, `plumb search`, and `plumb review --recorded`.
@@ -71,34 +71,49 @@ your review, and `plumb sync` folds approved decisions into the spec and
 tests. In record mode the commit lands immediately, and you sync when you
 choose.
 
-## How It Works
+## How it works
 
-### Committing inside Claude Code
+### Review mode, inside Claude Code
 
-1. You run `git commit` (or Claude Code does)
-2. The pre-commit hook fires, analyzes the staged diff and the agent transcripts for this repo
-3. It writes pending decisions and exits non-zero, aborting the commit
+1. You run `git commit`, or Claude Code does
+2. The pre-commit hook fires and analyzes the staged diff and the agent transcripts for this repo
+3. It writes pending decisions and exits non-zero, which aborts the commit
 4. Claude Code's skill reads the output and presents each decision:
    > **Question:** Should we cache API responses in memory or on disk?
    > **Decision made:** In-memory cache using a dict.
-   > Approve, reject, or edit?
-5. You respond in chat. The skill calls `plumb approve`, `plumb reject`, or `plumb edit`
+   > Approve, ignore, reject, or edit?
+5. You answer in chat. The skill calls `plumb approve`, `plumb ignore`, `plumb reject`, or `plumb edit`
 6. Rejected decisions trigger `plumb modify`, which rewrites the staged code
-7. Once all decisions are resolved, `git commit` runs again and lands
+7. The skill runs `plumb sync`, which folds the approved decisions into your spec and tests, and stages the result
+8. `git commit` runs again and lands
 
-### Committing from the terminal
+### Review mode, from the terminal
 
-Same flow, but you drive it with `plumb review` instead of the skill.
+The flow is the same, but you resolve the decisions with `plumb review`.
+Then you run `plumb sync`, stage its output, and commit again.
 
-### Record mode details
+### Record mode
 
-Set `record_threshold` in `.plumb/config.json` to auto-record only confident
-decisions. Decisions below the threshold are written as `pending`, and you
-review them in a batch whenever you like. `plumb status` shows how many
-recorded decisions have not been synced yet. Agents can also force a mode
-for one run with the `PLUMB_MODE` environment variable, without touching the
-committed config. Rejecting a recorded decision never rewrites code, because
-the code is already committed.
+Nothing intercepts the commit. It lands immediately, and the post-commit
+hook starts a background worker. The worker extracts decisions from the
+commit's diff and the agent transcripts, and appends them to the log with
+the commit SHA. This works the same whether you commit from the terminal
+or an agent does.
+
+Inside Claude Code, the Plumb block tells the agent to check `plumb log`
+before ending a session and mention notable recorded decisions, and to run
+`plumb search` before proposing something that may contradict a prior
+decision. You review the record whenever you like with `plumb log`,
+`plumb search`, and `plumb review --recorded`, and you run `plumb sync`
+when you want the spec and tests updated.
+
+Set `record_threshold` in `.plumb/config.json` to auto-record only
+confident decisions. Decisions below the threshold are written as
+`pending`, and you review them in a batch whenever you like. `plumb status`
+shows how many recorded decisions have not been synced yet. Agents can
+force a mode for one run with the `PLUMB_MODE` environment variable,
+without touching the committed config. Rejecting a recorded decision never
+rewrites code, because the code is already committed.
 
 ### Which agents Plumb reads
 
