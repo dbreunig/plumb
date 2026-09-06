@@ -121,6 +121,37 @@ rewrites code, because the code is already committed.
 
 Plumb reads transcripts from Claude Code, Codex, Pi, and Copilot CLI (the Copilot adapter is unverified against live sessions). Sessions are matched to your repo by the working directory each agent records in its transcript, so linked worktrees attribute to the main repo and no path configuration is needed. Subagent sessions are read too. Every decision records which agent, session, and turn range it came from; `plumb log` shows decisions grouped by commit and agent, and `plumb log --verify` re-checks that evidence against the transcripts on disk.
 
+## Models
+
+Plumb addresses models with litellm strings, so any provider litellm supports
+can serve inference. The default is `anthropic/claude-haiku-4-5`. During
+`plumb init` you can keep the default or pick from these suggestions:
+
+| Provider | Suggested model | Key to set |
+|---|---|---|
+| anthropic | `anthropic/claude-haiku-4-5` | `ANTHROPIC_API_KEY` |
+| openai | `openai/gpt-4.1-mini` | `OPENAI_API_KEY` |
+| groq | `groq/llama-3.3-70b-versatile` | `GROQ_API_KEY` |
+| gemini | `gemini/gemini-2.0-flash` | `GEMINI_API_KEY` |
+| ollama | `ollama/llama3.1` | `OLLAMA_API_BASE` (a URL, no key) |
+
+Any other litellm string works too. See the
+[litellm provider list](https://docs.litellm.ai/docs/providers).
+
+Change the model at any time with `plumb model <litellm-string>`. The command
+tests the new model first and saves it only when the test passes. A failed
+test leaves your config unchanged. Run `plumb model` with no argument to see
+the current model and any per-program overrides.
+
+You can override the model for a single Plumb program in
+`.plumb/config.json`, e.g., to run deduplication on Groq:
+
+```json
+"program_models": {
+  "decision_deduplicator": { "model": "groq/llama-3.3-70b-versatile", "max_tokens": 8192 }
+}
+```
+
 ## Commands
 
 | Command | What it does |
