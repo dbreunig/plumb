@@ -163,10 +163,10 @@ def test_other_validation_errors_still_return_none(tmp_repo):
 def test_ensure_plumb_dir_ignores_record_runtime_files(tmp_path):
     ensure_plumb_dir(tmp_path)
     gi = tmp_path / ".plumb" / ".gitignore"
-    assert gi.read_text() == "record.log\nrecord.lock\n"
+    assert gi.read_text() == "record.log\nrecord.lock\ngate.json\n"
     gi.write_text("custom\n")
-    ensure_plumb_dir(tmp_path)  # idempotent: never clobbers an existing file
-    assert gi.read_text() == "custom\n"
+    ensure_plumb_dir(tmp_path)  # appends missing entries, keeps existing lines
+    assert gi.read_text() == "custom\nrecord.log\nrecord.lock\ngate.json\n"
 
 
 def test_model_field_defaults_and_roundtrip(tmp_repo):
