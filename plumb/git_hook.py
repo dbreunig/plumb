@@ -35,7 +35,7 @@ def _get_staged_diff(repo: Repo) -> str:
 
 def _get_plumb_managed_paths(config) -> list[str]:
     """Return paths managed by plumb that should be excluded from diff analysis."""
-    return [".plumb/"] + list(config.spec_paths)
+    return [".plumb/"] + list(config.spec_paths) + list(config.test_paths)
 
 
 def _filter_paths(repo: Repo, config, paths: list[str]) -> list[str]:

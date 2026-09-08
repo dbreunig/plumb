@@ -53,6 +53,46 @@ class TestGetPlumbManagedPaths:
         paths = _get_plumb_managed_paths(cfg)
         assert len(paths) == 3  # .plumb/ + 2 spec paths
 
+    def test_includes_test_paths(self, sample_config):
+        paths = _get_plumb_managed_paths(sample_config)
+        assert "tests/" in paths
+
+    def test_spec_and_test_paths(self):
+        from plumb.config import PlumbConfig
+        cfg = PlumbConfig(spec_paths=["spec.md"], test_paths=["tests/", "spec_tests/"])
+        paths = _get_plumb_managed_paths(cfg)
+        assert paths == [".plumb/", "spec.md", "tests/", "spec_tests/"]
+
+
+class TestFilterPathsTestPaths:
+    def test_drops_test_files_keeps_others(self, initialized_repo):
+        from plumb.config import load_config
+        from plumb.git_hook import _filter_paths
+
+        repo = Repo(initialized_repo)
+        config = load_config(initialized_repo)
+        kept = _filter_paths(repo, config, ["app.py", "tests/test_app.py"])
+        assert kept == ["app.py"]
+
+    def test_tests_only_staging_yields_empty_diff(self, initialized_repo):
+        from plumb.config import load_config
+
+        repo = Repo(initialized_repo)
+        (initialized_repo / "tests" / "test_app.py").write_text("def test_x():\n    assert True\n")
+        repo.index.add(["tests/test_app.py"])
+        config = load_config(initialized_repo)
+        assert _get_staged_diff_filtered(repo, config) == ""
+
+    def test_hook_skips_extraction_for_tests_only_commit(self, initialized_repo):
+        repo = Repo(initialized_repo)
+        (initialized_repo / "tests" / "test_app.py").write_text("def test_x():\n    assert True\n")
+        repo.index.add(["tests/test_app.py"])
+
+        with patch("plumb.git_hook.extract_decisions") as extract:
+            result = run_hook(initialized_repo)
+        assert result == 0
+        extract.assert_not_called()
+
 
 class TestGetStagedDiffFiltered:
     def test_excludes_spec_file(self, initialized_repo):
