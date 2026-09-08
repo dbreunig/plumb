@@ -687,3 +687,125 @@ def test_diff_only_fallback_carries_hunk_file_refs(initialized_repo):
     assert d.conversation_available is False
     assert sorted((r.file, tuple(r.lines)) for r in d.file_refs) == [
         ("src/a.py", (3, 5)), ("src/b.py", (1, 1))]
+
+
+# --- Gate idempotence (reviewed-diff short-circuit) -------------------------
+
+from plumb.config import load_config
+from plumb.gate import diff_signature, read_gate_state, write_gate_state
+from plumb.git_hook import extract_decisions, run_post_commit
+
+
+def _stage_code(repo_root, name="feature.py", content="x = 1\n"):
+    repo = Repo(repo_root)
+    (repo_root / name).write_text(content)
+    repo.index.add([name])
+    return repo
+
+
+def _pending_decision(dec_id="dec-gate1"):
+    return Decision(
+        id=dec_id,
+        status="pending",
+        question="Q?",
+        decision="A.",
+        made_by="user",
+        confidence=0.9,
+    )
+
+
+def _current_signature(repo_root):
+    repo = Repo(repo_root)
+    config = load_config(repo_root)
+    return diff_signature(repo_root, _get_staged_diff_filtered(repo, config))
+
+
+class TestGateIdempotence:
+    def test_block_writes_gate_state_then_clean_rerun_short_circuits(self, initialized_repo):
+        repo = _stage_code(initialized_repo)
+        branch = _get_branch_name(repo)
+
+        with patch("plumb.git_hook.extract_decisions", return_value=[_pending_decision()]):
+            assert run_hook(initialized_repo) == 1
+        state = read_gate_state(initialized_repo)
+        assert state is not None
+        assert state["diff_signature"] == _current_signature(initialized_repo)
+
+        # Resolve the pending decision (latest line wins)
+        append_decision(initialized_repo, _pending_decision().model_copy(
+            update={"status": "approved"}), branch=branch)
+
+        with patch(
+            "plumb.git_hook.extract_decisions",
+            side_effect=AssertionError("must not run"),
+        ) as extract:
+            assert run_hook(initialized_repo) == 0
+        extract.assert_not_called()
+        assert read_gate_state(initialized_repo) is None
+
+    def test_changed_signature_reextracts_without_diff_fallback(self, initialized_repo):
+        repo = _stage_code(initialized_repo)
+        branch = _get_branch_name(repo)
+
+        with patch("plumb.git_hook.extract_decisions", return_value=[_pending_decision()]):
+            assert run_hook(initialized_repo) == 1
+        append_decision(initialized_repo, _pending_decision().model_copy(
+            update={"status": "approved"}), branch=branch)
+
+        # The agent stages more code after review; the signature changes.
+        _stage_code(initialized_repo, name="extra.py", content="y = 2\n")
+
+        with patch("plumb.git_hook.extract_decisions", return_value=[]) as extract:
+            assert run_hook(initialized_repo) == 0
+        extract.assert_called_once()
+        assert extract.call_args.kwargs["allow_diff_fallback"] is False
+
+    def test_unresolved_pendings_still_block_and_rewrite_state(self, initialized_repo):
+        _stage_code(initialized_repo)
+
+        with patch("plumb.git_hook.extract_decisions", return_value=[_pending_decision()]):
+            assert run_hook(initialized_repo) == 1
+        first = read_gate_state(initialized_repo)
+
+        with patch("plumb.git_hook.extract_decisions", return_value=[]):
+            assert run_hook(initialized_repo) == 1
+        second = read_gate_state(initialized_repo)
+        assert second["diff_signature"] == first["diff_signature"]
+        assert second["created_at"] != first["created_at"]
+
+    def test_dry_run_ignores_gate_state(self, initialized_repo):
+        _stage_code(initialized_repo)
+        signature = _current_signature(initialized_repo)
+        write_gate_state(initialized_repo, signature)
+        gate_file = initialized_repo / ".plumb" / "gate.json"
+        before = gate_file.read_text()
+
+        with patch("plumb.git_hook.extract_decisions", return_value=[]) as extract:
+            assert run_hook(initialized_repo, dry_run=True) == 0
+        extract.assert_called_once()
+        assert gate_file.read_text() == before
+
+    def test_run_post_commit_clears_gate_state(self, initialized_repo):
+        write_gate_state(initialized_repo, "abc123")
+        repo = Repo(initialized_repo)
+        (initialized_repo / "f.txt").write_text("f\n")
+        repo.index.add(["f.txt"])
+        repo.index.commit("second")
+
+        run_post_commit(initialized_repo)
+        assert read_gate_state(initialized_repo) is None
+
+
+def test_extract_decisions_fallback_suppressed(initialized_repo):
+    with patch("plumb.programs.validate_api_access"), \
+         patch("plumb.git_hook._analyze_diff", return_value="summary"), \
+         patch("plumb.git_hook.read_conversation_with_refs", return_value=([], {})), \
+         patch("plumb.git_hook._extract_decisions_from_diff",
+               side_effect=AssertionError("must not run")) as diff_extract, \
+         patch("plumb.git_hook._synthesize_questions", side_effect=lambda ds: ds):
+        out = extract_decisions(
+            initialized_repo, load_config(initialized_repo), diff="+x", branch="main",
+            allow_diff_fallback=False,
+        )
+    assert out == []
+    diff_extract.assert_not_called()

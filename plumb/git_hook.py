@@ -19,6 +19,12 @@ from plumb.conversation import (
     chunk_conversation,
 )
 from plumb import record
+from plumb.gate import (
+    clear_gate_state,
+    diff_signature,
+    read_gate_state,
+    write_gate_state,
+)
 from plumb.decision_log import (
     Decision,
     generate_decision_id,
@@ -304,6 +310,7 @@ def extract_decisions(
     since_datetime: str | None = None,
     hunks: dict[str, list[list[int]]] | None = None,
     timings: list | None = None,
+    allow_diff_fallback: bool = True,
 ) -> list[Decision]:
     """Stages 1–2 for one diff: analyze, read transcripts since the cutoff, extract,
     dedup against the existing log, synthesize questions. Writes nothing.
@@ -311,7 +318,9 @@ def extract_decisions(
     Shared by review mode (pre-commit, staged diff) and record mode (post-commit,
     landed commit's diff). ``since_commit`` / ``since_datetime`` default to the
     config's cutoffs when ``None``; ``hunks`` defaults to the staged hunks. If
-    ``timings`` is given, ``(label, seconds)`` is appended per stage."""
+    ``timings`` is given, ``(label, seconds)`` is appended per stage.
+    ``allow_diff_fallback=False`` suppresses the diff-only extraction fallback;
+    the pre-commit hook passes it inside an active review cycle."""
     repo_root = Path(repo_root)
     repo = Repo(repo_root)
 
@@ -342,7 +351,7 @@ def extract_decisions(
             since_datetime=since_datetime,
             hunks=hunks,
         )
-        if not decisions:
+        if not decisions and allow_diff_fallback:
             if hunks is None:
                 from plumb.traces.hunks import staged_hunks
 
@@ -463,19 +472,40 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
         if _detect_amend(repo, config.last_commit):
             delete_decisions_by_commit(repo_root, config.last_commit, branch=branch)
 
-    # 4. Analyze, extract, dedup, synthesize (shared with record mode)
+    # 4. Reviewed-diff short-circuit. A re-run over an already-reviewed diff
+    # with zero pending decisions passes without any LLM work. Dry runs
+    # (`plumb diff`) neither read nor write gate state.
+    signature = None
+    state = None
+    if not dry_run:
+        with _timed("Gate check"):
+            signature = diff_signature(repo_root, diff)
+            state = read_gate_state(repo_root)
+            if (
+                state is not None
+                and state.get("diff_signature") == signature
+                and not any(
+                    d.status == "pending" for d in read_all_decisions(repo_root)
+                )
+            ):
+                clear_gate_state(repo_root)
+                _print_timings()
+                return 0
+
+    # 5. Analyze, extract, dedup, synthesize (shared with record mode)
     conv_decisions = extract_decisions(
-        repo_root, config, diff, branch, timings=timings
+        repo_root, config, diff, branch, timings=timings,
+        allow_diff_fallback=(state is None),
     )
 
-    # 5. Write decisions (unless dry_run)
+    # 6. Write decisions (unless dry_run)
     with _timed("Write decisions"):
         if not dry_run and conv_decisions:
             append_decisions(repo_root, conv_decisions, branch=branch)
             config.last_extracted_at = datetime.now(timezone.utc).isoformat()
             save_config(repo_root, config)
 
-    # 6. Check pending decisions
+    # 7. Check pending decisions
     with _timed("Check pending"):
         if dry_run:
             _print_timings()
@@ -489,6 +519,8 @@ def _run_hook_inner(repo_root: str | Path | None, dry_run: bool) -> int:
         pending = [d for d in all_decisions if d.status == "pending"]
 
     if pending:
+        # Record the reviewed diff so a clean re-run can short-circuit.
+        write_gate_state(repo_root, signature)
         _print_timings()
         is_tty = sys.stdout.isatty()
         if is_tty:
@@ -538,6 +570,8 @@ def run_post_commit(repo_root: str | Path | None = None) -> None:
         config.last_commit_branch = branch
         config.last_extracted_at = None
         save_config(repo_root, config)
+        # A landed commit ends the review cycle; drop the reviewed-diff record.
+        clear_gate_state(repo_root)
 
         if prev_dt is not None:
             _stamp_commit_sha(repo_root, new_sha, branch, prev_dt)
