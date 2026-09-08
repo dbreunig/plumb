@@ -73,9 +73,10 @@ following:
 5. Stage any files changed by sync (spec files, generated tests), then re-run
    `git commit`. Draft the commit message **after** decision review is complete
    and include a summary of approved decisions (e.g. "Approved: dec-abc123
-   (added caching), dec-def456 (fixed retry logic)"). The hook will fire again.
-   If there are no pending decisions it will exit 0 and the commit will land.
-   If new decisions are found (rare), repeat the review process.
+   (added caching), dec-def456 (fixed retry logic)"). The hook fires again,
+   recognizes the already-reviewed diff, and exits 0 without re-analysis. The
+   commit lands. If new code was staged after review, the hook analyzes the
+   changed diff and may find new decisions; repeat the review process.
 
 ### After committing
 Run `plumb coverage` and briefly report the three coverage dimensions to the

@@ -144,7 +144,7 @@ This is the primary workflow. The user works inside a Claude Code session. When 
 1. The hook validates API access before proceeding with analysis. If API authentication fails, the hook must exit non-zero and block the commit.
 2. The hook analyzes the staged diff and the agent transcripts for this repository. Every registered `TraceSource` (Claude Code, Codex, Pi, Copilot CLI) discovers the sessions whose recorded `cwd` resolves to this repository and normalizes them into turns (see **Conversation Log Parsing and Chunking**).
 3. It writes pending decisions to branch-specific decision log files with filesystem-safe path sanitization and sets the `last_extracted_at` timestamp.
-4. It **prints a machine-readable JSON summary of pending decisions to stdout** and **exits non-zero**, aborting the commit.
+4. It writes a signature of the reviewed staged diff to `.plumb/gate.json`, **prints a machine-readable JSON summary of pending decisions to stdout**, and **exits non-zero**, aborting the commit.
 5. Claude Code's skill reads that output and begins presenting decisions to the user using AskUserQuestion format, one at a time:
    > "Plumb found 3 decisions before this commit. Here's the first one:
    > **Question:** Should we cache API responses in memory or on disk?
@@ -152,13 +152,17 @@ This is the primary workflow. The user works inside a Claude Code session. When 
    > Approve, reject, or edit?"
 6. The user responds in the chat. The skill calls the appropriate per-decision command (`plumb approve <id>`, `plumb reject <id>`, or `plumb edit <id> "<text>"`). The system includes explicit safeguards to never approve, reject, or edit decisions on the user's behalf. Users can approve multiple pending decisions efficiently using the `--all` flag with the approve command. Decision operations support branch-specific handling through branch parameter support.
 7. For **rejected** decisions, the skill invokes `plumb modify <id>` (see below), which modifies the staged code, runs tests, and reports the result conversationally.
-8. Once all decisions are resolved, the skill re-runs `git commit`. The hook fires again, finds no pending decisions, exits zero, and the commit lands. The system drafts commit messages after decision review and includes the list of approved decisions.
+8. Once all decisions are resolved, the skill re-runs `git commit`. The hook fires again, matches the staged diff signature against `.plumb/gate.json`, finds zero pending decisions, and exits zero without any re-analysis. The commit lands. The system drafts commit messages after decision review and includes the list of approved decisions.
 
 **The commit only lands when there are zero pending decisions.**
 
+The hook stores a reviewed-diff signature whenever it blocks. The signature is the first field of `git patch-id --stable` computed over the filtered staged diff, and an empty filtered diff uses the literal signature `empty`. The signature and a creation timestamp live in `.plumb/gate.json`. On a later run the hook compares the current signature to the stored one. When they match and zero pending decisions remain, the hook deletes the file and exits zero without reading transcripts or calling the LLM. When gate state exists but the signature differs, the hook re-runs extraction and suppresses the diff-only extraction fallback. `.plumb/gate.json` is transient, per-machine, and gitignored via `.plumb/.gitignore`. The post-commit hook deletes it after every commit in both modes. `plumb diff` and `plumb hook --dry-run` neither read nor write it.
+
+Diff analysis excludes `.plumb/`, the configured spec paths, and the configured test paths. Tests-only commits produce an empty filtered diff and pass without review. The tests staged by `plumb sync` never read as new work on the second commit attempt. Decision `file_refs` still come from the raw staged hunks and may reference test files.
+
 The pre-commit hook must validate API access before performing any LLM operations and must block commits when authentication fails. When API authentication fails, the system must raise a custom PlumbAuthError exception that alerts the user and provides clear instructions to set their API key via environment variable export or in a .env file. API key validation must be implemented as a separate validate_api_access function that is called before all LLM operations. All authentication functionality must have comprehensive test coverage, and existing tests must be updated to mock API validation calls to ensure test suites remain unaffected. The system supports environment variable management using .env files with python-dotenv dependency.
 
-The system uses gitignore-style patterns for ignore functionality, with default patterns used when no .plumbignore file exists. After commit completion, the post-commit hook clears the `last_extracted_at` timestamp to reset the filter for future extractions.
+The system uses gitignore-style patterns for ignore functionality, with default patterns used when no .plumbignore file exists. After commit completion, the post-commit hook clears the `last_extracted_at` timestamp to reset the filter for future extractions and deletes `.plumb/gate.json` to end the review cycle.
 
 Each adapter handles its agent's native transcript schema and normalizes tool usage into `ToolCall` records, which are rendered for the extractor with file paths, commands, and truncated results. The system includes comprehensive documentation for the Plumb skill with detailed instructions for managing spec/test/code alignment and decision review processes.
 
@@ -179,7 +183,7 @@ The user commits directly from a terminal, outside of Claude Code. The pre-commi
 3. It prints a human-readable summary of pending decisions and exits non-zero, aborting the commit.
 4. The user runs `plumb review` in their terminal, which presents decisions interactively and accepts keypresses.
 5. Rejected decisions can be modified via `plumb modify <id>`, which stages the modified code and reports test results.
-6. The user re-runs `git commit`. Hook fires again, finds no pending decisions, exits zero. Commit lands.
+6. The user re-runs `git commit`. The hook fires again, matches the reviewed-diff signature, finds no pending decisions, and exits zero without re-analysis. Commit lands.
 
 Both paths use the same hook, the same decision log, the same per-decision commands, and the same sync logic. The only difference is who drives the review loop: Claude Code's skill or the interactive `plumb review` CLI. Agents other than Claude Code do not get the conversational review loop; their sessions are still read for decisions, and the human reviews with `plumb review`. The system uses exact deduplication and LLM-based semantic deduplication with groq/openai/gpt-oss-120b configured for both decision_deduplicator and question_synthesizer (8192 max_tokens). Source summaries are structured as per-file mappings to enable granular tracking. All documentation files including SKILL files and CLAUDE.md must be kept consistent with the same sync workflow requirements.
 ### Path 3: Record mode (no gate)

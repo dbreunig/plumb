@@ -1,7 +1,7 @@
 # Gate idempotence
 
 **Date:** 2026-09-08
-**Status:** Proposed
+**Status:** Implemented
 
 ## Problem
 

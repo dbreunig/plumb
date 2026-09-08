@@ -87,12 +87,13 @@ choose.
 5. You answer in chat. The skill calls `plumb approve`, `plumb ignore`, `plumb reject`, or `plumb edit`
 6. Rejected decisions trigger `plumb modify`, which rewrites the staged code
 7. The skill runs `plumb sync`, which folds the approved decisions into your spec and tests, and stages the result
-8. `git commit` runs again and lands
+8. `git commit` runs again. The hook recognizes the reviewed diff and lands the commit without re-analysis
 
 ### Review mode, from the terminal
 
 The flow is the same, but you resolve the decisions with `plumb review`.
-Then you run `plumb sync`, stage its output, and commit again.
+Then you run `plumb sync`, stage its output, and commit again. The second
+commit passes without re-analysis.
 
 ### Record mode
 
@@ -199,6 +200,7 @@ All Plumb state lives in `.plumb/` at the repo root:
 ├── config.json          # Spec paths, test paths, mode, settings
 ├── coverage.json        # Cached coverage data
 ├── decisions/           # Append-only per-branch decision logs (*.jsonl)
+├── gate.json            # Review mode: reviewed-diff signature (not committed)
 ├── record.lock          # Record mode: worker lock (not committed)
 ├── record.log           # Record mode: worker output (not committed)
 └── requirements.json    # Parsed requirements from the spec
