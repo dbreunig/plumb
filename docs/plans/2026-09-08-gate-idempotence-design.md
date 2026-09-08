@@ -117,9 +117,11 @@ a preview.
 
 ## Compatibility notes
 
-- `gate.json` is transient. A stale file from an aborted cycle is harmless:
-  the signature will not match the next unrelated diff, and post-commit
-  deletes it.
+- `gate.json` is transient. A stale file from an aborted cycle cannot cause
+  a false pass: the signature will not match an unrelated diff, so extraction
+  runs. The stale state does suppress the diff-only fallback for that one
+  attempt, so a commit with no transcript evidence can lose its diff-only
+  decisions once. Post-commit then deletes the file.
 - Existing repos gain the `.gitignore` entry on the next command that calls
   `ensure_plumb_dir`.
 - Behavior change: tests-only commits no longer gate. The spec must state

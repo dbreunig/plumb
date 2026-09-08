@@ -604,6 +604,8 @@ def test_extract_decisions_is_mode_agnostic_and_writes_nothing(initialized_repo)
     with patch("plumb.programs.validate_api_access"), \
          patch("plumb.git_hook._analyze_diff", return_value="summary") as an, \
          patch("plumb.git_hook._extract_decisions_from_conversation", side_effect=fake_conv), \
+         patch("plumb.git_hook.deduplicate_decisions",
+               side_effect=lambda ds, existing_decisions=None, use_llm=True: ds), \
          patch("plumb.git_hook._synthesize_questions", side_effect=lambda ds: ds):
         out = extract_decisions(initialized_repo, load_config(initialized_repo), diff="+x", branch="main",
                                 since_commit="abc123", since_datetime=None)
@@ -622,6 +624,8 @@ def test_extract_decisions_falls_back_to_diff_only(initialized_repo):
          patch("plumb.git_hook._analyze_diff", return_value="summary"), \
          patch("plumb.git_hook._extract_decisions_from_conversation", return_value=[]), \
          patch("plumb.git_hook._extract_decisions_from_diff", return_value=mock), \
+         patch("plumb.git_hook.deduplicate_decisions",
+               side_effect=lambda ds, existing_decisions=None, use_llm=True: ds), \
          patch("plumb.git_hook._synthesize_questions", side_effect=lambda ds: ds):
         out = extract_decisions(initialized_repo, load_config(initialized_repo), diff="+x", branch="main")
     assert [d.id for d in out] == ["dec-d"]

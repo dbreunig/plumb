@@ -103,7 +103,7 @@ def ensure_plumb_dir(repo_root: str | Path) -> Path:
     else:
         existing = gitignore.read_text()
         present = set(existing.splitlines())
-        missing = [l for l in _PLUMB_GITIGNORE.splitlines() if l not in present]
+        missing = [line for line in _PLUMB_GITIGNORE.splitlines() if line not in present]
         if missing:
             if existing and not existing.endswith("\n"):
                 existing += "\n"
