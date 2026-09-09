@@ -201,8 +201,8 @@ def search_decisions(
                 return []
             ids = [i for _, _, i in ranked]
             rel = con.execute(
-                f"{cte} SELECT {', '.join(cols)} FROM latest WHERE _rn = 1 AND id IN ({','.join('?' * len(ids))})",
-                ids,
+                f"{cte} SELECT {', '.join(cols)} FROM latest WHERE _rn = 1 AND id = ANY(?)",
+                [ids],
             )
             by_id = {x.id: x for x in (_row_to_decision(cols, r) for r in rel.fetchall())}
             return [Hit(by_id[i], s) for s, _, i in ranked]

@@ -1663,3 +1663,250 @@ class TestMinimalModelConfiguration:
         }
         config_path.write_text(json.dumps(config))
         assert config_path.exists()
+
+
+import json
+
+
+from pathlib import Path
+
+
+from datetime import datetime, timezone
+
+
+from unittest.mock import patch, MagicMock
+
+
+import pytest
+
+
+from plumb.decision_log import Decision
+
+
+from plumb.search import tokenize, bm25_scores, Hit, search_decisions, _resolve_since, _row_to_decision
+
+
+class TestTokenize:
+    # plumb:req-239ccad3
+    def test_tokenize_lowercase(self):
+        """Tokenize converts text to lowercase tokens."""
+        result = tokenize("Hello WORLD Test")
+        assert result == ["hello", "world", "test"]
+
+    def test_tokenize_alphanumeric_only(self):
+        """Tokenize extracts only alphanumeric sequences."""
+        result = tokenize("foo-bar_baz123 @special!")
+        assert result == ["foo", "bar", "baz123", "special"]
+
+    def test_tokenize_empty_string(self):
+        """Tokenize returns empty list for empty string."""
+        assert tokenize("") == []
+
+    def test_tokenize_none_input(self):
+        """Tokenize handles None input."""
+        assert tokenize(None) == []
+
+    def test_tokenize_numbers_only(self):
+        """Tokenize extracts numeric tokens."""
+        result = tokenize("123 456")
+        assert result == ["123", "456"]
+
+
+class TestBM25Scores:
+    # plumb:req-f7ee5484
+    def test_bm25_exact_match(self):
+        """BM25 scoring gives highest score to exact match."""
+        docs = ["the quick brown fox", "slow turtle", "fast dog"]
+        query = "quick"
+        scores = bm25_scores(docs, query)
+        assert scores[0] > scores[1]
+        assert scores[0] > scores[2]
+
+    def test_bm25_multiple_terms(self):
+        """BM25 scores multiple query terms in document."""
+        docs = ["quick brown fox", "slow turtle"]
+        query = "quick brown"
+        scores = bm25_scores(docs, query)
+        assert scores[0] > scores[1]
+
+    def test_bm25_no_match(self):
+        """BM25 returns 0.0 for no matches."""
+        docs = ["abc def", "ghi jkl"]
+        query = "xyz"
+        scores = bm25_scores(docs, query)
+        assert all(s == 0.0 for s in scores)
+
+    def test_bm25_empty_docs(self):
+        """BM25 handles empty document list."""
+        scores = bm25_scores([], "query")
+        assert scores == []
+
+    def test_bm25_empty_query(self):
+        """BM25 returns 0.0 for empty query."""
+        docs = ["some text", "more text"]
+        scores = bm25_scores(docs, "")
+        assert all(s == 0.0 for s in scores)
+
+    def test_bm25_case_insensitive(self):
+        """BM25 is case insensitive."""
+        docs = ["The Quick Brown", "the quick brown"]
+        query = "QUICK"
+        scores = bm25_scores(docs, query)
+        assert scores[0] == scores[1]
+
+    def test_bm25_idf_rarity(self):
+        """BM25 scores rare terms higher than common ones."""
+        docs = ["the the the the rare", "the the common"]
+        query = "rare"
+        scores = bm25_scores(docs, query)
+        assert scores[0] > scores[1]
+
+
+class TestHitDataclass:
+    # plumb:req-4c7c9467
+    def test_hit_creation(self):
+        """Hit stores decision and score."""
+        decision = Decision(
+            id="test-123",
+            status="pending",
+            question="What should we do?",
+            decision="Do this",
+        )
+        hit = Hit(decision=decision, score=0.95)
+        assert hit.decision.id == "test-123"
+        assert hit.score == 0.95
+
+
+class TestResolveSince:
+    # plumb:req-9db7f64e
+    def test_resolve_since_none(self):
+        """_resolve_since returns None for None input."""
+        assert _resolve_since(Path("/tmp"), None) is None
+
+    def test_resolve_since_empty_string(self):
+        """_resolve_since returns None for empty string."""
+        assert _resolve_since(Path("/tmp"), "") is None
+
+    def test_resolve_since_iso_datetime(self):
+        """_resolve_since parses ISO datetime string."""
+        dt_str = "2024-01-15T10:30:00Z"
+        result = _resolve_since(Path("/tmp"), dt_str)
+        assert result is not None
+        assert isinstance(result, datetime)
+        assert result.year == 2024
+        assert result.month == 1
+        assert result.day == 15
+
+    def test_resolve_since_iso_date(self):
+        """_resolve_since parses ISO date string."""
+        result = _resolve_since(Path("/tmp"), "2024-01-15")
+        assert result is not None
+        assert isinstance(result, datetime)
+        assert result.year == 2024
+        assert result.month == 1
+        assert result.day == 15
+
+    def test_resolve_since_invalid_format(self, tmp_repo):
+        """_resolve_since raises ValueError for invalid format."""
+        with pytest.raises(ValueError):
+            _resolve_since(tmp_repo, "not-a-valid-date-or-ref")
+
+
+class TestRowToDecision:
+    # plumb:req-8d3308d7
+    def test_row_to_decision_complete(self):
+        """_row_to_decision converts row to Decision with all fields."""
+        cols = ["id", "status", "question", "decision", "made_by", "created_at", "branch"]
+        row = ("dec-1", "pending", "What?", "Do this", "agent", "2024-01-15T10:00:00Z", "main")
+        decision = _row_to_decision(cols, row)
+        assert decision.id == "dec-1"
+        assert decision.status == "pending"
+        assert decision.question == "What?"
+        assert decision.decision == "Do this"
+        assert decision.made_by == "agent"
+
+    def test_row_to_decision_with_nulls(self):
+        """_row_to_decision handles NULL columns from older shards."""
+        cols = ["id", "status", "question", "decision", "file_refs"]
+        row = ("dec-1", "pending", "What?", "Do this", None)
+        decision = _row_to_decision(cols, row)
+        assert decision.id == "dec-1"
+        assert decision.file_refs == []
+
+
+class TestSearchDecisions:
+    # plumb:req-2857c998
+    def test_search_no_decisions_dir(self, tmp_repo):
+        """search_decisions returns empty list when decisions dir doesn't exist."""
+        result = search_decisions(tmp_repo, query="test")
+        assert result == []
+
+    def test_search_empty_decisions_dir(self, tmp_repo):
+        """search_decisions returns empty list when no shards exist."""
+        plumb_dir = tmp_repo / ".plumb"
+        plumb_dir.mkdir()
+        decisions_dir = plumb_dir / "decisions"
+        decisions_dir.mkdir()
+        result = search_decisions(tmp_repo, query="test")
+        assert result == []
+
+
+    def test_search_with_explicit_status(self, tmp_repo):
+        # plumb:req-0f7c4eaa
+        """search_decisions includes ignored when explicitly requested."""
+        plumb_dir = tmp_repo / ".plumb"
+        plumb_dir.mkdir()
+        decisions_dir = plumb_dir / "decisions"
+        decisions_dir.mkdir()
+        
+        shard = decisions_dir / "main.jsonl"
+        shard.write_text(
+            json.dumps({
+                "id": "dec-1",
+                "status": "ignored",
+                "question": "Q1",
+                "decision": "D1",
+                "created_at": "2024-01-15T10:00:00Z"
+            }) + "\n"
+        )
+        
+        result = search_decisions(tmp_repo, status=["ignored"])
+        assert len(result) == 1
+        assert result[0].decision.status == "ignored"
+
+    def test_search_filter_by_branch(self, tmp_repo):
+        # plumb:req-7f18fa95
+        """search_decisions filters by branch."""
+        plumb_dir = tmp_repo / ".plumb"
+        plumb_dir.mkdir()
+        decisions_dir = plumb_dir / "decisions"
+        decisions_dir.mkdir()
+        
+        main_shard = decisions_dir / "main.jsonl"
+        main_shard.write_text(
+            json.dumps({
+                "id": "dec-1",
+                "status": "pending",
+                "branch": "main",
+                "question": "Q1",
+                "decision": "D1",
+                "created_at": "2024-01-15T10:00:00Z"
+            }) + "\n"
+        )
+        
+        feature_shard = decisions_dir / "feature-x.jsonl"
+        feature_shard.write_text(
+            json.dumps({
+                "id": "dec-2",
+                "status": "pending",
+                "branch": "feature-x",
+                "question": "Q2",
+                "decision": "D2",
+                "created_at": "2024-01-16T10:00:00Z"
+            }) + "\n"
+        )
+        
+        result = search_decisions(tmp_repo, branch="feature-x")
+        assert len(result) == 1
+        assert result[0].decision.branch == "feature-x"
+
